@@ -1,0 +1,23 @@
+.DS_Store
+*.log
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# JavaScript dependencies and generated hosting output
+node_modules/
+dist/
+
+# SwiftPM and packaged macOS application artifacts
+.build/
+build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+
+# Editor-local files
+.idea/
+.vscode/
+*.swp
