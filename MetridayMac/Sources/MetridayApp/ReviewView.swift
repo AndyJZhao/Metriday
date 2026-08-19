@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 struct ReviewView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var monitor: AppActivityMonitor
+    @ObservedObject var filterStore: ActivityFilterStore
+    @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
     @ObservedObject var projectStore: ProjectStore
     @ObservedObject var timeEntryStore: TimeEntryStore
@@ -520,7 +522,11 @@ struct ReviewView: View {
     }
 
     private func activitySegments(for date: Date) -> [ActivitySegment] {
-        monitor.segments(for: date) + screenTimeStore.segments(for: date)
+        categoryStore.applyingCategories(
+            to: monitor.segments(for: date) + screenTimeStore.segments(for: date),
+            filterStore: filterStore,
+            date: date
+        )
     }
 }
 

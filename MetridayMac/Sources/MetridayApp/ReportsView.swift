@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ReportsView: View {
     @ObservedObject var monitor: AppActivityMonitor
+    @ObservedObject var filterStore: ActivityFilterStore
+    @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
     @ObservedObject var projectStore: ProjectStore
     @ObservedObject var timeEntryStore: TimeEntryStore
@@ -194,7 +196,13 @@ struct ReportsView: View {
     }
 
     private var activityDays: [[ActivitySegment]] {
-        weekDates.map { monitor.segments(for: $0) + screenTimeStore.segments(for: $0) }
+        weekDates.map { date in
+            categoryStore.applyingCategories(
+                to: monitor.segments(for: date) + screenTimeStore.segments(for: date),
+                filterStore: filterStore,
+                date: date
+            )
+        }
     }
 
     private var activeSeconds: Int {

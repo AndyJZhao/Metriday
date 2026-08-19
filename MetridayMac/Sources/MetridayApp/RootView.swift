@@ -59,6 +59,8 @@ struct RootView: View {
                     case .reports:
                         ReportsView(
                             monitor: appState.activityMonitor,
+                            filterStore: appState.filterStore,
+                            categoryStore: appState.categoryStore,
                             screenTimeStore: appState.screenTimeStore,
                             projectStore: appState.projectStore,
                             timeEntryStore: appState.timeEntryStore,
@@ -73,6 +75,8 @@ struct RootView: View {
                     case .review:
                         ReviewView(
                             monitor: appState.activityMonitor,
+                            filterStore: appState.filterStore,
+                            categoryStore: appState.categoryStore,
                             screenTimeStore: appState.screenTimeStore,
                             projectStore: appState.projectStore,
                             timeEntryStore: appState.timeEntryStore,

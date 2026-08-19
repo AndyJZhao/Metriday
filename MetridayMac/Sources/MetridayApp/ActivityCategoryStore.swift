@@ -128,6 +128,24 @@ final class ActivityCategoryStore: ObservableObject {
             )
     }
 
+    func applyingCategory(
+        to activity: ActivitySegment,
+        filterStore: ActivityFilterStore,
+        date: Date?
+    ) -> ActivitySegment {
+        var resolved = activity
+        resolved.relevance = category(for: activity, filterStore: filterStore, date: date).role.relevance
+        return resolved
+    }
+
+    func applyingCategories(
+        to activities: [ActivitySegment],
+        filterStore: ActivityFilterStore,
+        date: Date?
+    ) -> [ActivitySegment] {
+        activities.map { applyingCategory(to: $0, filterStore: filterStore, date: date) }
+    }
+
     @discardableResult
     func createCategory(
         name rawName: String,

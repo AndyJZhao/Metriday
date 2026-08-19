@@ -470,7 +470,11 @@ struct StatsView: View {
     }
 
     private func activitySegments(for date: Date) -> [ActivitySegment] {
-        monitor.segments(for: date) + screenTimeStore.segments(for: date)
+        categoryStore.applyingCategories(
+            to: monitor.segments(for: date) + screenTimeStore.segments(for: date),
+            filterStore: filterStore,
+            date: date
+        )
     }
 
     private func category(for segment: ActivitySegment) -> ActivityCategoryDefinition {

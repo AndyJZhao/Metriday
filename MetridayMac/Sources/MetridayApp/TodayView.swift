@@ -156,7 +156,11 @@ struct TodayView: View {
     }
 
     private var visibleActivitySegments: [ActivitySegment] {
-        let sourceSegments = monitor.observedSegments + screenTimeStore.segments
+        let sourceSegments = categoryStore.applyingCategories(
+            to: monitor.observedSegments + screenTimeStore.segments,
+            filterStore: filterStore,
+            date: appState.selectedDate
+        )
         let clipped: [ActivitySegment] = sourceSegments.compactMap { segment in
             let timelineStart = TimelineMetrics.startMinute * 60
             let timelineEnd = TimelineMetrics.endMinute * 60

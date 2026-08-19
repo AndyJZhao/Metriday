@@ -1897,16 +1897,18 @@ struct ActivitiesView: View {
     }
 
     private var segmentsForSelectedRange: [ActivitySegment] {
+        let source: [ActivitySegment]
         switch preferences.activityTimeRange {
         case .selectedDay:
-            return monitor.observedSegments + screenTimeStore.segments
+            source = monitor.observedSegments + screenTimeStore.segments
         case .lastSevenDays:
             let calendar = Calendar.current
-            return (0..<7).flatMap { offset in
+            source = (0..<7).flatMap { offset in
                 let date = calendar.date(byAdding: .day, value: -offset, to: selectedDate) ?? selectedDate
                 return monitor.segments(for: date) + screenTimeStore.segments(for: date)
             }
         }
+        return categoryStore.applyingCategories(to: source, filterStore: filterStore, date: selectedDate)
     }
 
     private var filteredSegments: [ActivitySegment] {
@@ -1942,7 +1944,12 @@ struct ActivitiesView: View {
     }
 
     private var timelineScopedSegments: [ActivitySegment] {
-        let scoped = scopedSegments(from: monitor.observedSegments + screenTimeStore.segments)
+        let resolved = categoryStore.applyingCategories(
+            to: monitor.observedSegments + screenTimeStore.segments,
+            filterStore: filterStore,
+            date: selectedDate
+        )
+        let scoped = scopedSegments(from: resolved)
         guard let selectedBuiltinFilter else { return scoped }
         return scoped.filter { selectedBuiltinFilter.matches($0) }
     }
