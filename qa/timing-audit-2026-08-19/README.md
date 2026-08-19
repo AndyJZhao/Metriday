@@ -172,3 +172,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 82. Stats App / Category color ownership — verified that an App, website, or item assigned to multiple categories produces separate ranking rows with the category badge, category text color, and matching bar color on both native and Web Stats surfaces.
 83. Web Stats parity — verified that weekly Stats now includes productive weekday/hour charts and a Projects & Time Entries panel, with weekly time-entry data loaded alongside each day’s native activity evidence.
 84. Stats navigation parity — verified that Web Stats exposes the same explicit Open Activities path as native Stats while preserving the full-width date and refresh controls.
+85. Stats summary semantics — verified that Web uses native-style weighted productivity (Focused 100 / Other 50 / Distracting 0) and reports actual Distraction duration instead of a segment count.
