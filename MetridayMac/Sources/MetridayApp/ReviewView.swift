@@ -62,6 +62,8 @@ struct ReviewView: View {
 
                 ActivityInsightsPanel(segments: activitySegments(for: selectedDate))
 
+                categoryPulse
+
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
@@ -228,7 +230,65 @@ struct ReviewView: View {
                                 .foregroundStyle(MetridayTheme.secondary)
                         }
                         ProgressView(value: Double(item.seconds), total: Double(maximum))
-                            .tint(item.isDistracted ? MetridayTheme.danger : MetridayTheme.accent)
+                            .tint(categoryColor(for: item.category))
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .metridayPanel()
+    }
+
+    private var categoryPulse: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Category pulse")
+                        .font(.system(size: 17, weight: .bold))
+                    Text("App and website time grouped by your custom Activity Categories")
+                        .font(.system(size: 11))
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
+                Spacer()
+                Text(formatSeconds(categoryTotals.reduce(0) { $0 + $1.seconds }))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(MetridayTheme.secondary)
+            }
+
+            if categoryTotals.isEmpty {
+                Text("No categorized active time in this week yet.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(MetridayTheme.secondary)
+            } else {
+                let totalSeconds = max(1, categoryTotals.reduce(0) { $0 + $1.seconds })
+                ForEach(categoryTotals) { total in
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(categoryColor(for: total.category))
+                                .frame(width: 8, height: 8)
+                            Text(total.category.name)
+                                .font(.system(size: 12, weight: .semibold))
+                                .lineLimit(1)
+                            Spacer()
+                            Text("\(Int((Double(total.seconds) / Double(totalSeconds) * 100).rounded()))%")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(MetridayTheme.graphite)
+                            Text(formatSeconds(total.seconds))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(MetridayTheme.secondary)
+                        }
+                        GeometryReader { proxy in
+                            Capsule()
+                                .fill(MetridayTheme.line.opacity(0.35))
+                                .overlay(alignment: .leading) {
+                                    Capsule()
+                                        .fill(categoryColor(for: total.category))
+                                        .frame(width: proxy.size.width * CGFloat(total.seconds) / CGFloat(totalSeconds))
+                                }
+                        }
+                        .frame(height: 7)
                     }
                 }
             }
@@ -426,24 +486,42 @@ struct ReviewView: View {
     }
 
     private var applicationTotals: [ApplicationTotal] {
-        var totals: [String: (seconds: Int, distracted: Bool)] = [:]
+        var totals: [String: (seconds: Int, categories: [UUID: (category: ActivityCategoryDefinition, seconds: Int)])] = [:]
         for date in weekDates {
-            for segment in activitySegments(for: date) {
-                guard segment.relevance != .idle else { continue }
+            let sourceSegments = monitor.segments(for: date) + screenTimeStore.segments(for: date)
+            for segment in sourceSegments {
+                let category = categoryStore.category(for: segment, filterStore: filterStore, date: date)
+                guard category.role != .idle else { continue }
                 let name = segment.displayTitle
-                let existing = totals[name, default: (seconds: 0, distracted: false)]
-                totals[name] = (
-                    seconds: existing.seconds + segment.durationSeconds,
-                    distracted: existing.distracted || segment.relevance == .distracted
-                )
+                var existing = totals[name, default: (seconds: 0, categories: [:])]
+                existing.seconds += segment.durationSeconds
+                existing.categories[category.id, default: (category: category, seconds: 0)].seconds += segment.durationSeconds
+                totals[name] = existing
             }
         }
         return totals.map { name, value in
-            ApplicationTotal(name: name, seconds: value.seconds, isDistracted: value.distracted)
+            let primary = value.categories.values.max { left, right in left.seconds < right.seconds }?.category
+                ?? ActivityCategoryDefinition(name: "Other", role: .other, isSystem: true)
+            return ApplicationTotal(name: name, seconds: value.seconds, category: primary)
         }
         .sorted { $0.seconds > $1.seconds }
         .prefix(8)
         .map { $0 }
+    }
+
+    private var categoryTotals: [CategoryTotal] {
+        var totals: [UUID: (category: ActivityCategoryDefinition, seconds: Int)] = [:]
+        for date in weekDates {
+            let sourceSegments = monitor.segments(for: date) + screenTimeStore.segments(for: date)
+            for segment in sourceSegments {
+                let category = categoryStore.category(for: segment, filterStore: filterStore, date: date)
+                guard category.role != .idle, segment.durationSeconds > 0 else { continue }
+                totals[category.id, default: (category: category, seconds: 0)].seconds += segment.durationSeconds
+            }
+        }
+        return totals.values
+            .map { CategoryTotal(category: $0.category, seconds: $0.seconds) }
+            .sorted { $0.seconds > $1.seconds }
     }
 
     private var hourlyTotals: [HourlyTotal] {
@@ -465,6 +543,23 @@ struct ReviewView: View {
             return MetridayTheme.secondary
         }
         switch project.color {
+        case .blue:
+            return MetridayTheme.accent
+        case .green:
+            return MetridayTheme.success
+        case .orange:
+            return MetridayTheme.warning
+        case .purple:
+            return Color.purple
+        case .red:
+            return MetridayTheme.danger
+        case .graphite:
+            return MetridayTheme.graphite
+        }
+    }
+
+    private func categoryColor(for category: ActivityCategoryDefinition) -> Color {
+        switch category.color {
         case .blue:
             return MetridayTheme.accent
         case .green:
@@ -556,7 +651,13 @@ private struct ApplicationTotal: Identifiable {
     var id: String { name }
     let name: String
     let seconds: Int
-    let isDistracted: Bool
+    let category: ActivityCategoryDefinition
+}
+
+private struct CategoryTotal: Identifiable {
+    var id: UUID { category.id }
+    let category: ActivityCategoryDefinition
+    let seconds: Int
 }
 
 private struct HourlyTotal: Identifiable {
