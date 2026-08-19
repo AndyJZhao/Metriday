@@ -41,6 +41,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 35. Historical project assignment — carried the source date through the activity drag payload so assigning a seven-day-range row updates the correct native date.
 36. Native workspace parity — added Web Stats, Reports, and Teams first-level navigation; Reports now owns the report builder, Stats summarizes seven-day evidence, and Teams supports native-backed creation, member addition, and archive.
 37. Persistent Web shell — verified one shared date / current-block / Focus / Research Focus header across Today, Plan, Activities, Stats, Reports, Teams, Review, and Rules; Today no longer duplicates its page-local header.
+38. Activities Entry-O-Matic — verified the native-shaped conversion dialog, project scope, minimum-duration and maximum-gap controls, overlap replacement toggle, preview recalculation, billing/notes fields, and create action against the selected App / Category evidence.
 
 ## Findings applied
 
@@ -77,4 +78,6 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Historical activity drag-and-drop now carries its source date into project assignment, matching the detail dialog's date-aware recording behavior.
 - Web navigation now matches the native AppSection set: Stats, Reports, and Teams are first-level workspaces, while Review remains focused on planned-vs-actual and category evidence.
 - Teams uses the native `/v1/teams` and `/v1/teams/:id/members` stores; creating, adding a member, and archiving a temporary QA team were verified against the running packaged app.
-- The Web companion now preserves the native global workspace shell across every first-level page, so date navigation, the current block, focus timer, and blocklist entry remain available without replacing page-specific content.
+- The Web companion now preserves the native global workspace shell across every first-level page, so date navigation, the current block, Focus state, and blocklist entry remain available without replacing page-specific content.
+- The global Focus control now matches native semantics: it toggles the Research Focus blocklist, shows Resume/Pause focus, is disabled without a scheduled current block, and never starts a timer implicitly.
+- Activities now exposes Entry-O-Matic conversion: visible non-idle App / Category segments are merged by configurable gap, existing time can be subtracted or replaced, and the preview maps directly to native time-entry creation payloads.
