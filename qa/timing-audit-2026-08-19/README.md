@@ -235,3 +235,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 123. Native/Web date-banner hit target — verified the native GlobalTopHeader date banner now sends empty-area clicks to Today while preserving calendar and previous/next-day controls; Web build and Sites tests remain green.
 124. Native Activities date-range hit target — verified the Activities date-range banner now sends empty-area clicks to Today while preserving previous/next-day controls; native debug build and smoke tests passed.
 125. Web global date-banner hit target — verified the Web global date controls now share a reusable full-banner target: empty space goes to Today while the calendar input and previous/next buttons keep independent actions.
+126. Web report preset semantics — verified Web Timesheet, Week + Day, Time Per Project, and Time Per Document presets now map to native include/group behavior, including native-compatible Week + Day grouping.
