@@ -37,6 +37,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 31. Activities filter editing — verified create, rule/name update, and delete of a temporary saved filter from the Web companion.
 32. Activity detail project fidelity — corrected the detail dialog to show the assigned project instead of always displaying `None`.
 33. Activities display preferences — verified native-backed Show Idle, Chronological grouping by Project/Device, mutually exclusive grouping, preference persistence, and wrapped toolbar layout in the running Web companion.
+34. Activities Display menu — verified persisted Selected day / Last 7 days range, Show window titles, Show website paths, Include time entries, device selection, date labels for historical rows, and historical detail recording dates.
 
 ## Findings applied
 
@@ -69,3 +70,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Saved Activity Filters now support editing as well as creation/deletion; changing a filter name or rule updates the native reusable filter store used by the toolbar and reports context.
 - Activity detail now reflects project assignment persisted by the drag target; unassigned segments still explicitly identify their source as app usage.
 - Activities display preferences now persist through `/v1/activity-preferences`; Show Idle filters the shared timeline/list, Chronological can group by Project or Device, and the toolbar wraps instead of clipping on the desktop viewport.
+- Activities now exposes a native-shaped Display menu; Last 7 days uses the already fetched weekly evidence while the selected-day timeline remains focused on the active date, and historical rows carry their source date through detail recording.
