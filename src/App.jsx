@@ -321,6 +321,8 @@ function useMetridayAPI(dateKey, apiBase) {
     stopTimer: () => mutate("/v1/timer/stop"),
     setTimerEstimate: (minutes) => mutate("/v1/timer/estimate", { estimatedMinutes: Number(minutes) }),
     adjustTimer: (minutes) => mutate("/v1/timer/adjust", { minutes: Number(minutes) }),
+    alignTimer: () => mutate("/v1/timer/adjust", { align_previous_entry: true }),
+    adjustTimerEstimate: (minutes) => mutate("/v1/timer/estimate", { deltaSeconds: Number(minutes) * 60 }),
     toggleTracking: () => mutate(snapshot.status?.tracking ? "/v1/tracking/pause" : "/v1/tracking/resume"),
     updatePreferences: async (preferences) => {
       await request("/v1/preferences", { method: "PATCH", body: JSON.stringify(preferences) });
@@ -1148,7 +1150,23 @@ function TimerControls({ api }) {
       setMessage(error.message || "Could not adjust timer.");
     }
   };
-  return <div className="timer-controls" aria-label="Running timer controls"><span>{Number.isFinite(remaining) ? `${formatDurationSeconds(remaining)} remaining` : "Timer running"}</span><select aria-label="Timer estimate" value={timer.estimatedDurationSeconds ? Math.round(Number(timer.estimatedDurationSeconds) / 60) : ""} onChange={setEstimate}><option value="">Set estimate</option><option value={15}>15 min</option><option value={25}>25 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 hour</option><option value={90}>90 min</option><option value={120}>2 hours</option></select><button type="button" onClick={() => adjust(-15)} aria-label="Move timer start 15 minutes earlier">−15m</button><button type="button" onClick={() => adjust(15)} aria-label="Move timer start 15 minutes later">+15m</button>{message ? <small role="status">{message}</small> : null}</div>;
+  const align = async () => {
+    try {
+      await api.alignTimer();
+      setMessage("Timer aligned to previous entry");
+    } catch (error) {
+      setMessage(error.message || "Could not align timer.");
+    }
+  };
+  const adjustEstimate = async (minutes) => {
+    try {
+      await api.adjustTimerEstimate(minutes);
+      setMessage(`${minutes > 0 ? "+" : ""}${minutes} min estimate adjustment saved`);
+    } catch (error) {
+      setMessage(error.message || "Could not adjust timer estimate.");
+    }
+  };
+  return <div className="timer-controls" aria-label="Running timer controls"><span>{Number.isFinite(remaining) ? `${formatDurationSeconds(remaining)} remaining` : "Timer running"}</span><select aria-label="Timer estimate" value={timer.estimatedDurationSeconds ? Math.round(Number(timer.estimatedDurationSeconds) / 60) : ""} onChange={setEstimate}><option value="">Set estimate</option><option value={15}>15 min</option><option value={25}>25 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 hour</option><option value={90}>90 min</option><option value={120}>2 hours</option></select><details className="timer-adjust-menu" onClick={(event) => { if (event.target.closest("button")) event.currentTarget.open = false; }}><summary>Adjust</summary><div className="timer-adjust-popover"><strong>Adjust start</strong><div className="timer-adjust-grid">{[-15, -5, -1, 1, 5, 15].map((minutes) => <button type="button" key={minutes} onClick={() => adjust(minutes)}>{minutes > 0 ? `+${minutes}` : minutes}m</button>)}</div><button type="button" onClick={align}>Align to previous entry</button><strong>Estimate</strong><div className="timer-adjust-estimate-list">{[15, 30, 60].map((minutes) => <button type="button" key={minutes} onClick={() => adjustEstimate(minutes)}>Add {minutes === 60 ? "1 hour" : `${minutes} min`}</button>)}</div></div></details>{message ? <small role="status">{message}</small> : null}</div>;
 }
 
 function TodayHeader({ focusRunning, setFocusRunning, setPage, api, dateKey, setDateKey }) {

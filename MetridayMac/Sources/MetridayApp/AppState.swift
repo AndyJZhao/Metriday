@@ -1515,12 +1515,19 @@ final class AppState: ObservableObject {
 
         if request.method == "POST", path == "/v1/timer/adjust" {
             guard timeEntryStore.runningTimer != nil,
-                  let body = apiBody(request),
-                  let seconds = (body["seconds"] as? Int)
-                    ?? (body["minutes"] as? Int).map({ $0 * 60 }) else {
+                  let body = apiBody(request) else {
                 return .error("Timer adjustment needs seconds or minutes", statusCode: 400)
             }
-            timeEntryStore.adjustRunningTimerStart(by: TimeInterval(seconds))
+            if body["align_previous_entry"] as? Bool == true {
+                guard timeEntryStore.moveRunningTimerStartToPreviousEntryBoundary() else {
+                    return .error("No previous time-entry boundary is available", statusCode: 409)
+                }
+            } else if let seconds = (body["seconds"] as? Int)
+                        ?? (body["minutes"] as? Int).map({ $0 * 60 }) {
+                timeEntryStore.adjustRunningTimerStart(by: TimeInterval(seconds))
+            } else {
+                return .error("Timer adjustment needs seconds, minutes, or align_previous_entry", statusCode: 400)
+            }
             guard let timer = timeEntryStore.runningTimer else {
                 return .error("No running timer", statusCode: 409)
             }
@@ -1535,6 +1542,17 @@ final class AppState: ObservableObject {
             guard timeEntryStore.runningTimer != nil,
                   let body = apiBody(request) else {
                 return .error("No running timer", statusCode: 409)
+            }
+            if let deltaSeconds = (body["deltaSeconds"] as? Int) ?? (body["delta_seconds"] as? Int) {
+                timeEntryStore.adjustRunningTimerEstimate(by: deltaSeconds)
+                guard let timer = timeEntryStore.runningTimer else {
+                    return .error("No running timer", statusCode: 409)
+                }
+                return .jsonObject([
+                    "id": timer.id.uuidString,
+                    "estimatedDurationSeconds": timer.estimatedDurationSeconds.map { $0 as Any } ?? NSNull(),
+                    "remainingSeconds": timeEntryStore.runningTimerRemainingSeconds.map { $0 as Any } ?? NSNull()
+                ])
             }
             let seconds = (body["estimatedDurationSeconds"] as? Int)
                 ?? (body["estimated_duration_seconds"] as? Int)
