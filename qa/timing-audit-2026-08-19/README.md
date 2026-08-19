@@ -55,6 +55,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 49. Plan Time Block resizing — verified separate top/start and bottom/end resize hit targets, 15-minute snapping, a 30-minute minimum duration, and independent Markdown persistence.
 50. Plan Markdown editor — verified the connected Plan surface uses one continuous editable Markdown document, preserves arbitrary lines and normal Return editing, and overlays task drag/check controls without replacing the source with per-line title fields.
 51. Plan Time Block selection — verified a plain click selects a narrow calendar block without opening the schedule dialog or removing its time; only pointer movement beyond the drag threshold starts a reschedule, and selected actions no longer cover the block body.
+52. Plan Time Block accessibility — verified scheduled blocks expose button semantics, readable range labels, selected state, and Enter / Space keyboard selection without opening the schedule dialog.
 
 ## Findings applied
 
@@ -107,3 +108,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Plan calendar Time Blocks now expose separate full-width start and end resize handles; moving the top edge rewrites the start time, moving the bottom edge rewrites the end time, and both keep the task selectable and Markdown-first.
 - Plan now keeps a single continuous Markdown textarea as the source of truth; task handles and circular checkboxes are overlays keyed to parsed task lines, while free-form Markdown remains directly editable and saveable.
 - Plan Time Blocks now distinguish click from drag and place completion/remove actions below the selected block, preserving the full block hit target even in narrow three-day timeline columns.
+- Plan Time Blocks now expose explicit button semantics and keyboard selection, keeping the visual click target and accessibility hit target aligned.
