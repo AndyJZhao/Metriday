@@ -167,10 +167,18 @@ final class ScreenTimeStore: ObservableObject {
         return imported
     }
 
-    func assignActivity(_ id: UUID, to projectID: UUID?) {
-        guard let index = segments.firstIndex(where: { $0.id == id }) else { return }
-        segments[index].projectID = projectID
-        try? history.save(segments, date: selectedDate)
+    func assignActivity(_ id: UUID, to projectID: UUID?, date: Date? = nil) {
+        let targetDate = Calendar.current.startOfDay(for: date ?? selectedDate)
+        if targetDate == selectedDate {
+            guard let index = segments.firstIndex(where: { $0.id == id }) else { return }
+            segments[index].projectID = projectID
+            try? history.save(segments, date: selectedDate)
+            return
+        }
+        var historicalSegments = history.load(date: targetDate)
+        guard let index = historicalSegments.firstIndex(where: { $0.id == id }) else { return }
+        historicalSegments[index].projectID = projectID
+        try? history.save(historicalSegments, date: targetDate)
     }
 
     func openAccessSettings() {

@@ -883,6 +883,35 @@ final class AppState: ObservableObject {
             }
         }
 
+        if (request.method == "PATCH" || request.method == "PUT"), path.hasPrefix("/v1/activities/") {
+            let rawID = String(path.dropFirst("/v1/activities/".count))
+            guard let activityID = UUID(uuidString: rawID), let body = apiBody(request) else {
+                return .error("Activity assignment body is invalid", statusCode: 400)
+            }
+            let rawProject = (body["projectID"] as? String) ?? (body["project_id"] as? String) ?? (body["project"] as? String)
+            let resolvedProjectID: UUID?
+            if let rawProject, !rawProject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                guard let resolved = projectID(for: rawProject) else {
+                    return .error("Project not found", statusCode: 404)
+                }
+                resolvedProjectID = resolved
+            } else {
+                resolvedProjectID = nil
+            }
+            let date = apiDate(from: request.query["date"]) ?? selectedDate
+            if activityMonitor.segments(for: date).contains(where: { $0.id == activityID }) {
+                activityMonitor.assignActivity(activityID, to: resolvedProjectID, date: date)
+            } else if screenTimeStore.segments(for: date).contains(where: { $0.id == activityID }) {
+                screenTimeStore.assignActivity(activityID, to: resolvedProjectID, date: date)
+            } else {
+                return .error("Activity not found", statusCode: 404)
+            }
+            guard let updated = rawActivitySegments(for: date).first(where: { $0.id == activityID }) else {
+                return .error("Activity could not be reloaded", statusCode: 500)
+            }
+            return .jsonObject(apiActivity(updated, date: date))
+        }
+
         if request.method == "GET", path == "/v1/activities" {
             let date = apiDate(from: request.query["date"]) ?? selectedDate
             do {
@@ -1196,6 +1225,7 @@ final class AppState: ObservableObject {
                     "GET /v1/plans?date=YYYY-MM-DD",
                     "PUT /v1/plans?date=YYYY-MM-DD",
                     "GET /v1/activities?date=YYYY-MM-DD",
+                    "PATCH /v1/activities/{id}?date=YYYY-MM-DD",
                     "GET /v1/phone-calls?date=YYYY-MM-DD",
                     "POST /v1/phone-calls/hide",
                     "GET /v1/reports?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&format=json",

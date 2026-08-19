@@ -168,28 +168,27 @@ final class AppActivityMonitor: ObservableObject {
         refreshObservedSegments()
     }
 
-    func assignActivity(_ id: UUID, to projectID: UUID?) {
-        if let index = dailySegments.firstIndex(where: { $0.id == id }) {
+    func assignActivity(_ id: UUID, to projectID: UUID?, date: Date? = nil) {
+        let targetDate = calendar.startOfDay(for: date ?? visibleDate)
+        if targetDate == trackedDate, let index = dailySegments.firstIndex(where: { $0.id == id }) {
             dailySegments[index].projectID = projectID
             persistDailySegments()
             refreshObservedSegments()
             return
         }
 
-        if currentSegmentID == id {
+        if targetDate == trackedDate, currentSegmentID == id {
             currentObservation?.projectID = projectID
             persistSnapshot(at: .now)
             refreshObservedSegments()
             return
         }
 
-        if visibleDate != trackedDate {
-            var historicalSegments = history.load(date: visibleDate)
-            guard let index = historicalSegments.firstIndex(where: { $0.id == id }) else { return }
-            historicalSegments[index].projectID = projectID
-            try? history.save(historicalSegments, date: visibleDate)
-            refreshObservedSegments()
-        }
+        var historicalSegments = history.load(date: targetDate)
+        guard let index = historicalSegments.firstIndex(where: { $0.id == id }) else { return }
+        historicalSegments[index].projectID = projectID
+        try? history.save(historicalSegments, date: targetDate)
+        if targetDate == visibleDate { refreshObservedSegments() }
     }
 
     @discardableResult

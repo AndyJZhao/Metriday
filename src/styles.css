@@ -431,6 +431,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .project-create-form button:disabled { cursor: not-allowed; opacity: 0.55; }
 .project-table { margin-top: 18px; border-top: 1px solid var(--border); }
 .project-row { display: grid; grid-template-columns: 10px minmax(170px, 1fr) 120px 110px 70px; align-items: center; gap: 10px; min-height: 48px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
+.project-row.drop-target { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .project-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
 .project-row small { color: var(--muted); }
 .project-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
