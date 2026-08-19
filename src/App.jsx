@@ -1275,6 +1275,12 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
     });
     return () => { cancelled = true; };
   }, [api.connected, api.fetchPlan, dateKey]);
+  useEffect(() => {
+    if (!pendingSchedule) return undefined;
+    const handleKeyDown = (event) => { if (event.key === "Escape") setPendingSchedule(null); };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [pendingSchedule]);
   const persistTasks = (nextTasks, message) => {
     const nextMarkdown = markdownWithTasks(markdownRef.current || api.plan?.markdown || "", nextTasks);
     markdownRef.current = nextMarkdown;
@@ -2191,6 +2197,12 @@ function WebEntryOMaticDialog({ open, activities, entries, projects, dateKey, on
     setBusy(false);
     setMessage("");
   }, [dateKey, open]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = (event) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
   const updateProject = (value) => {
     setProjectID(value);
     const project = projects.find((item) => resourceID(item.id) === value);
@@ -2239,6 +2251,12 @@ function WebTimeEntryDialog({ mode, open, api, projects, recentEntries, dateKey,
     setBusy(false);
     setMessage("");
   }, [dateKey, open, timerMode]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = (event) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
   const selectRecent = (entry) => {
     setTitle(entry.title || "");
     setProjectID(resourceID(entry.project) || "");
