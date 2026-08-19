@@ -253,6 +253,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .review-summary strong { font-size: 24px; }
 .weekly-chart, .rule-overview, .site-list-section { max-width: 1120px; margin: 0 auto; padding: 26px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
 .review-category-panel { max-width: 1120px; margin: 20px auto 0; padding: 26px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.review-evidence-grid { display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(300px, 0.82fr); gap: 20px; max-width: 1120px; margin: 0 auto; align-items: stretch; }
+.review-evidence-grid .weekly-chart, .review-evidence-grid .review-category-panel { max-width: none; margin: 0; }
 .review-category-list { display: grid; gap: 17px; margin-top: 24px; }
 .review-category-row { display: grid; gap: 8px; }
 .review-category-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; }
@@ -268,9 +270,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .legend i { width: 9px; height: 9px; border-radius: 2px; }
 .legend i.planned, .bar-pair i.planned { background: #cdd2fa; }
 .legend i.actual, .bar-pair i.actual { background: var(--accent); }
-.bar-chart { display: grid; grid-template-columns: repeat(6, 1fr); align-items: end; height: 330px; margin-top: 30px; padding: 0 28px 12px; border-bottom: 1px solid var(--border); }
+.bar-chart { display: grid; grid-template-columns: repeat(6, 1fr); align-items: end; height: 250px; margin-top: 30px; padding: 0 16px 12px; border-bottom: 1px solid var(--border); }
 .bar-day { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.bar-pair { display: flex; align-items: end; gap: 5px; height: 250px; }
+.bar-pair { display: flex; align-items: end; gap: 5px; height: 190px; }
 .bar-pair i { width: 18px; border-radius: 4px 4px 1px 1px; }
 .bar-day > span { color: var(--muted); font-size: 12px; }
 .web-report-panel { max-width: 1120px; margin: 20px auto 0; padding: 26px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
@@ -422,6 +424,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   .current-session { grid-template-columns: minmax(190px, 1fr) auto; }
   .focus-rule { display: none; }
   .today-comparison { grid-template-columns: 66px minmax(330px, 0.9fr) minmax(400px, 1.1fr); }
+  .review-evidence-grid { grid-template-columns: minmax(0, 1fr); }
   .plan-workspace { grid-template-columns: minmax(520px, 1.6fr) minmax(330px, 1fr); }
   .inline-success { display: none; }
 }
