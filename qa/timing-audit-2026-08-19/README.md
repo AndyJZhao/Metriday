@@ -177,6 +177,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Web Stats now exposes the native Time per Project Hour / Day unit selector and formats project values from the selected unit.
 - Web Review Projects & Time Entries now applies each project's billing rate to captured activity and time entries, showing the native-style currency amount beside project duration.
 - Web Reports now supports native-style multi-project scope selection; the selected project set filters local preview/export rows and is sent through to native XLSX/PDF generation.
+- Web Reports now exposes native advanced options for duration format, short App usage inclusion, covered App usage absorption, and individual-entry rounding; local preview applies the range/coverage rules and native exports receive the matching query parameters.
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
 78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
@@ -204,3 +205,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 100. Web Stats project unit parity — verified Web build, Sites tests, and diff checks after adding the native Hour / Day project time selector and unit-aware values.
 101. Web Review project billing parity — verified Web build, Sites tests, and diff checks after calculating project amounts from native billing rates for both activity and time-entry seconds.
 102. Web Reports project scope parity — verified Web build, Sites tests, and diff checks after adding the All projects / individual project selector and wiring its scope through local report rows and native export query parameters.
+103. Web Reports advanced options — verified Web build, Sites tests, and diff checks after adding duration format, short-entry, covered-usage, and individual-rounding controls plus local/native export semantics.
