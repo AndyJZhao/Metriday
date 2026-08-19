@@ -95,6 +95,7 @@ struct ActivitiesView: View {
                             calendarEvents: calendarStore.events,
                             timeEntries: preferences.includeTimeEntries ? timelineTimeEntries : [],
                             selectedDate: selectedDate,
+                            project: { projectStore.project($0) },
                             selectionStart: $timelineSelectionStart,
                             selectionEnd: $timelineSelectionEnd,
                             onCreateTimeEntry: { startMinute, endMinute in
@@ -3125,11 +3126,124 @@ private struct RunningTimerStatus: View {
     }
 }
 
+private struct TimelineHoverDetail {
+    let id: String
+    let sourceLabel: String
+    let sourceColor: Color
+    let title: String
+    let timeRange: String
+    let duration: String
+    let projectName: String
+    let projectColor: Color
+    let projectQualifier: String?
+}
+
+private struct TimelineHoverBanner: View {
+    let detail: TimelineHoverDetail
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(detail.timeRange)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(MetridayTheme.graphite)
+
+            detailRow(
+                label: detail.sourceLabel,
+                color: detail.sourceColor,
+                value: detail.title,
+                suffix: detail.duration
+            )
+            detailRow(
+                label: "Project",
+                color: detail.projectColor,
+                value: detail.projectName,
+                suffix: detail.projectQualifier ?? ""
+            )
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(MetridayTheme.graphite.opacity(0.24), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Timeline details")
+    }
+
+    private func detailRow(
+        label: String,
+        color: Color,
+        value: String,
+        suffix: String
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("\(label):")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(MetridayTheme.secondary)
+                .frame(width: 55, alignment: .trailing)
+            Circle()
+                .fill(color)
+                .frame(width: 9, height: 9)
+            Text(value)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(MetridayTheme.graphite)
+                .lineLimit(1)
+            if !suffix.isEmpty {
+                Text("· \(suffix)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(MetridayTheme.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+}
+
+private struct TimelineLegend: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            item("App usage", color: MetridayTheme.warning)
+            item("Related", color: MetridayTheme.success)
+            item("Distracted", color: MetridayTheme.danger)
+            item("Other / idle", color: MetridayTheme.secondary)
+            item("Time entry", color: MetridayTheme.warning, outlined: true)
+            item("Calendar", color: MetridayTheme.accent, outlined: true)
+        }
+        .font(.system(size: 9, weight: .medium))
+        .foregroundStyle(MetridayTheme.secondary)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Timeline color legend")
+    }
+
+    private func item(
+        _ label: String,
+        color: Color,
+        outlined: Bool = false
+    ) -> some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(outlined ? color.opacity(0.14) : color.opacity(0.82))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .stroke(outlined ? color : .clear, lineWidth: 1)
+                )
+                .frame(width: 12, height: 7)
+            Text(label)
+        }
+    }
+}
+
 private struct ActivityTimelinePanel: View {
     let segments: [ActivitySegment]
     let calendarEvents: [CalendarEventItem]
     let timeEntries: [TimeEntry]
     let selectedDate: Date
+    let project: (UUID?) -> TrackingProject?
     @Binding var selectionStart: Int?
     @Binding var selectionEnd: Int?
     let onCreateTimeEntry: (Int?, Int?) -> Void
@@ -3138,6 +3252,8 @@ private struct ActivityTimelinePanel: View {
 
     @State private var dragAnchorMinute: Int?
     @State private var hoveredSegmentID: UUID?
+    @State private var hoveredTimeEntryID: UUID?
+    @State private var hoveredCalendarEventID: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -3166,7 +3282,11 @@ private struct ActivityTimelinePanel: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
-            .padding(.bottom, 8)
+            .padding(.bottom, 6)
+
+            TimelineLegend()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
 
             GeometryReader { proxy in
                 ZStack(alignment: .topLeading) {
@@ -3217,6 +3337,8 @@ private struct ActivityTimelinePanel: View {
                             // the next positive hover replaces it naturally.
                             if isHovered, hoveredSegmentID != segment.id {
                                 hoveredSegmentID = segment.id
+                                hoveredTimeEntryID = nil
+                                hoveredCalendarEventID = nil
                             }
                         }
                         .contextMenu {
@@ -3252,6 +3374,13 @@ private struct ActivityTimelinePanel: View {
                             .frame(width: width, height: 12)
                             .position(x: left + width / 2, y: 96)
                             .contentShape(Rectangle())
+                            .onHover { isHovered in
+                                if isHovered {
+                                    hoveredCalendarEventID = event.id
+                                    hoveredSegmentID = nil
+                                    hoveredTimeEntryID = nil
+                                }
+                            }
                             .onTapGesture {
                                 onRecordCalendarEvent(event, NSEvent.modifierFlags.contains(.option))
                             }
@@ -3279,6 +3408,13 @@ private struct ActivityTimelinePanel: View {
                                 .frame(width: width, height: 12)
                                 .position(x: left + width / 2, y: 114)
                                 .contentShape(Rectangle())
+                                .onHover { isHovered in
+                                    if isHovered {
+                                        hoveredTimeEntryID = entry.id
+                                        hoveredSegmentID = nil
+                                        hoveredCalendarEventID = nil
+                                    }
+                                }
                                 .onTapGesture {
                                     onEditTimeEntry(entry)
                                 }
@@ -3313,6 +3449,13 @@ private struct ActivityTimelinePanel: View {
                         }
                     }
                     .padding(.top, 134)
+
+                    if let detail = hoveredTimelineDetail {
+                        TimelineHoverBanner(detail: detail)
+                            .padding(.horizontal, 16)
+                            .allowsHitTesting(false)
+                            .zIndex(10)
+                    }
                 }
                 .contentShape(Rectangle())
                 .gesture(
@@ -3331,6 +3474,13 @@ private struct ActivityTimelinePanel: View {
                             dragAnchorMinute = nil
                         }
                 )
+                .onHover { isInside in
+                    if !isInside {
+                        hoveredSegmentID = nil
+                        hoveredTimeEntryID = nil
+                        hoveredCalendarEventID = nil
+                    }
+                }
             }
             .frame(height: 156)
             .padding(.horizontal, 16)
@@ -3371,6 +3521,60 @@ private struct ActivityTimelinePanel: View {
         }.count
     }
 
+    private var hoveredTimelineDetail: TimelineHoverDetail? {
+        if let hoveredSegmentID,
+           let segment = segments.first(where: { $0.id == hoveredSegmentID }) {
+            let project = project(segment.projectID)
+            return TimelineHoverDetail(
+                id: "activity-\(segment.id.uuidString)",
+                sourceLabel: "App",
+                sourceColor: MetridayTheme.warning,
+                title: segment.displayTitle,
+                timeRange: secondRange(start: segment.startSecond, end: segment.endSecond),
+                duration: durationLabel(segment.durationSeconds),
+                projectName: project?.name ?? "None",
+                projectColor: color(for: project?.color),
+                projectQualifier: project == nil ? "From the app usage" : nil
+            )
+        }
+
+        if let hoveredTimeEntryID,
+           let entry = timeEntries.first(where: { $0.id == hoveredTimeEntryID }),
+           let range = clippedRange(for: entry) {
+            let project = project(entry.projectID)
+            return TimelineHoverDetail(
+                id: "entry-\(entry.id.uuidString)",
+                sourceLabel: "Entry",
+                sourceColor: MetridayTheme.warning,
+                title: entry.title,
+                timeRange: secondRange(start: range.start, end: range.end),
+                duration: durationLabel(range.end - range.start),
+                projectName: project?.name ?? "None",
+                projectColor: color(for: project?.color),
+                projectQualifier: project == nil ? "Manual time entry" : nil
+            )
+        }
+
+        if let hoveredCalendarEventID,
+           let event = calendarEvents.first(where: { $0.id == hoveredCalendarEventID }) {
+            let start = second(of: event.start)
+            let end = max(start + 900, second(of: event.end))
+            return TimelineHoverDetail(
+                id: "calendar-\(event.id)",
+                sourceLabel: "Calendar",
+                sourceColor: MetridayTheme.accent,
+                title: event.title,
+                timeRange: secondRange(start: start, end: end),
+                duration: durationLabel(event.durationSeconds),
+                projectName: "None",
+                projectColor: color(for: nil),
+                projectQualifier: "Offline calendar event"
+            )
+        }
+
+        return nil
+    }
+
     private func minute(at x: CGFloat, width: CGFloat) -> Int {
         let normalized = min(1, max(0, x / max(1, width)))
         let raw = Int((normalized * 1_440).rounded())
@@ -3382,6 +3586,35 @@ private struct ActivityTimelinePanel: View {
         return calendar.component(.hour, from: date) * 3_600
             + calendar.component(.minute, from: date) * 60
             + calendar.component(.second, from: date)
+    }
+
+    private func secondRange(start: Int, end: Int) -> String {
+        "\(clock(start))–\(clock(end))"
+    }
+
+    private func clock(_ second: Int) -> String {
+        let clamped = max(0, min(86_400, second))
+        if clamped == 86_400 { return "24:00:00" }
+        return String(
+            format: "%02d:%02d:%02d",
+            clamped / 3_600,
+            (clamped % 3_600) / 60,
+            clamped % 60
+        )
+    }
+
+    private func durationLabel(_ seconds: Int) -> String {
+        let total = max(1, seconds)
+        let hours = total / 3_600
+        let minutes = (total % 3_600) / 60
+        let remainingSeconds = total % 60
+        if hours > 0 {
+            return minutes == 0 ? "\(hours)h" : "\(hours)h \(minutes)m"
+        }
+        if minutes > 0 {
+            return remainingSeconds == 0 ? "\(minutes)m" : "\(minutes)m \(remainingSeconds)s"
+        }
+        return "\(remainingSeconds)s"
     }
 
     private func clippedRange(for entry: TimeEntry) -> (start: Int, end: Int)? {
@@ -3407,6 +3640,24 @@ private struct ActivityTimelinePanel: View {
             return MetridayTheme.danger
         case .other, .idle:
             return MetridayTheme.secondary
+        }
+    }
+
+    private func color(for projectColor: ProjectColor?) -> Color {
+        guard let projectColor else { return MetridayTheme.secondary }
+        switch projectColor {
+        case .blue:
+            return MetridayTheme.accent
+        case .green:
+            return MetridayTheme.success
+        case .orange:
+            return MetridayTheme.warning
+        case .purple:
+            return .purple
+        case .red:
+            return MetridayTheme.danger
+        case .graphite:
+            return MetridayTheme.graphite
         }
     }
 }
