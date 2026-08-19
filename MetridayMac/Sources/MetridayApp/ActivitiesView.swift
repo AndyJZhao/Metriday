@@ -458,46 +458,53 @@ struct ActivitiesView: View {
     }
 
     private var dateRangeToolbar: some View {
-        HStack(spacing: 0) {
-            Button {
-                appState.moveSelectedDate(byDays: -1)
-            } label: {
-                Image(systemName: "chevron.left")
-                    .frame(width: 28, height: 28)
+        ZStack {
+            Color.clear
+                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .onTapGesture { appState.goToToday() }
+                .accessibilityHidden(true)
+
+            HStack(spacing: 0) {
+                Button {
+                    appState.moveSelectedDate(byDays: -1)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .help("Previous day")
+                .accessibilityLabel("Previous")
+                .accessibilityIdentifier("activities.toolbar.previous")
+
+                Divider()
+                    .frame(height: 18)
+
+                Button {
+                    appState.goToToday()
+                } label: {
+                    Text(dateRangeTitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(minWidth: 76, minHeight: 28, maxHeight: 28)
+                }
+                .buttonStyle(.plain)
+                .help("Go to today")
+                .accessibilityLabel("Today")
+                .accessibilityIdentifier("activities.toolbar.today")
+
+                Divider()
+                    .frame(height: 18)
+
+                Button {
+                    appState.moveSelectedDate(byDays: 1)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .help("Next day")
+                .accessibilityLabel("Next")
+                .accessibilityIdentifier("activities.toolbar.next")
             }
-            .buttonStyle(.plain)
-            .help("Previous day")
-            .accessibilityLabel("Previous")
-            .accessibilityIdentifier("activities.toolbar.previous")
-
-            Divider()
-                .frame(height: 18)
-
-            Button {
-                appState.goToToday()
-            } label: {
-                Text(dateRangeTitle)
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(minWidth: 76, minHeight: 28, maxHeight: 28)
-            }
-            .buttonStyle(.plain)
-            .help("Go to today")
-            .accessibilityLabel("Today")
-            .accessibilityIdentifier("activities.toolbar.today")
-
-            Divider()
-                .frame(height: 18)
-
-            Button {
-                appState.moveSelectedDate(byDays: 1)
-            } label: {
-                Image(systemName: "chevron.right")
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.plain)
-            .help("Next day")
-            .accessibilityLabel("Next")
-            .accessibilityIdentifier("activities.toolbar.next")
         }
         .padding(.horizontal, 4)
         .background(MetridayTheme.canvas)
