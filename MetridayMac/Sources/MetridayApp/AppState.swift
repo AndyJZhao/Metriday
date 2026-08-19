@@ -981,6 +981,30 @@ final class AppState: ObservableObject {
             ])
         }
 
+        if request.method == "GET", path == "/v1/calendar-events" {
+            let date = apiDate(from: request.query["date"]) ?? selectedDate
+            calendarStore.loadEvents(for: date)
+            return .jsonObject([
+                "date": apiDayKey(date),
+                "data": calendarStore.events.map(apiCalendarEvent),
+                "authorized": calendarStore.isAuthorized,
+                "status": calendarStore.statusMessage,
+                "read_only": true
+            ])
+        }
+
+        if request.method == "GET", path == "/v1/reminders" {
+            let date = apiDate(from: request.query["date"]) ?? selectedDate
+            reminderStore.loadCompleted(for: date)
+            return .jsonObject([
+                "date": apiDayKey(date),
+                "data": reminderStore.reminders.map(apiReminder),
+                "authorized": reminderStore.isAuthorized,
+                "status": reminderStore.statusMessage,
+                "read_only": true
+            ])
+        }
+
         if request.method == "POST", path == "/v1/phone-calls/hide" {
             guard let body = apiBody(request),
                   let address = body["address"] as? String,
@@ -1272,6 +1296,8 @@ final class AppState: ObservableObject {
                     "PATCH /v1/activities/{id}?date=YYYY-MM-DD",
                     "GET /v1/phone-calls?date=YYYY-MM-DD",
                     "POST /v1/phone-calls/hide",
+                    "GET /v1/calendar-events?date=YYYY-MM-DD",
+                    "GET /v1/reminders?date=YYYY-MM-DD",
                     "GET /v1/reports?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&format=json",
                     "GET /v1/activity-hierarchy?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD",
                     "GET /v1/rules",
@@ -1956,6 +1982,35 @@ final class AppState: ObservableObject {
             "end": apiDate(call.end),
             "duration_seconds": call.durationSeconds,
             "is_point_in_time": call.isPointInTime,
+            "read_only": true
+        ]
+    }
+
+    private func apiCalendarEvent(_ event: CalendarEventItem) -> [String: Any] {
+        [
+            "id": event.id,
+            "title": event.title,
+            "calendar": event.calendarTitle,
+            "calendar_identifier": event.calendarIdentifier,
+            "location": event.location,
+            "notes": event.notes,
+            "url": event.urlString,
+            "start": apiDate(event.start),
+            "end": apiDate(event.end),
+            "duration_seconds": event.durationSeconds,
+            "is_editable": event.isEditable,
+            "read_only": true
+        ]
+    }
+
+    private func apiReminder(_ reminder: ReminderItem) -> [String: Any] {
+        [
+            "id": reminder.id,
+            "title": reminder.title,
+            "list": reminder.listTitle,
+            "notes": reminder.notes,
+            "completed_at": apiDate(reminder.completedAt),
+            "is_recurring": reminder.isRecurring,
             "read_only": true
         ]
     }
