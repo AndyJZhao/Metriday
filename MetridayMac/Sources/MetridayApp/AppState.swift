@@ -335,6 +335,20 @@ final class AppState: ObservableObject {
             return .jsonObject(["data": apiProjectRule(rule)], statusCode: 201)
         }
 
+        if request.method == "POST", path == "/v1/project-rules/reapply" {
+            let date = apiDate(from: apiBody(request)?["date"] as? String) ?? selectedDate
+            activityMonitor.reapplyRules(for: date)
+            return .jsonObject([
+                "date": apiDate(date),
+                "status": projectStore.statusMessage
+            ])
+        }
+
+        if request.method == "POST", path == "/v1/project-rules/reapply-all" {
+            activityMonitor.reapplyRulesForAllStoredDays()
+            return .jsonObject(["status": projectStore.statusMessage])
+        }
+
         if path.hasPrefix("/v1/project-rules/") {
             let rawID = String(path.dropFirst("/v1/project-rules/".count))
             guard let ruleID = UUID(uuidString: rawID),
@@ -1473,6 +1487,8 @@ final class AppState: ObservableObject {
                     "POST /v1/project-rules",
                     "PATCH /v1/project-rules/{id}",
                     "DELETE /v1/project-rules/{id}",
+                    "POST /v1/project-rules/reapply",
+                    "POST /v1/project-rules/reapply-all",
                     "GET /v1/exclusions",
                     "POST /v1/exclusions",
                     "GET /v1/teams",

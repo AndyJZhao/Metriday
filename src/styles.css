@@ -722,6 +722,10 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .rule-overview > svg { margin-bottom: 24px; }
 .rule-meta { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; }
 .rule-meta span { display: flex; align-items: center; gap: 9px; color: #555b66; font-size: 13px; }
+.rules-current-scope { display: grid; gap: 5px; margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); }
+.rules-current-scope span { color: var(--muted); font-size: 11px; font-weight: 650; }
+.rules-current-scope strong { color: #282b32; font-size: 14px; }
+.rules-current-scope small { color: var(--muted); font-size: 11px; }
 .site-list-section { width: 100%; margin: 0; }
 .site-list-heading > strong { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 17px; background: var(--accent-soft); color: var(--accent); font-size: 13px; }
 .site-list { margin-top: 20px; border-top: 1px solid var(--border); }
@@ -731,6 +735,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .site-list-section form { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; margin-top: 15px; padding: 0 0 0 11px; border: 1px solid var(--border); border-radius: 8px; }
 .site-list-section form input { height: 42px; border: 0; background: transparent; }
 .site-list-section form button { display: flex; align-items: center; gap: 5px; height: 34px; margin-right: 5px; padding: 0 11px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+.rules-explanation { display: grid; gap: 16px; max-width: 1120px; margin: 20px auto 0; padding: 20px 26px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.rules-explanation > div, .rules-explanation > span { display: flex; align-items: flex-start; gap: 10px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.rules-explanation > div > svg { flex: 0 0 auto; color: var(--accent); }
+.rules-explanation strong { display: block; margin-bottom: 5px; color: #343842; font-size: 13px; }
+.rules-explanation p { margin: 0; }
+.rules-explanation > span { padding-top: 14px; border-top: 1px solid #eceef2; }
+.rules-explanation > span > svg { flex: 0 0 auto; color: var(--success); }
 .project-rules-panel { max-width: 1120px; margin: 20px auto 0; padding: 26px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
 .project-rules-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .project-rules-heading h2 { margin: 0; font-size: 18px; }
@@ -749,6 +760,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .project-rule-order svg.rotate-up { transform: rotate(90deg); }
 .project-rule-order svg.rotate-down { transform: rotate(-90deg); }
 .project-rules-empty { display: flex; align-items: center; gap: 9px; margin-top: 18px; padding: 14px; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); font-size: 12px; }
+.project-rules-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #eceef2; }
+.project-rules-footer > span { display: inline-flex; align-items: center; gap: 7px; min-width: 0; color: var(--muted); font-size: 10px; }
+.project-rules-footer > span svg { flex: 0 0 auto; color: var(--accent); }
+.project-rules-footer > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.project-rules-footer button { min-height: 31px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #4a4f5a; cursor: pointer; font-size: 10px; }
+.project-rules-footer button:hover { border-color: var(--accent); color: var(--accent); }
+.project-rules-footer button:disabled { cursor: not-allowed; opacity: 0.5; }
 
 /* Web companion connection */
 .settings-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(29, 32, 43, 0.22); }

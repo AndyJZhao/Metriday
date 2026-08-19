@@ -67,6 +67,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 61. Native timeline segment hit targets — verified `swift build` and native smoke tests after making both horizontal and vertical App activity segments respond to the same full-segment double-click Time Entry action already available on activity rows.
 62. Web Markdown hybrid preview — verified the Plan editor renders semantic heading, quote, task, and list previews without raw task markers, reveals the active line as source syntax, keeps one editable textarea, and preserves task handle selection.
 63. Markdown Return continuation — verified in the live Plan editor that Return continues task, bullet, and numbered-list prefixes; an empty list item exits the list, and the original daily Markdown was restored exactly after the test.
+64. Rules workflow parity — verified Web Rules exposes current Focus scope, separate blocked/allowed domain forms, blocking explanation, and Today/All History project-rule reapply actions; after packaging and relaunching native Metriday, the Today action completed through the new local API endpoint and its success status remained visible.
 
 ## Findings applied
 
@@ -130,3 +131,5 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Native Activities now keeps timeline orientation behavior consistent: horizontal and vertical App segments expose a full visual double-click target for creating a Time Entry, while hover and context-menu actions remain available.
 - Web Plan now shares native Markdown presentation semantics: inactive lines preview headings, quotes, lists, tasks, inline emphasis, code, strike, and links; the active line reveals source syntax without changing the persisted Markdown.
 - Web Plan Return behavior now mirrors the native editor for task, bullet, and numbered-list continuation, including exiting an empty list item while preserving the single Markdown source.
+- Rules now mirrors the native project-rule maintenance workflow: allowed domains can be added directly, the current scheduled scope and native blocking model are visible, and reapplying rules is an explicit Today or All History action backed by the local API.
+- Web global and Rules current-block labels now accept the native API's camelCase `startMinute` / `endMinute` fields, so a scheduled block keeps its time range instead of falling back to “No scheduled time.”

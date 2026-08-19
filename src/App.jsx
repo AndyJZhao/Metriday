@@ -414,6 +414,16 @@ function useMetridayAPI(dateKey, apiBase) {
       await request(`/v1/project-rules/${resourceID(id)}`, { method: "PATCH", body: JSON.stringify({ offset }) });
       await refresh();
     },
+    reapplyProjectRules: async (date = dateKey || localDateKey()) => {
+      const result = await request("/v1/project-rules/reapply", { method: "POST", body: JSON.stringify({ date }) });
+      await refresh();
+      return result;
+    },
+    reapplyAllProjectRules: async () => {
+      const result = await request("/v1/project-rules/reapply-all", { method: "POST" });
+      await refresh();
+      return result;
+    },
     savePlan: async (markdown, date = dateKey || localDateKey()) => {
       await request(`/v1/plans?date=${date}`, { method: "PUT", body: JSON.stringify({ markdown }) });
       await refresh();
@@ -447,6 +457,12 @@ function formatTime(minutes) {
 
 function formatRange(start, end) {
   return start == null || end == null ? "" : `${formatTime(start)}–${formatTime(end)}`;
+}
+
+function taskMinuteRange(task) {
+  const start = Number(task?.startMinute ?? task?.start_minute);
+  const end = Number(task?.endMinute ?? task?.end_minute);
+  return Number.isFinite(start) && Number.isFinite(end) ? { start, end } : null;
 }
 
 function currentMinuteAndLabel() {
@@ -938,8 +954,9 @@ function WebGlobalHeader({ api, setPage, dateKey, setDateKey }) {
   const currentTask = api.status?.currentTask;
   const focusActive = Boolean(api.focusActive);
   const currentTitle = currentTask?.title || "No scheduled block";
-  const currentRange = Number.isFinite(currentTask?.start_minute) && Number.isFinite(currentTask?.end_minute)
-    ? formatRange(currentTask.start_minute, currentTask.end_minute)
+  const currentTaskRange = taskMinuteRange(currentTask);
+  const currentRange = currentTaskRange
+    ? formatRange(currentTaskRange.start, currentTaskRange.end)
     : "No scheduled time";
   const toggleFocus = async () => {
     if (!api.connected || !currentTask) return;
@@ -999,8 +1016,9 @@ function TimerControls({ api }) {
 function TodayHeader({ focusRunning, setFocusRunning, setPage, api, dateKey, setDateKey }) {
   const currentTask = api.status?.currentTask;
   const currentTitle = currentTask?.title || (api.connected ? "No scheduled block" : "GeneZip rebuttal experiment");
-  const currentRange = Number.isFinite(currentTask?.start_minute) && Number.isFinite(currentTask?.end_minute)
-    ? formatRange(currentTask.start_minute, currentTask.end_minute)
+  const currentTaskRange = taskMinuteRange(currentTask);
+  const currentRange = currentTaskRange
+    ? formatRange(currentTaskRange.start, currentTaskRange.end)
     : api.connected ? "No scheduled time" : "14:00–16:00";
   const currentApplication = api.status?.currentApplication && api.status.currentApplication !== "Waiting for activity" ? api.status.currentApplication : "Research Focus";
   const focusActionLabel = focusRunning ? "Pause focus" : api.connected && !currentTask ? "Start timer" : "Resume focus";
@@ -2654,11 +2672,13 @@ function RulesPage() {
   return <main className="page supporting-page rules-page"><header className="supporting-header"><div><span>Focus rules</span><h1>Research Focus</h1></div><button type="button" className={`status-pill ${locked ? "active" : ""}`} onClick={() => setLocked((value) => !value)}><LockSimple size={17} />{locked ? "Locked mode on" : "Flexible mode"}</button></header><div className="rules-layout"><section className="rule-overview"><ShieldCheck size={54} color="#3da65a" weight="duotone" /><h2>Protect deep-work blocks</h2><p>This rule starts with scheduled research tasks and stays local to this Mac.</p><div className="rule-meta"><span><Clock size={18} />Runs with calendar blocks</span><span><Laptop size={18} />Local processing</span><span><Browsers size={18} />All browsers</span></div></section><section className="site-list-section"><div className="site-list-heading"><div><h2>Blocked sites</h2><p>Attempts are recorded as distraction evidence.</p></div><strong>{blocked.length}</strong></div><div className="site-list">{blocked.map((site) => <div key={site}><GlobeSimple size={20} /><span>{site}</span><IconButton label={`Allow ${site}`} onClick={() => { setBlocked((items) => items.filter((item) => item !== site)); setAllowed((items) => [...items, site]); }}><X size={15} /></IconButton></div>)}</div><form onSubmit={(event) => { event.preventDefault(); if (draft.trim() && !blocked.includes(draft.trim())) setBlocked((items) => [...items, draft.trim()]); setDraft(""); }}><GlobeSimple size={19} /><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add a distracting domain" aria-label="Add blocked website" /><button type="submit"><Plus size={17} />Add</button></form></section><section className="site-list-section allowed-section"><div className="site-list-heading"><div><h2>Allowed research</h2><p>Always available inside this focus rule.</p></div><strong>{allowed.length}</strong></div><div className="site-list">{allowed.map((site) => <div key={site}><CheckCircle size={20} weight="fill" /><span>{site}</span></div>)}</div></section></div></main>;
 }
 
-function WebProjectRulesPanel({ api }) {
+function WebProjectRulesPanel({ api, dateKey }) {
   const [projectID, setProjectID] = useState("");
   const [field, setField] = useState("application");
   const [comparison, setComparison] = useState("contains");
   const [pattern, setPattern] = useState("");
+  const [reapplyBusy, setReapplyBusy] = useState("");
+  const [message, setMessage] = useState("");
   const fields = { application: "Application", bundleIdentifier: "Bundle identifier", titleContains: "Title contains", resourceContains: "URL or path contains", domain: "Domain", fullURL: "Full website URL", keyword: "Keyword", startTime: "Start time", dayOfWeek: "Day of week" };
   const projects = api.projects || [];
   const submit = async (event) => {
@@ -2667,11 +2687,26 @@ function WebProjectRulesPanel({ api }) {
     try {
       await api.createProjectRule({ project_id: projectID, field, comparison, pattern: pattern.trim(), case_sensitive: false });
       setPattern("");
+      setMessage("Project rule saved.");
     } catch (error) {
-      // Keep the form available while the shared API connection state recovers.
+      setMessage(error.message || "Could not save the project rule.");
     }
   };
-  return <section className="project-rules-panel"><div className="project-rules-heading"><div><h2>Project automation rules</h2><p>Assign future App, title, domain, URL, or keyword activity to a project.</p></div><span className="api-badge">{api.projectRules.length} saved</span></div><form className="project-rules-form" onSubmit={submit}><select value={projectID} onChange={(event) => setProjectID(event.target.value)} aria-label="Project rule project"><option value="">Choose project</option>{projects.map((project) => <option key={project.id} value={resourceID(project.id)}>{project.title || project.name}</option>)}</select><select value={field} onChange={(event) => setField(event.target.value)} aria-label="Project rule field">{Object.entries(fields).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={comparison} onChange={(event) => setComparison(event.target.value)} aria-label="Project rule comparison"><option value="contains">contains</option><option value="equals">is</option><option value="beginsWith">begins with</option><option value="endsWith">ends with</option><option value="like">is like</option><option value="matchesRegex">matches regex</option></select><input value={pattern} onChange={(event) => setPattern(event.target.value)} placeholder="Matching value" aria-label="Project rule value" /><button type="submit" disabled={!api.connected || !projectID || !pattern.trim()}><Plus size={16} />Add Rule</button></form>{api.projectRules.length > 0 ? <div className="project-rules-list">{api.projectRules.map((rule, index) => <div className="project-rule-row" key={rule.id}><span className="web-source-icon"><Sparkle size={17} /></span><div><strong>{rule.project_name || projectTitleFor(projects, rule.project_id)}</strong><small>{fields[rule.field] || rule.field} {rule.comparison} “{rule.pattern}”</small></div><span className="project-rule-order"><IconButton label="Move rule up" onClick={() => api.moveProjectRule(rule.id, -1)} disabled={index === 0}><CaretLeft size={15} className="rotate-up" /></IconButton><IconButton label="Move rule down" onClick={() => api.moveProjectRule(rule.id, 1)} disabled={index === api.projectRules.length - 1}><CaretRight size={15} className="rotate-down" /></IconButton></span><IconButton label={`Delete rule for ${rule.project_name || "project"}`} onClick={() => api.deleteProjectRule(rule.id)}><Trash size={15} /></IconButton></div>)}</div> : <div className="project-rules-empty"><Sparkle size={22} /><span>No project automation rules yet. Assign an activity in Activities, then save its matching pattern here.</span></div>}</section>;
+  const reapply = async (scope) => {
+    if (!api.connected || reapplyBusy) return;
+    setReapplyBusy(scope);
+    setMessage("");
+    try {
+      if (scope === "today") await api.reapplyProjectRules(dateKey);
+      else await api.reapplyAllProjectRules();
+      setMessage(scope === "today" ? `Project rules reapplied to ${dateKey}.` : "Project rules reapplied to all stored history.");
+    } catch (error) {
+      setMessage(error.message || "Could not reapply project rules.");
+    } finally {
+      setReapplyBusy("");
+    }
+  };
+  return <section className="project-rules-panel"><div className="project-rules-heading"><div><h2>Project automation rules</h2><p>Assign future App, title, domain, URL, or keyword activity to a project.</p></div><span className="api-badge">{api.projectRules.length} saved</span></div><form className="project-rules-form" onSubmit={submit}><select value={projectID} onChange={(event) => setProjectID(event.target.value)} aria-label="Project rule project"><option value="">Choose project</option>{projects.map((project) => <option key={project.id} value={resourceID(project.id)}>{project.title || project.name}</option>)}</select><select value={field} onChange={(event) => setField(event.target.value)} aria-label="Project rule field">{Object.entries(fields).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={comparison} onChange={(event) => setComparison(event.target.value)} aria-label="Project rule comparison"><option value="contains">contains</option><option value="equals">is</option><option value="beginsWith">begins with</option><option value="endsWith">ends with</option><option value="like">is like</option><option value="matchesRegex">matches regex</option></select><input value={pattern} onChange={(event) => setPattern(event.target.value)} placeholder="Matching value" aria-label="Project rule value" /><button type="submit" disabled={!api.connected || !projectID || !pattern.trim()}><Plus size={16} />Add Rule</button></form>{api.projectRules.length > 0 ? <div className="project-rules-list">{api.projectRules.map((rule, index) => <div className="project-rule-row" key={rule.id}><span className="web-source-icon"><Sparkle size={17} /></span><div><strong>{rule.project_name || projectTitleFor(projects, rule.project_id)}</strong><small>{fields[rule.field] || rule.field} {rule.comparison} “{rule.pattern}”</small></div><span className="project-rule-order"><IconButton label="Move rule up" onClick={() => api.moveProjectRule(rule.id, -1)} disabled={index === 0}><CaretLeft size={15} className="rotate-up" /></IconButton><IconButton label="Move rule down" onClick={() => api.moveProjectRule(rule.id, 1)} disabled={index === api.projectRules.length - 1}><CaretRight size={15} className="rotate-down" /></IconButton></span><IconButton label={`Delete rule for ${rule.project_name || "project"}`} onClick={() => api.deleteProjectRule(rule.id)}><Trash size={15} /></IconButton></div>)}</div> : <div className="project-rules-empty"><Sparkle size={22} /><span>No project automation rules yet. Assign an activity in Activities, then save its matching pattern here.</span></div>}<div className="project-rules-footer"><span><ArrowsClockwise size={15} />{message || "Rules only change existing activity when you explicitly reapply them."}</span><div><button type="button" onClick={() => reapply("today")} disabled={!api.connected || Boolean(reapplyBusy)}>{reapplyBusy === "today" ? "Reapplying…" : "Reapply to Today"}</button><button type="button" onClick={() => reapply("all")} disabled={!api.connected || Boolean(reapplyBusy)}>{reapplyBusy === "all" ? "Reapplying…" : "Reapply All History"}</button></div></div></section>;
 }
 
 function RulesPageLive({ api }) {
@@ -2679,6 +2714,7 @@ function RulesPageLive({ api }) {
   const [blocked, setBlocked] = useState(["youtube.com", "x.com", "reddit.com"]);
   const [allowed, setAllowed] = useState(["arxiv.org", "github.com", "pytorch.org"]);
   const [draft, setDraft] = useState("");
+  const [allowedDraft, setAllowedDraft] = useState("");
   const [message, setMessage] = useState("");
   const remoteRules = api.connected ? api.rules : null;
   const blockedItems = remoteRules ? remoteRules.filter((rule) => !rule.allowed) : blocked.map((domain) => ({ id: domain, domain, allowed: false }));
@@ -2704,6 +2740,19 @@ function RulesPageLive({ api }) {
       setMessage(error.message || "Could not add the blocked site.");
     }
   };
+  const addAllowedDomain = async (event) => {
+    event.preventDefault();
+    const domain = allowedDraft.trim();
+    if (!domain) return;
+    try {
+      if (api.connected) await api.addWebRule(domain, true);
+      else if (!allowed.includes(domain)) setAllowed((items) => [...items, domain]);
+      setAllowedDraft("");
+      setMessage("Allowed site added.");
+    } catch (error) {
+      setMessage(error.message || "Could not add the allowed site.");
+    }
+  };
   const allowDomain = (item) => {
     if (api.connected) api.updateWebRule(item.id, true).catch((error) => setMessage(error.message || "Could not allow the site."));
     else {
@@ -2715,7 +2764,11 @@ function RulesPageLive({ api }) {
     if (api.connected) api.deleteWebRule(item.id).catch((error) => setMessage(error.message || "Could not remove the site."));
     else setAllowed((items) => items.filter((domain) => domain !== item.domain));
   };
-  return <main className="page supporting-page rules-page"><header className="supporting-header"><div><span>{api.connected ? "Native Focus rules" : "Focus rules"}</span><h1>Research Focus</h1></div><button type="button" className={`status-pill ${focusActive ? "active" : ""}`} onClick={toggleFocus}><LockSimple size={17} />{focusActive ? "Locked mode on" : "Flexible mode"}</button></header><div className="rules-layout"><section className="rule-overview"><ShieldCheck size={54} color="#3da65a" weight="duotone" /><h2>Protect deep-work blocks</h2><p>{api.connected ? "Changes are saved to the native Metriday blocklist on this Mac." : "This rule starts with scheduled research tasks and stays local to this Mac."}</p><div className="rule-meta"><span><Clock size={18} />Runs with calendar blocks</span><span><Laptop size={18} />Local processing</span><span><Browsers size={18} />Safari + Chrome</span></div></section><section className="site-list-section"><div className="site-list-heading"><div><h2>Blocked sites</h2><p>Attempts are recorded as distraction evidence.</p></div><strong>{blockedItems.length}</strong></div><div className="site-list">{blockedItems.map((item) => <div key={item.id}><GlobeSimple size={20} /><span>{item.domain}</span><IconButton label={`Allow ${item.domain}`} onClick={() => allowDomain(item)}><X size={15} /></IconButton></div>)}</div><form onSubmit={addDomain}><GlobeSimple size={19} /><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add a distracting domain" aria-label="Add blocked website" /><button type="submit"><Plus size={17} />Add</button></form></section><section className="site-list-section allowed-section"><div className="site-list-heading"><div><h2>Allowed research</h2><p>Always available inside this focus rule.</p></div><strong>{allowedItems.length}</strong></div><div className="site-list">{allowedItems.map((item) => <div key={item.id}><CheckCircle size={20} weight="fill" /><span>{item.domain}</span><IconButton label={`Remove ${item.domain}`} onClick={() => removeDomain(item)}><X size={15} /></IconButton></div>)}</div></section></div><WebProjectRulesPanel api={api} />{message ? <p className="entry-message rules-message" role="status">{message}</p> : null}</main>;
+  const currentTask = api.status?.currentTask;
+  const currentTaskRange = taskMinuteRange(currentTask);
+  const currentScope = currentTask?.title || "No scheduled block";
+  const currentScopeTime = currentTaskRange ? formatRange(currentTaskRange.start, currentTaskRange.end) : "No time";
+  return <main className="page supporting-page rules-page"><header className="supporting-header"><div><span>{api.connected ? "Native Focus rules" : "Focus rules"}</span><h1>Research Focus</h1></div><button type="button" className={`status-pill ${focusActive ? "active" : ""}`} onClick={toggleFocus}><LockSimple size={17} />{focusActive ? "Locked mode on" : "Flexible mode"}</button></header><div className="rules-layout"><section className="rule-overview"><ShieldCheck size={54} color="#3da65a" weight="duotone" /><h2>Protect deep-work blocks</h2><p>{api.connected ? "Changes are saved to the native Metriday blocklist on this Mac." : "This rule starts with scheduled research tasks and stays local to this Mac."}</p><div className="rule-meta"><span><Clock size={18} />Runs with calendar blocks</span><span><Laptop size={18} />Local processing</span><span><Browsers size={18} />Safari + Chrome</span></div><div className="rules-current-scope"><span>Current scope</span><strong>{currentScope}</strong><small>{currentScopeTime} · Safari + Chrome</small></div></section><section className="site-list-section"><div className="site-list-heading"><div><h2>Blocked sites</h2><p>Attempts are recorded as distraction evidence.</p></div><strong>{blockedItems.length}</strong></div><div className="site-list">{blockedItems.map((item) => <div key={item.id}><GlobeSimple size={20} /><span>{item.domain}</span><IconButton label={`Allow ${item.domain}`} onClick={() => allowDomain(item)}><X size={15} /></IconButton></div>)}</div><form onSubmit={addDomain}><GlobeSimple size={19} /><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add a distracting domain" aria-label="Add blocked website" /><button type="submit"><Plus size={17} />Add</button></form></section><section className="site-list-section allowed-section"><div className="site-list-heading"><div><h2>Allowed research</h2><p>Always available inside this focus rule.</p></div><strong>{allowedItems.length}</strong></div><div className="site-list">{allowedItems.map((item) => <div key={item.id}><CheckCircle size={20} weight="fill" /><span>{item.domain}</span><IconButton label={`Remove ${item.domain}`} onClick={() => removeDomain(item)}><X size={15} /></IconButton></div>)}</div><form onSubmit={addAllowedDomain}><CheckCircle size={19} weight="fill" /><input value={allowedDraft} onChange={(event) => setAllowedDraft(event.target.value)} placeholder="Add a research domain" aria-label="Add allowed website" /><button type="submit"><Plus size={17} />Add</button></form></section></div><section className="rules-explanation"><div><ShieldCheck size={20} /><div><strong>How blocking works in this build</strong><p>When a focus session is active, Metriday checks the frontmost Safari or Chrome tab. A matching domain is replaced with a local focus page. macOS asks for Automation permission the first time. The blocklist stays on this Mac and is never uploaded.</p></div></div><span><LockSimple size={17} />A future hardened mode can use an Apple Network Extension for system-wide enforcement; that target requires Apple-granted entitlements and code signing.</span></section><WebProjectRulesPanel api={api} dateKey={api.status?.selectedDate || localDateKey()} />{message ? <p className="entry-message rules-message" role="status">{message}</p> : null}</main>;
 }
 
 export function App() {
