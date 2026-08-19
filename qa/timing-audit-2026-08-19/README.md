@@ -171,6 +171,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Web Today Actual now exposes the native Track/Pause control and Accessibility request shortcut in the Actual header; the full header remains a readable banner while each action keeps its own hit target.
 - Web Activities timeline now matches native App / website interaction semantics: single click opens detail and double-click opens a prefilled Time Entry dialog; Calendar and Time Entry overlays keep their existing single-click actions.
 - Web Activities Filters now includes native-matching built-in semantic filters (Web Browsing, Media, Communication, Office & Business, Reading & Writing, File Management, Graphics, Development, Finance, Gaming, and Social Media), and applies the selected filter consistently to both the activity list and Timeline.
+- Web Activities Projects sidebar now exposes a native-style New Project plus action; it scrolls to and focuses the shared project creation form so project creation is available from the same primary location.
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
 78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
@@ -192,3 +193,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 94. Web Today tracking controls — verified Web build, Sites tests, and diff checks after adding native-shaped Track/Pause and Accessibility actions to the Actual timeline header without changing activity block selection behavior.
 95. Web Activities double-click parity — verified Web build, Sites tests, and diff checks after adding native-matching double-click Time Entry creation to App / website timeline segments while preserving single-click detail and overlay actions.
 96. Web built-in activity filters — verified Web build, Sites tests, and diff checks after adding the native 11-filter vocabulary and matching semantics to the Web Filters popover, list filtering, and Timeline filtering.
+97. Web Activities New Project entry point — verified Web build, Sites tests, and diff checks after adding the sidebar plus action, project panel anchor, and automatic focus on the existing creation form.
