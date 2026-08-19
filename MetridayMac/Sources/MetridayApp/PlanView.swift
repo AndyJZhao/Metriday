@@ -56,8 +56,27 @@ struct MarkdownEditorPane: View {
                     .font(.system(size: 10))
                     .foregroundStyle(MetridayTheme.secondary)
                 Spacer()
-                Button(action: {}) { Image(systemName: "ellipsis") }
-                    .buttonStyle(.plain)
+                Menu {
+                    Button("Reveal in Finder", systemImage: "folder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([store.fileURL])
+                    }
+                    Button("Copy Markdown", systemImage: "doc.on.doc") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(store.markdown, forType: .string)
+                        store.statusMessage = "Markdown copied"
+                    }
+                    Divider()
+                    Button("Reload from disk", systemImage: "arrow.clockwise") {
+                        _ = store.load(date: appState.selectedDate, createIfMissing: false)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.borderlessButton)
+                .accessibilityLabel("Plan actions")
+                .accessibilityIdentifier("plan.actions")
             }
             .padding(.horizontal, 20)
             .frame(height: 50)
