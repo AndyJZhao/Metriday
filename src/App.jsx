@@ -33,6 +33,20 @@ const navItems = [
   { id: "rules", label: "Rules", icon: ShieldCheck },
 ];
 
+const activityBuiltinFilters = [
+  { key: "webBrowsing", label: "Web Browsing", terms: ["safari", "chrome", "firefox", "brave", "arc", "edge", "opera", "vivaldi", "browser"] },
+  { key: "media", label: "Media", terms: ["music", "spotify", "podcast", "tv", "youtube", "netflix", "vlc", "video", "plex", "twitch"] },
+  { key: "communication", label: "Communication", terms: ["slack", "messages", "mail", "outlook", "teams", "zoom", "discord", "wechat", "telegram", "signal", "skype", "whatsapp"] },
+  { key: "officeBusiness", label: "Office & Business", terms: ["word", "excel", "powerpoint", "keynote", "numbers", "notion", "linear", "clickup", "asana", "office", "spreadsheet", "invoice", "salesforce"] },
+  { key: "readingWriting", label: "Reading & Writing", terms: ["books", "kindle", "reader", "preview", "notes", "textedit", "ulysses", "ia writer", "obsidian", "scrivener", "writer", "medium", "wikipedia"] },
+  { key: "fileManagement", label: "File Management", terms: ["finder", "file manager", "path finder", "transmit", "dropbox", "google drive", "onedrive", "files", "folder"] },
+  { key: "graphics", label: "Graphics", terms: ["figma", "sketch", "photoshop", "illustrator", "affinity", "pixelmator", "blender", "design", "paint", "canva"] },
+  { key: "development", label: "Development", terms: ["xcode", "terminal", "iterm", "visual studio", "code", "cursor", "sublime", "intellij", "pycharm", "android studio", "git", "github", "developer", "console"] },
+  { key: "finance", label: "Finance", terms: ["bank", "finance", "budget", "money", "mint", "quickbooks", "coinbase", "paypal", "stripe", "invoice", "accounting", "trading"] },
+  { key: "gaming", label: "Gaming", terms: ["steam", "game", "gaming", "epic games", "battle.net", "minecraft", "playstation", "xbox", "roblox"] },
+  { key: "socialMedia", label: "Social Media", terms: ["facebook", "instagram", "twitter", "x.com", "reddit", "linkedin", "tiktok", "mastodon", "social", "threads", "snapchat", "pinterest"] },
+];
+
 const fixedPlanBlocks = [
   { id: "literature", title: "Literature review", start: 9 * 60, end: 10 * 60 + 30, icon: FileText },
   { id: "notes", title: "Notes & synthesis", start: 10 * 60 + 30, end: 12 * 60, icon: BookOpen },
@@ -569,6 +583,24 @@ function activityCategory(activity) {
 
 function categoryRoleColor(role) {
   return ["focused", "related", "current"].includes(role) ? "blue" : ["distracting", "distracted"].includes(role) ? "red" : "graphite";
+}
+
+function activityMatchesBuiltinFilter(activity, key) {
+  const filter = activityBuiltinFilters.find((item) => item.key === key);
+  if (!filter) return true;
+  const app = String(activity?.appName || "").toLowerCase();
+  const bundle = String(activity?.bundleIdentifier || "").toLowerCase();
+  const title = String(activity?.windowTitle || "").toLowerCase();
+  const resource = String(activity?.resource || "").toLowerCase();
+  const haystack = `${app} ${bundle} ${title} ${resource}`;
+  if (key === "webBrowsing") {
+    try {
+      if (new URL(activity?.resource || "").host) return true;
+    } catch {
+      // Fall back to browser application names below.
+    }
+  }
+  return filter.terms.some((term) => haystack.includes(term));
 }
 
 function activityCategoryStyle(category) {
@@ -2474,11 +2506,16 @@ function WebActivityDevicesMenu({ open, devices, selectedDevice, hideDevicesWith
 
 function WebActivityFiltersMenu({ open, filters, projectFilterID, savedFilterID, categoryFilter, onToggle, onProjectFilter, onSavedFilter, onCategoryFilter }) {
   const savedFilter = filters.find((filter) => resourceID(filter.id) === savedFilterID);
-  const title = savedFilter?.name || (projectFilterID === "unassigned" ? "Unassigned" : categoryFilter !== "all" ? `${categoryFilter[0].toUpperCase()}${categoryFilter.slice(1)}` : "Filters");
+  const builtinKey = categoryFilter.startsWith("builtin:") ? categoryFilter.slice("builtin:".length) : "all";
+  const builtin = activityBuiltinFilters.find((filter) => filter.key === builtinKey);
+  const categoryLabel = categoryFilter === "all" ? "Filters" : categoryFilter[0].toUpperCase() + categoryFilter.slice(1);
+  const title = savedFilter?.name || (projectFilterID === "unassigned" ? "Unassigned" : builtin?.label || categoryLabel);
   const selectAll = () => { onProjectFilter("all"); onSavedFilter("all"); onCategoryFilter("all"); };
   const selectProject = () => { onProjectFilter("unassigned"); onSavedFilter("all"); onCategoryFilter("all"); };
+  const selectBuiltin = (value) => { onProjectFilter("all"); onSavedFilter("all"); onCategoryFilter("builtin:" + value); };
   const selectCategory = (value) => { onProjectFilter("all"); onSavedFilter("all"); onCategoryFilter(value); };
-  return <div className="activity-toolbar-popover"><button type="button" className={`quiet-pill activity-toolbar-popover-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />{title}</button>{open ? <div className="activity-toolbar-popover-panel" role="dialog" aria-label="Activity filters"><strong>Filters</strong><button type="button" className={`activity-popover-option ${savedFilterID === "all" && projectFilterID === "all" && categoryFilter === "all" ? "active" : ""}`} onClick={selectAll}><span><Waveform size={15} /></span><strong>All activity</strong>{savedFilterID === "all" && projectFilterID === "all" && categoryFilter === "all" ? <Check size={14} weight="bold" /> : null}</button><button type="button" className={`activity-popover-option ${projectFilterID === "unassigned" ? "active" : ""}`} onClick={selectProject}><span><TrayIcon /></span><strong>Unassigned</strong>{projectFilterID === "unassigned" ? <Check size={14} weight="bold" /> : null}</button><div className="activity-popover-divider" />{["focused", "distracting", "other", "idle"].map((value) => <button type="button" className={`activity-popover-option ${categoryFilter === value ? "active" : ""}`} key={value} onClick={() => selectCategory(value)}><span className={`activity-popover-category-dot ${value}`} /><strong>{value[0].toUpperCase() + value.slice(1)}</strong>{categoryFilter === value ? <Check size={14} weight="bold" /> : null}</button>)}{filters.length > 0 ? <><div className="activity-popover-divider" /><span className="activity-popover-label">Saved Filters</span>{filters.map((filter) => <button type="button" className={`activity-popover-option ${savedFilterID === resourceID(filter.id) ? "active" : ""}`} key={filter.id} onClick={() => { onProjectFilter("all"); onCategoryFilter("all"); onSavedFilter(resourceID(filter.id)); }}><span><Waveform size={15} /></span><strong>{filter.name}</strong>{savedFilterID === resourceID(filter.id) ? <Check size={14} weight="bold" /> : null}</button>)}</> : null}</div> : null}</div>;
+  const allSelected = savedFilterID === "all" && projectFilterID === "all" && categoryFilter === "all";
+  return <div className="activity-toolbar-popover"><button type="button" className={`quiet-pill activity-toolbar-popover-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />{title}</button>{open ? <div className="activity-toolbar-popover-panel" role="dialog" aria-label="Activity filters"><strong>Filters</strong><button type="button" className={`activity-popover-option ${allSelected ? "active" : ""}`} onClick={selectAll}><span><Waveform size={15} /></span><strong>All activity</strong>{allSelected ? <Check size={14} weight="bold" /> : null}</button><button type="button" className={`activity-popover-option ${projectFilterID === "unassigned" ? "active" : ""}`} onClick={selectProject}><span><TrayIcon /></span><strong>Unassigned</strong>{projectFilterID === "unassigned" ? <Check size={14} weight="bold" /> : null}</button><div className="activity-popover-divider" /><span className="activity-popover-label">Built-in Filters</span>{activityBuiltinFilters.map((filter) => <button type="button" className={`activity-popover-option ${builtinKey === filter.key ? "active" : ""}`} key={filter.key} onClick={() => selectBuiltin(filter.key)}><span className="activity-popover-category-dot other" /><strong>{filter.label}</strong>{builtinKey === filter.key ? <Check size={14} weight="bold" /> : null}</button>)}<div className="activity-popover-divider" />{["focused", "distracting", "other", "idle"].map((value) => <button type="button" className={`activity-popover-option ${categoryFilter === value ? "active" : ""}`} key={value} onClick={() => selectCategory(value)}><span className={`activity-popover-category-dot ${value}`} /><strong>{value[0].toUpperCase() + value.slice(1)}</strong>{categoryFilter === value ? <Check size={14} weight="bold" /> : null}</button>)}{filters.length > 0 ? <><div className="activity-popover-divider" /><span className="activity-popover-label">Saved Filters</span>{filters.map((filter) => <button type="button" className={`activity-popover-option ${savedFilterID === resourceID(filter.id) ? "active" : ""}`} key={filter.id} onClick={() => { onProjectFilter("all"); onCategoryFilter("all"); onSavedFilter(resourceID(filter.id)); }}><span><Waveform size={15} /></span><strong>{filter.name}</strong>{savedFilterID === resourceID(filter.id) ? <Check size={14} weight="bold" /> : null}</button>)}</> : null}</div> : null}</div>;
 }
 
 function WebActivityProjectSidebar({ projects, filters, activities, projectFilterID, savedFilterID, onProjectFilter, onSavedFilter }) {
@@ -2669,12 +2706,13 @@ function ActivitiesPage({ api, dateKey, setDateKey }) {
   const allActivities = [...rangeActivities].sort((left, right) => String(left.date || dateKey).localeCompare(String(right.date || dateKey)) || Number(left.startSecond || 0) - Number(right.startSecond || 0));
   const devices = [...new Set([...currentActivities, ...rangeActivities].map((activity) => activity.deviceName || "This Mac"))].sort();
   const normalizedQuery = query.trim().toLowerCase();
+  const builtinFilterKey = categoryFilter.startsWith("builtin:") ? categoryFilter.slice("builtin:".length) : "all";
   const savedFilter = api.filters.find((filter) => resourceID(filter.id) === savedFilterID);
   const filterActivity = (activity) => {
     const category = activityCategory(activity);
     const searchable = `${activityLabel(activity)} ${activityContext(activity)} ${activity.appName || ""} ${activity.deviceName || ""} ${category.label}`.toLowerCase();
     return (!normalizedQuery || searchable.includes(normalizedQuery))
-      && (categoryFilter === "all" || category.key === categoryFilter)
+      && (builtinFilterKey !== "all" ? activityMatchesBuiltinFilter(activity, builtinFilterKey) : categoryFilter === "all" || category.key === categoryFilter)
       && (deviceFilter === "all" || (activity.deviceName || "This Mac") === deviceFilter)
       && (projectFilterID === "all" || (projectFilterID === "unassigned" ? !activity.projectID : resourceID(activity.projectID) === projectFilterID))
       && (!savedFilter || activityMatchesFilter(activity, savedFilter));
