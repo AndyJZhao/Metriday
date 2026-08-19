@@ -59,6 +59,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 53. Stats Category breakdown — verified the seven-day Stats view aggregates active time by Category, shows percentages and durations, uses the custom category color, Focused deep blue, Distracting red, excludes Idle from active totals, and has no horizontal overflow.
 54. Native Stats Category parity — verified `swift build`, packaged-app launch, and native smoke tests after adding the same active Category breakdown to the macOS Stats workspace.
 55. Native Today timeline hit targets — verified `swift build`, packaged-app launch, and native smoke tests after making Plan, Actual, and recorded time blocks full visual/accessibility hit targets that route to their owning workspaces.
+56. Activities/Plan modal keyboard dismissal — verified the New Time Entry and timeline edit dialogs open from their full button hit targets and close with Escape; Plan's schedule-choice and Entry-O-Matic paths now also register Escape dismissal in code.
 
 ## Findings applied
 
@@ -115,3 +116,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Stats now provides a RescueTime-style active-time Category ranking beside weekday, project, and application views; Category remains the color owner, with Focused deep blue and Distracting red.
 - Native Stats now presents the same Category ranking and colors beside Applications, while Project and Time Entry totals remain separate from active App / website / item classification.
 - Native Today Plan blocks now open Plan and select the task; Actual and recorded time blocks open Activities. Their visible block surfaces, not only text glyphs, carry the interaction and accessibility labels.
+- Activities timeline Time Entry overlays now open an editable dialog instead of only showing a passive status message; the edit form preserves the selected date, project, billing status, and full keyboard dismissal path.

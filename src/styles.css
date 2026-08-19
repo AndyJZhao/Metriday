@@ -646,6 +646,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .entry-edit-row { display: grid; grid-template-columns: minmax(150px, 1fr) 110px 110px 140px 125px 70px; align-items: center; gap: 8px; min-height: 58px; border-bottom: 1px solid #eceef1; }
 .entry-edit-row input, .entry-edit-row select, .project-edit-row input, .project-edit-row select { height: 34px; min-width: 0; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #2d3038; font-size: 12px; }
 .entry-edit-message { grid-column: 1 / -1; color: var(--danger); font-size: 11px; }
+.time-entry-edit-form { display: grid; gap: 13px; margin-top: 20px; }
+.time-entry-edit-form > label { display: grid; gap: 6px; color: #555b66; font-size: 11px; font-weight: 650; }
+.time-entry-edit-form input, .time-entry-edit-form select { width: 100%; height: 38px; min-width: 0; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #2d3038; font-size: 12px; }
+.time-entry-edit-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 7px; }
+.time-entry-edit-actions > button[type="submit"] { min-height: 38px; padding: 0 14px; border: 0; border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font-size: 12px; font-weight: 650; }
+.time-entry-edit-actions > button[type="submit"]:disabled { cursor: not-allowed; opacity: 0.55; }
+.time-entry-edit-form .entry-edit-message { grid-column: 1 / -1; }
 .entries-empty { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: var(--muted); font-size: 12px; }
 .entries-empty svg { color: var(--accent); }
 .projects-panel { max-width: 1120px; margin: 0 auto 20px; padding: 26px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
