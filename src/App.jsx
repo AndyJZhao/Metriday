@@ -143,6 +143,7 @@ function useMetridayAPI(dateKey, apiBase) {
     rules: [],
     focusActive: false,
     phoneCalls: { data: [], database_available: false, status: "Phone Calls integration not connected" },
+    filters: [],
     weekly: [],
     insights: [],
   });
@@ -174,6 +175,7 @@ function useMetridayAPI(dateKey, apiBase) {
           };
         })),
         request(`/v1/insights?date=${date}`),
+        request("/v1/filters"),
       ]);
       const value = (index, fallback) => results[index].status === "fulfilled" ? results[index].value : fallback;
       setSnapshot({
@@ -191,6 +193,7 @@ function useMetridayAPI(dateKey, apiBase) {
         phoneCalls: value(6, { data: [], database_available: false, status: "Phone Calls integration not connected" }),
         weekly: value(7, []),
         insights: value(8, { data: [] })?.data || [],
+        filters: value(9, { data: [] })?.data || [],
       });
       setRefreshVersion((value) => value + 1);
     } catch (error) {
@@ -279,6 +282,14 @@ function useMetridayAPI(dateKey, apiBase) {
     },
     hidePhoneCallAddress: async (address, hidden = true) => {
       await request("/v1/phone-calls/hide", { method: "POST", body: JSON.stringify({ address, hidden }) });
+      await refresh();
+    },
+    createActivityFilter: async (filter) => {
+      await request("/v1/filters", { method: "POST", body: JSON.stringify(filter) });
+      await refresh();
+    },
+    deleteActivityFilter: async (id) => {
+      await request(`/v1/filters/${resourceID(id)}`, { method: "DELETE" });
       await refresh();
     },
     savePlan: async (markdown, date = dateKey || localDateKey()) => {
@@ -386,6 +397,51 @@ function activityCategoryStyle(category) {
     graphite: { color: "#6f7480", background: "#f0f1f4" },
   };
   return palette[category?.color] || palette.graphite;
+}
+
+function activityFilterValues(activity, field) {
+  switch (field) {
+    case "application": return [activity.appName || ""];
+    case "bundleIdentifier": return [activity.bundleIdentifier || ""];
+    case "windowTitle": return [activity.windowTitle || ""];
+    case "resource": return [activity.resource || ""];
+    case "domain": return [activity.resource || ""];
+    case "fullURL": return [activity.resource || ""];
+    case "keyword": return [activity.appName, activity.windowTitle, activity.resource].filter(Boolean);
+    case "device": return [activity.deviceName || "This Mac"];
+    default: return [];
+  }
+}
+
+function activityFilterRuleMatches(activity, rule) {
+  const pattern = String(rule.pattern || "");
+  const flags = rule.case_sensitive ? "" : "i";
+  const values = activityFilterValues(activity, rule.field);
+  if (!values.length || !pattern) return false;
+  if (rule.comparison === "matchesRegex") {
+    try { return values.some((value) => new RegExp(pattern, flags).test(String(value))); } catch { return false; }
+  }
+  return values.some((value) => {
+    const source = String(value);
+    const left = rule.case_sensitive ? source : source.toLowerCase();
+    const right = rule.case_sensitive ? pattern : pattern.toLowerCase();
+    switch (rule.comparison) {
+      case "equals": return left === right;
+      case "beginsWith": return left.startsWith(right);
+      case "endsWith": return left.endsWith(right);
+      case "isNot": return left !== right;
+      case "like": return left.includes(right.replaceAll("%", ""));
+      default: return left.includes(right);
+    }
+  });
+}
+
+function activityMatchesFilter(activity, filter) {
+  const rules = Array.isArray(filter?.rules) ? filter.rules : [];
+  if (!rules.length) return false;
+  return filter.match_mode === "all"
+    ? rules.every((rule) => activityFilterRuleMatches(activity, rule))
+    : rules.some((rule) => activityFilterRuleMatches(activity, rule));
 }
 
 function activityBlockStyle(color) {
@@ -1458,10 +1514,31 @@ function WebPhoneCallsPanel({ api }) {
   return <section className="web-source-panel" aria-label="Phone Calls"><div className="web-source-heading"><div><h2>Phone Calls</h2><p>Read-only call history that can be recorded as local time evidence.</p></div><div className="web-source-actions"><span className={`api-badge ${payload.database_available ? "online" : ""}`}>{payload.database_available ? `${calls.length} calls` : "Not connected"}</span><button type="button" className="quiet-pill" onClick={api.refresh}>Refresh</button></div></div>{calls.length > 0 ? <div className="web-source-list">{calls.map((call) => <div className="web-source-row" key={call.id}><span className="web-source-icon"><Clock size={18} /></span><div><strong>{call.address || "Phone call"}</strong><small>{call.service_provider || "Call history"} · {formatCallTime(call.start)}–{formatCallTime(call.end)}</small></div><span>{formatDurationSeconds(Number(call.duration_seconds || 0))}</span><IconButton label={`Hide calls from ${call.address || "this address"}`} onClick={() => api.hidePhoneCallAddress(call.address, true)}><X size={15} /></IconButton></div>)}</div> : <div className="web-source-empty"><Clock size={22} /><span>{payload.status || "No phone calls for this date."}</span></div>}</section>;
 }
 
+function WebActivityFiltersPanel({ api }) {
+  const [name, setName] = useState("");
+  const [field, setField] = useState("application");
+  const [comparison, setComparison] = useState("contains");
+  const [pattern, setPattern] = useState("");
+  const fields = { application: "Application", bundleIdentifier: "Bundle identifier", windowTitle: "Window title", resource: "URL or path", domain: "Domain", keyword: "Keyword", device: "Device" };
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!name.trim() || !pattern.trim() || !api.connected) return;
+    try {
+      await api.createActivityFilter({ name: name.trim(), color: "purple", match_mode: "any", rules: [{ field, comparison, pattern: pattern.trim(), case_sensitive: false }] });
+      setName("");
+      setPattern("");
+    } catch (error) {
+      // The shared Activities refresh surface already exposes connection errors.
+    }
+  };
+  return <section className="web-source-panel web-filters-panel" aria-label="Activity Filters"><div className="web-source-heading"><div><h2>Filters</h2><p>Save reusable App, website, and device rules for this activity stream.</p></div><span className="api-badge">{api.filters.length} saved</span></div><form className="web-filter-form" onSubmit={submit}><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Filter name" aria-label="Activity filter name" /><select value={field} onChange={(event) => setField(event.target.value)} aria-label="Activity filter field">{Object.entries(fields).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={comparison} onChange={(event) => setComparison(event.target.value)} aria-label="Activity filter comparison"><option value="contains">contains</option><option value="equals">is</option><option value="beginsWith">begins with</option><option value="endsWith">ends with</option><option value="matchesRegex">matches regex</option></select><input value={pattern} onChange={(event) => setPattern(event.target.value)} placeholder="Value" aria-label="Activity filter value" /><button type="submit" disabled={!api.connected || !name.trim() || !pattern.trim()}><Plus size={16} />Save filter</button></form>{api.filters.length > 0 ? <div className="web-source-list">{api.filters.map((filter) => <div className="web-source-row web-filter-row" key={filter.id}><span className="web-source-icon" style={{ color: activityCategoryStyle({ color: filter.color }).color }}><Waveform size={17} /></span><div><strong>{filter.name}</strong><small>{(filter.rules || []).map((rule) => `${fields[rule.field] || rule.field} ${rule.comparison} “${rule.pattern}”`).join(` ${filter.match_mode === "all" ? "and" : "or"} `)}</small></div><span>{filter.match_mode === "all" ? "All rules" : "Any rule"}</span><IconButton label={`Delete ${filter.name}`} onClick={() => api.deleteActivityFilter(filter.id)}><Trash size={15} /></IconButton></div>)}</div> : <div className="web-source-empty"><Waveform size={22} /><span>No saved filters yet. Add one to reuse the same activity rule on this Mac.</span></div>}</section>;
+}
+
 function ActivitiesPage({ api, dateKey, setDateKey }) {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [deviceFilter, setDeviceFilter] = useState("all");
+  const [savedFilterID, setSavedFilterID] = useState("all");
   const [activityView, setActivityView] = useState("unified");
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [timerBusy, setTimerBusy] = useState(false);
@@ -1470,18 +1547,21 @@ function ActivitiesPage({ api, dateKey, setDateKey }) {
   const allActivities = [...api.activities].sort((left, right) => Number(left.startSecond || 0) - Number(right.startSecond || 0));
   const devices = [...new Set(allActivities.map((activity) => activity.deviceName || "This Mac"))].sort();
   const normalizedQuery = query.trim().toLowerCase();
+  const savedFilter = api.filters.find((filter) => resourceID(filter.id) === savedFilterID);
   const activities = allActivities.filter((activity) => {
     const category = activityCategory(activity);
     const searchable = `${activityLabel(activity)} ${activityContext(activity)} ${activity.appName || ""} ${activity.deviceName || ""} ${category.label}`.toLowerCase();
     return (!normalizedQuery || searchable.includes(normalizedQuery))
       && (categoryFilter === "all" || category.key === categoryFilter)
-      && (deviceFilter === "all" || (activity.deviceName || "This Mac") === deviceFilter);
+      && (deviceFilter === "all" || (activity.deviceName || "This Mac") === deviceFilter)
+      && (!savedFilter || activityMatchesFilter(activity, savedFilter));
   });
-  const hasFilters = Boolean(normalizedQuery || categoryFilter !== "all" || deviceFilter !== "all");
+  const hasFilters = Boolean(normalizedQuery || categoryFilter !== "all" || deviceFilter !== "all" || savedFilterID !== "all");
   const resetFilters = () => {
     setQuery("");
     setCategoryFilter("all");
     setDeviceFilter("all");
+    setSavedFilterID("all");
   };
   const toggleTimer = async () => {
     if (timerBusy || !api.connected) return;
@@ -1497,7 +1577,7 @@ function ActivitiesPage({ api, dateKey, setDateKey }) {
     }
   };
   useEffect(() => setSelectedActivity(null), [dateKey]);
-  return <main className="page supporting-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Activities date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button type="button" className={`status-pill activities-timer ${timerRunning ? "active" : ""}`} onClick={toggleTimer} disabled={timerBusy || !api.connected}><Timer size={16} weight={timerRunning ? "fill" : "regular"} />{timerBusy ? "Updating…" : timerRunning ? "Stop timer" : "Start timer"}</button><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="activities-page-toolbar"><div className="activity-view-switcher" role="group" aria-label="Activity view"><button type="button" className={activityView === "unified" ? "active" : ""} onClick={() => setActivityView("unified")}>Unified</button><button type="button" className={activityView === "category" ? "active" : ""} onClick={() => setActivityView("category")}>By Category</button><button type="button" className={activityView === "chronological" ? "active" : ""} onClick={() => setActivityView("chronological")}>Chronological</button></div><label className="activity-search"><Waveform size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search app, website, window title…" aria-label="Search activities" />{query ? <IconButton label="Clear activity search" onClick={() => setQuery("")}><X size={15} /></IconButton> : null}</label><label className="activity-filter-control">Category<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Activity category filter"><option value="all">All categories</option><option value="focused">Focused</option><option value="distracting">Distracting</option><option value="other">Other</option><option value="idle">Idle</option></select></label><label className="activity-filter-control">Device<select value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)} aria-label="Activity device filter"><option value="all">All devices</option>{devices.map((device) => <option key={device} value={device}>{device}</option>)}</select></label><button type="button" className="quiet-pill activity-reset" onClick={resetFilters} disabled={!hasFilters}>Reset</button></div>{timerMessage ? <p className="entry-message activities-timer-message" role="status">{timerMessage}</p> : null}<WebActivityTimeline activities={activities} dateKey={dateKey} api={api} onSelect={setSelectedActivity} /><WebPhoneCallsPanel api={api} /><section className="activities-list"><div className="activities-list-heading"><div><h2>Today’s activity</h2><p>{api.connected ? hasFilters ? `${activities.length} of ${allActivities.length} locally recorded segments` : `${activities.length} locally recorded segments` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? allActivities.length > 0 ? "No activity matches these filters" : "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || (hasFilters ? "Clear the filters to see all local activity." : "The hosted view keeps working with preview data until the loopback API is available.")}</span></div> : <ActivityTable activities={activities} viewMode={activityView} onSelect={setSelectedActivity} />}</section><ProjectPanel api={api} onAssignActivity={(id, projectID) => api.assignActivity(id, projectID, dateKey)} /><TimeEntriesPanel api={api} dateKey={dateKey} />{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} onClose={() => setSelectedActivity(null)} /> : null}</main>;
+  return <main className="page supporting-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Activities date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button type="button" className={`status-pill activities-timer ${timerRunning ? "active" : ""}`} onClick={toggleTimer} disabled={timerBusy || !api.connected}><Timer size={16} weight={timerRunning ? "fill" : "regular"} />{timerBusy ? "Updating…" : timerRunning ? "Stop timer" : "Start timer"}</button><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="activities-page-toolbar"><div className="activity-view-switcher" role="group" aria-label="Activity view"><button type="button" className={activityView === "unified" ? "active" : ""} onClick={() => setActivityView("unified")}>Unified</button><button type="button" className={activityView === "category" ? "active" : ""} onClick={() => setActivityView("category")}>By Category</button><button type="button" className={activityView === "chronological" ? "active" : ""} onClick={() => setActivityView("chronological")}>Chronological</button></div><label className="activity-search"><Waveform size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search app, website, window title…" aria-label="Search activities" />{query ? <IconButton label="Clear activity search" onClick={() => setQuery("")}><X size={15} /></IconButton> : null}</label><label className="activity-filter-control">Saved filter<select value={savedFilterID} onChange={(event) => setSavedFilterID(event.target.value)} aria-label="Saved activity filter"><option value="all">All activity</option>{api.filters.map((filter) => <option key={filter.id} value={resourceID(filter.id)}>{filter.name}</option>)}</select></label><label className="activity-filter-control">Category<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Activity category filter"><option value="all">All categories</option><option value="focused">Focused</option><option value="distracting">Distracting</option><option value="other">Other</option><option value="idle">Idle</option></select></label><label className="activity-filter-control">Device<select value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)} aria-label="Activity device filter"><option value="all">All devices</option>{devices.map((device) => <option key={device} value={device}>{device}</option>)}</select></label><button type="button" className="quiet-pill activity-reset" onClick={resetFilters} disabled={!hasFilters}>Reset</button></div>{timerMessage ? <p className="entry-message activities-timer-message" role="status">{timerMessage}</p> : null}<WebActivityTimeline activities={activities} dateKey={dateKey} api={api} onSelect={setSelectedActivity} /><WebPhoneCallsPanel api={api} /><WebActivityFiltersPanel api={api} /><section className="activities-list"><div className="activities-list-heading"><div><h2>Today’s activity</h2><p>{api.connected ? hasFilters ? `${activities.length} of ${allActivities.length} locally recorded segments` : `${activities.length} locally recorded segments` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? allActivities.length > 0 ? "No activity matches these filters" : "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || (hasFilters ? "Clear the filters to see all local activity." : "The hosted view keeps working with preview data until the loopback API is available.")}</span></div> : <ActivityTable activities={activities} viewMode={activityView} onSelect={setSelectedActivity} />}</section><ProjectPanel api={api} onAssignActivity={(id, projectID) => api.assignActivity(id, projectID, dateKey)} /><TimeEntriesPanel api={api} dateKey={dateKey} />{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} onClose={() => setSelectedActivity(null)} /> : null}</main>;
 }
 
 function RulesPage() {

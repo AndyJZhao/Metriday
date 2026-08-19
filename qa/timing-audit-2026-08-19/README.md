@@ -22,6 +22,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 16. `16-activities-project-drop.png` — Activities after adding the Project assignment drop target below the App / Category list; activity rows advertise the drag affordance and projects accept the drop.
 17. `17-activities-view-modes.png` — Activities after adding Unified, By Category, and Chronological views with full-width collapsible group headers.
 18. `18-activities-phone-calls.png` — Activities after bringing the native read-only Phone Calls source into the Web timeline context, including its local connection state.
+19. `19-activities-filters.png` — Activities after adding reusable local Activity Filters with field, comparison, and value controls plus the saved-filter empty state.
 
 ## Findings applied
 
@@ -39,3 +40,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Activities now supports assigning a captured activity to a project by dragging its App / Category row onto a Project row; the local API persists the assignment for the selected date, including historical dates.
 - Activities now supports the native three-way view switch: Unified app groups, category groups, and Chronological rows; group headers are full-width buttons and preserve the App / Category row semantics.
 - Activities now surfaces the native read-only Phone Calls source beside the full-day timeline, with per-date loading, local connection status, and address hiding when call history is available.
+- Activities now supports reusable Activity Filters backed by the native local API; selecting one narrows the same App / Category rows, while creating or deleting a filter persists on this Mac.
