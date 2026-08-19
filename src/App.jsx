@@ -1184,7 +1184,7 @@ function MarkdownEditor({ tasks, markdown, planDate, onMarkdownChange, onMarkdow
     <section className="markdown-editor" aria-label="Markdown daily plan">
       <div className="editor-toolbar"><div className="file-name"><FileText size={18} /> {planDate}.md <span>{markdown ? "Markdown document" : "Blank Markdown document"}</span></div><div className="editor-actions"><span>Markdown</span><ActionMenu label="Document actions" items={[{ label: "Copy Markdown", onSelect: copyMarkdown }]}><DotsThree size={22} /></ActionMenu></div></div>
       <div className="editor-body markdown-source-wrap">
-        <textarea className="markdown-source-editor" aria-label="Markdown editor" value={markdown || ""} spellCheck={false} onChange={(event) => onMarkdownChange(event.target.value)} onBlur={() => onMarkdownCommit(markdown || "")} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} />
+        <textarea className="markdown-source-editor" aria-label="Markdown editor" value={markdown || ""} spellCheck={false} onChange={(event) => onMarkdownChange(event.target.value)} onBlur={(event) => onMarkdownCommit(event.currentTarget.value)} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} />
         <div className="markdown-source-overlays" style={{ transform: "translateY(" + (-scrollTop) + "px)" }} aria-hidden="false">
           {lines.map((_, index) => <span className="markdown-source-line-number" key={index}>{index + 1}</span>)}
           {taskLineIndices.map(({ index }, taskIndex) => { const task = tasks[taskIndex]; if (!task) return null; return <div className="markdown-source-task-actions" style={{ top: (index * 46) + 18 }} key={task.id}><button type="button" className="drag-handle" draggable onDragStart={(event) => onTaskDragStart(event, task.id)} onPointerDown={(event) => onPointerDragStart(event, task.id)} onClick={() => onSelectTask(task.id)} aria-label={`Drag ${task.title} to calendar`}><DotsSixVertical size={16} /></button><button type="button" className="markdown-check" onClick={() => onComplete(task.id)} aria-label={`Mark ${task.title} ${task.completed ? "incomplete" : "complete"}`}>{task.completed ? <Check size={13} weight="bold" /> : null}</button></div>; })}
@@ -1244,12 +1244,15 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
   const [lastUpdatedId, setLastUpdatedId] = useState(null);
   const [toast, setToast] = useState("");
   const [markdown, setMarkdown] = useState(() => markdownWithTasks("", tasks));
+  const markdownRef = useRef(markdown);
   const [neighborPlans, setNeighborPlans] = useState({});
   const [pendingSchedule, setPendingSchedule] = useState(null);
   const planDate = dateKey;
   useEffect(() => {
     if (!api.connected || !api.plan?.tasks) return;
-    setMarkdown(String(api.plan.markdown || ""));
+    const loadedMarkdown = String(api.plan.markdown || "");
+    markdownRef.current = loadedMarkdown;
+    setMarkdown(loadedMarkdown);
     setTasks(api.plan.tasks.map(planTaskFromAPI));
     setSelectedTaskId(null);
   }, [api.connected, api.plan?.date, api.plan?.markdown, setTasks]);
@@ -1273,7 +1276,8 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
     return () => { cancelled = true; };
   }, [api.connected, api.fetchPlan, dateKey]);
   const persistTasks = (nextTasks, message) => {
-    const nextMarkdown = markdownWithTasks(markdown || api.plan?.markdown || "", nextTasks);
+    const nextMarkdown = markdownWithTasks(markdownRef.current || api.plan?.markdown || "", nextTasks);
+    markdownRef.current = nextMarkdown;
     setMarkdown(nextMarkdown);
     setTasks(nextTasks);
     setToast(message);
@@ -1283,16 +1287,19 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
       .catch(() => setToast("Local change kept; sync failed"));
   };
   const updateMarkdown = (nextMarkdown) => {
+    markdownRef.current = nextMarkdown;
     setMarkdown(nextMarkdown);
     setTasks(tasksFromMarkdown(nextMarkdown, tasks));
   };
   const commitMarkdown = (nextMarkdown) => {
-    const parsedTasks = tasksFromMarkdown(nextMarkdown, tasks);
-    setMarkdown(nextMarkdown);
+    const source = markdownRef.current === nextMarkdown ? nextMarkdown : markdownRef.current;
+    markdownRef.current = source;
+    const parsedTasks = tasksFromMarkdown(source, tasks);
+    setMarkdown(source);
     setTasks(parsedTasks);
     setToast("Markdown saved");
     if (!api.connected || api.plan?.date !== dateKey) return;
-    api.savePlan(nextMarkdown)
+    api.savePlan(source)
       .then(() => setToast("Markdown synced to Metriday"))
       .catch(() => setToast("Local change kept; sync failed"));
   };
@@ -1303,13 +1310,22 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
   const pointerMoveStart = (event, id) => {
     event.preventDefault();
     setSelectedTaskId(id);
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let didMove = false;
+    const move = (moveEvent) => {
+      if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 5) didMove = true;
+    };
     const up = (upEvent) => {
+      window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      if (!didMove) return;
       const calendar = document.querySelector(".plan-calendar-canvas");
       if (!calendar) return;
       const rect = calendar.getBoundingClientRect();
       if (upEvent.clientX >= rect.left && upEvent.clientX <= rect.right && upEvent.clientY >= rect.top && upEvent.clientY <= rect.bottom) dropTask(id, upEvent.clientY - rect.top + calendar.scrollTop, { metaKey: upEvent.metaKey, altKey: upEvent.altKey });
     };
+    window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
   const completeTask = (id) => { const nextTasks = tasks.map((task) => task.id === id ? { ...task, completed: !task.completed } : task); persistTasks(nextTasks, "Markdown task state updated"); };

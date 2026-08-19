@@ -275,7 +275,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .calendar-task-block.selected { box-shadow: 0 0 0 3px rgba(78, 95, 242, 0.18); }
 .calendar-task-block.completed .block-content { opacity: 0.6; text-decoration: line-through; }
 .block-content { display: flex; flex-direction: column; }
-.block-actions { position: absolute; top: 5px; right: 5px; display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: rgba(255, 255, 255, 0.96); }
+.block-actions { position: absolute; top: calc(100% + 5px); left: 0; z-index: 5; display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 3px 10px rgba(34, 38, 56, 0.12); }
 .block-actions .icon-button { width: 27px; height: 27px; color: #555b6c; }
 .resize-handle { position: absolute; right: 0; bottom: 0; left: 0; height: 9px; padding: 0; border: 0; background: transparent; cursor: ns-resize; }
 .resize-handle::after { position: absolute; right: 42%; bottom: 3px; left: 42%; height: 2px; border-radius: 2px; background: currentColor; content: ""; opacity: 0.38; }
