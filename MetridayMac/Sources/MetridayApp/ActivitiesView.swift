@@ -169,6 +169,9 @@ struct ActivitiesView: View {
                                     showingNewEntry = true
                                 }
                             },
+                            onSelectActivity: { activity in
+                                selectedActivity = activity
+                            },
                             onEditTimeEntry: { entry in
                                 editingEntry = entry
                             }
@@ -1849,12 +1852,18 @@ struct ActivitiesView: View {
         .background(filter == target ? MetridayTheme.accentSoft : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .onTapGesture {
-            filter = target
-        }
-        .onTapGesture(count: 2) {
-            editingProject = project
-        }
+        .gesture(
+            TapGesture(count: 2)
+                .exclusively(before: TapGesture())
+                .onEnded { result in
+                    switch result {
+                    case .first:
+                        editingProject = project
+                    case .second:
+                        filter = target
+                    }
+                }
+        )
         .onDrop(of: [UTType.plainText], isTargeted: nil) { providers, _ in
             handleActivityDrop(providers, onto: project)
         }
@@ -4247,6 +4256,7 @@ private struct ActivityTimelinePanel: View {
     @Binding var selectionEnd: Int?
     let onCreateTimeEntry: (Int?, Int?) -> Void
     let onRecordCalendarEvent: (CalendarEventItem, Bool) -> Void
+    let onSelectActivity: (ActivitySegment) -> Void
     let onEditTimeEntry: (TimeEntry) -> Void
 
     @State private var dragAnchorMinute: Int?
@@ -4335,11 +4345,20 @@ private struct ActivityTimelinePanel: View {
                         }
                         .frame(width: width, height: 18)
                         .contentShape(Rectangle())
-                        .onTapGesture(count: 2) {
-                            let start = max(0, segment.startMinute)
-                            let end = min(1_440, max(start + 15, segment.endMinute))
-                            onCreateTimeEntry(start, end)
-                        }
+                        .gesture(
+                            TapGesture(count: 2)
+                                .exclusively(before: TapGesture())
+                                .onEnded { result in
+                                    switch result {
+                                    case .first:
+                                        let start = max(0, segment.startMinute)
+                                        let end = min(1_440, max(start + 15, segment.endMinute))
+                                        onCreateTimeEntry(start, end)
+                                    case .second:
+                                        onSelectActivity(segment)
+                                    }
+                                }
+                        )
                         .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))\(segment.resource.isEmpty ? "" : " · \(segment.resource)")")
                         .onHover { isHovered in
                             // Timeline blocks can overlap. Clearing the shared
@@ -4524,11 +4543,20 @@ private struct ActivityTimelinePanel: View {
                             .frame(width: width, height: 16)
                             .offset(x: left)
                             .contentShape(Rectangle())
-                            .onTapGesture(count: 2) {
-                                let start = max(0, segment.startMinute)
-                                let end = min(1_440, max(start + 15, segment.endMinute))
-                                onCreateTimeEntry(start, end)
-                            }
+                            .gesture(
+                                TapGesture(count: 2)
+                                    .exclusively(before: TapGesture())
+                                    .onEnded { result in
+                                        switch result {
+                                        case .first:
+                                            let start = max(0, segment.startMinute)
+                                            let end = min(1_440, max(start + 15, segment.endMinute))
+                                            onCreateTimeEntry(start, end)
+                                        case .second:
+                                            onSelectActivity(segment)
+                                        }
+                                    }
+                            )
                             .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
                     }
                 }

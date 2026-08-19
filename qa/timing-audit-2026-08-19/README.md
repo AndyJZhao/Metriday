@@ -73,6 +73,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 67. Native Activities detail parity — verified `swift build` and native smoke tests after wiring single-click App / Category activity rows to the shared Activity detail sheet, while preserving the existing double-click Time Entry action and project controls.
 68. Native Today Time Entry detail — verified `swift build`, native smoke tests, packaged-app launch, and relaunch after making recorded-time blocks open an editor with title, time, project, billing, notes, Save, and Delete actions instead of only navigating to Activities.
 69. Native Activity click disambiguation — verified `swift build`, native smoke tests, packaged-app build, and relaunch after replacing overlapping single/double tap handlers with an exclusive gesture: single click opens Activity detail, double click creates a Time Entry.
+70. Native Timeline click parity — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after making horizontal and vertical App activity blocks open the shared detail sheet on single click while retaining double-click Time Entry creation; Project rows now also use an exclusive single-select / double-edit gesture.
 
 ## Findings applied
 
@@ -143,3 +144,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Native Activities rows now open the same App / Category / Project / context detail surface on single click that the Web companion exposes, with explicit Record Time Entry rather than an implicit write.
 - Native Today recorded-time blocks now open a direct editor with Save/Delete actions, matching the Web timeline overlay workflow and preserving the full block as the hit target.
 - Native Activity row gestures now use one exclusive click recognizer, preserving both single-click detail and double-click Time Entry behavior without competing callbacks.
+- Native Timeline activity blocks now use the same exclusive click semantics as activity rows: single click opens App / Category detail, double click creates a Time Entry, and Project rows no longer compete between selection and edit callbacks.
