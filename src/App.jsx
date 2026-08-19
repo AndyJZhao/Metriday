@@ -257,6 +257,20 @@ function useMetridayAPI(dateKey, apiBase) {
     refresh,
     fetchRange,
     fetchPlan,
+    downloadReportFile: async ({ startDate, endDate, format, include, groupBy, billingFilter, rounding, roundingMinutes }) => {
+      const params = new URLSearchParams({ start_date: startDate, end_date: endDate, format, include, group_by: groupBy, billing_status: billingFilter, rounding, rounding_minutes: String(roundingMinutes) });
+      const response = await fetch(`${normalizeApiBase(apiBase)}/v1/reports?${params.toString()}`);
+      if (!response.ok) throw new Error((await response.text().catch(() => "")) || "Could not generate the native report.");
+      const blob = await response.blob();
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = `metriday-report-${startDate}-${endDate}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(href);
+    },
     startTimer: (title, projectID) => mutate("/v1/timer/start", { title, projectID }),
     stopTimer: () => mutate("/v1/timer/stop"),
     toggleTracking: () => mutate(snapshot.status?.tracking ? "/v1/tracking/pause" : "/v1/tracking/resume"),
@@ -1532,10 +1546,19 @@ function WebReportPanel({ api, dateKey }) {
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Metriday report ${rangeStart} to ${rangeEnd}</title><style>body{font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#252832;margin:36px}h1{font-size:24px}p{color:#626978}table{border-collapse:collapse;width:100%;margin-top:24px}th,td{border:1px solid #dfe1e6;padding:8px;text-align:left;font-size:12px}th{background:#f4f5f8}</style></head><body><h1>Metriday report</h1><p>${rangeStart} to ${rangeEnd} · Total ${reportHTMLCell(formatDurationSeconds(report.totalSeconds))} · Billable ${reportHTMLCell(formatDurationSeconds(report.billableSeconds))} · Amount ${reportHTMLCell(report.amount.toFixed(2))} ${reportHTMLCell(report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD")}</p><table><thead><tr><th>Kind</th><th>Title</th><th>Project</th><th>Billing</th><th>Currency</th><th>Start</th><th>End</th><th>Duration (s)</th><th>Amount</th></tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
     downloadReport(`metriday-report-${rangeStart}-${rangeEnd}.html`, html, "text/html;charset=utf-8");
   };
+  const exportNativeReport = async (format) => {
+    try {
+      setMessage(`Generating ${format.toUpperCase()}…`);
+      await api.downloadReportFile({ startDate: rangeStart, endDate: rangeEnd, format, include: includeMode, groupBy, billingFilter, rounding, roundingMinutes: roundingInterval });
+      setMessage(`${format.toUpperCase()} report exported.`);
+    } catch (error) {
+      setMessage(error.message || `Could not export ${format.toUpperCase()} report.`);
+    }
+  };
   return <section className="web-report-panel">
     <div className="chart-heading">
       <div><h2>Reports & exports</h2><p>Timing-style reports from local activities, time entries, projects, and billing status.</p></div>
-      <div className="report-actions"><button type="button" onClick={exportCSV} disabled={!report.rows.length}>Export CSV</button><button type="button" onClick={exportJSON} disabled={!report.rows.length}>Export JSON</button><button type="button" onClick={exportHTML} disabled={!report.rows.length}>Export HTML</button></div>
+      <div className="report-actions"><button type="button" onClick={exportCSV} disabled={!report.rows.length}>Export CSV</button><button type="button" onClick={exportJSON} disabled={!report.rows.length}>Export JSON</button><button type="button" onClick={exportHTML} disabled={!report.rows.length}>Export HTML</button><button type="button" onClick={() => exportNativeReport("xlsx")} disabled={!report.rows.length || !api.connected}>Export XLSX</button><button type="button" onClick={() => exportNativeReport("pdf")} disabled={!report.rows.length || !api.connected}>Export PDF</button></div>
     </div>
     <div className="report-presets">
       <label>Report<select value={reportPreset} onChange={(event) => applyReportPreset(event.target.value)}>{reportPresets.map((preset) => <option value={preset.key} key={preset.key}>{preset.label}</option>)}</select></label>
