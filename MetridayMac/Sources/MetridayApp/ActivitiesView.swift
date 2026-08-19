@@ -30,6 +30,7 @@ private final class LockedArray<Element>: @unchecked Sendable {
 }
 
 struct ActivitiesView: View {
+    @EnvironmentObject private var appState: AppState
     @ObservedObject var monitor: AppActivityMonitor
     @ObservedObject var projectStore: ProjectStore
     @ObservedObject var filterStore: ActivityFilterStore
@@ -54,6 +55,10 @@ struct ActivitiesView: View {
     @State private var collapsedProjectIDs: Set<UUID> = []
     @State private var selectedDevice = ActivityDeviceFilter.all
     @State private var timelineOrientation: ActivityTimelineOrientation = .horizontal
+    @State private var showingDevicesPopover = false
+    @State private var showingFiltersPopover = false
+    @State private var hideDevicesWithoutTime = false
+    @State private var selectedBuiltinFilter: ActivityBuiltinFilter?
     @State private var timelineSelectionStart: Int?
     @State private var timelineSelectionEnd: Int?
     @State private var showingNewProject = false
@@ -87,6 +92,8 @@ struct ActivitiesView: View {
                     title: "Activities",
                     subtitle: "Review, assign, and automate the time Timing captures"
                 )
+
+                activitiesToolbar
 
                 HStack(alignment: .top, spacing: 18) {
                     projectSidebar
@@ -292,6 +299,354 @@ struct ActivitiesView: View {
             ? preferences.selectedDevice
             : ActivityDeviceFilter.all
         displayPreferencesRestored = true
+    }
+
+    private var activitiesToolbar: some View {
+        HStack(spacing: 8) {
+            Button {
+                newProjectName = ""
+                newProjectParentID = nil
+                newProjectTeamID = nil
+                addProjectNameRules = true
+                showingNewProject = true
+            } label: {
+                Label("New Project", systemImage: "folder.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityIdentifier("activities.toolbar.new-project")
+
+            Button {
+                prepareNewEntry()
+                showingNewEntry = true
+            } label: {
+                Label("New Time Entry", systemImage: "clock.badge.plus")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityIdentifier("activities.toolbar.new-entry")
+
+            Button {
+                if timeEntryStore.runningTimer == nil {
+                    showingTimerStart = true
+                } else {
+                    _ = timeEntryStore.stopTimer()
+                }
+            } label: {
+                Label(
+                    timeEntryStore.runningTimer == nil ? "Start Timer" : "Stop Timer",
+                    systemImage: timeEntryStore.runningTimer == nil ? "play.fill" : "stop.fill"
+                )
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .accessibilityIdentifier("activities.toolbar.timer")
+
+            Spacer(minLength: 8)
+
+            dateRangeToolbar
+
+            Button {
+                showingDevicesPopover.toggle()
+            } label: {
+                Label(deviceToolbarTitle, systemImage: "macbook.and.iphone")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Choose devices")
+            .accessibilityIdentifier("activities.toolbar.devices")
+            .popover(isPresented: $showingDevicesPopover, arrowEdge: .bottom) {
+                devicesPopover
+            }
+
+            Button {
+                showingFiltersPopover.toggle()
+            } label: {
+                Label(filterToolbarTitle, systemImage: "line.3.horizontal.decrease.circle")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Choose an activity filter")
+            .accessibilityIdentifier("activities.toolbar.filters")
+            .popover(isPresented: $showingFiltersPopover, arrowEdge: .bottom) {
+                filtersPopover
+            }
+
+            Button {
+                timelineOrientation = timelineOrientation == .horizontal ? .vertical : .horizontal
+            } label: {
+                Image(systemName: timelineOrientation.icon)
+                    .frame(minWidth: 20)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Toggle timeline orientation")
+            .accessibilityLabel("Toggle Timeline Orientation")
+            .accessibilityIdentifier("activities.toolbar.timeline-orientation")
+
+            activitySearchField
+        }
+        .padding(10)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(MetridayTheme.line, lineWidth: 1)
+        )
+    }
+
+    private var dateRangeToolbar: some View {
+        HStack(spacing: 0) {
+            Button {
+                appState.moveSelectedDate(byDays: -1)
+            } label: {
+                Image(systemName: "chevron.left")
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .help("Previous day")
+            .accessibilityLabel("Previous")
+            .accessibilityIdentifier("activities.toolbar.previous")
+
+            Divider()
+                .frame(height: 18)
+
+            Button {
+                appState.goToToday()
+            } label: {
+                Text(dateRangeTitle)
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(minWidth: 76, minHeight: 28, maxHeight: 28)
+            }
+            .buttonStyle(.plain)
+            .help("Go to today")
+            .accessibilityLabel("Today")
+            .accessibilityIdentifier("activities.toolbar.today")
+
+            Divider()
+                .frame(height: 18)
+
+            Button {
+                appState.moveSelectedDate(byDays: 1)
+            } label: {
+                Image(systemName: "chevron.right")
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .help("Next day")
+            .accessibilityLabel("Next")
+            .accessibilityIdentifier("activities.toolbar.next")
+        }
+        .padding(.horizontal, 4)
+        .background(MetridayTheme.canvas)
+        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Date Range")
+        .accessibilityIdentifier("activities.toolbar.date-range")
+    }
+
+    private var activitySearchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(MetridayTheme.secondary)
+            TextField("Search", text: $searchText)
+                .textFieldStyle(.plain)
+                .frame(width: 120)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 28)
+        .background(MetridayTheme.canvas)
+        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Search activities")
+        .accessibilityIdentifier("activities.toolbar.search")
+    }
+
+    private var devicesPopover: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Devices")
+                .font(.system(size: 13, weight: .bold))
+
+            devicePopoverRow(
+                title: "All Mac devices",
+                icon: "macbook",
+                isSelected: selectedDevice == ActivityDeviceFilter.all
+            ) {
+                selectedDevice = ActivityDeviceFilter.all
+                showingDevicesPopover = false
+            }
+
+            Divider()
+
+            ForEach(availableDevices.dropFirst(), id: \.self) { device in
+                devicePopoverRow(
+                    title: device,
+                    icon: device == ActivityDeviceFilter.local ? "macbook" : "desktopcomputer",
+                    isSelected: selectedDevice == device
+                ) {
+                    selectedDevice = device
+                    showingDevicesPopover = false
+                }
+            }
+
+            if availableDevices.count == 1 {
+                Text("No other devices have recorded time yet.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(MetridayTheme.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+
+            Toggle("Hide devices without time", isOn: $hideDevicesWithoutTime)
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .font(.system(size: 11))
+                .disabled(availableDevices.count == 1)
+        }
+        .padding(14)
+        .frame(width: 250, alignment: .leading)
+    }
+
+    private func devicePopoverRow(
+        title: String,
+        icon: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .frame(width: 18)
+                Text(title)
+                    .lineLimit(1)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                }
+            }
+            .font(.system(size: 12))
+            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var filtersPopover: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Filters")
+                .font(.system(size: 13, weight: .bold))
+
+            toolbarFilterRow(
+                title: "No Filter",
+                icon: "line.3.horizontal.decrease.circle",
+                isSelected: selectedBuiltinFilter == nil
+            ) {
+                selectedBuiltinFilter = nil
+                showingFiltersPopover = false
+            }
+
+            Divider()
+
+            ForEach(ActivityBuiltinFilter.allCases) { builtin in
+                toolbarFilterRow(
+                    title: builtin.label,
+                    icon: builtin.icon,
+                    isSelected: selectedBuiltinFilter == builtin
+                ) {
+                    selectedBuiltinFilter = builtin
+                    showingFiltersPopover = false
+                }
+            }
+
+            if !filterStore.activeFilters.isEmpty {
+                Divider()
+                Text("Saved Filters")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(MetridayTheme.secondary)
+                ForEach(filterStore.activeFilters) { savedFilter in
+                    toolbarFilterRow(
+                        title: savedFilter.name,
+                        icon: "line.3.horizontal.decrease.circle",
+                        isSelected: filter == .saved(savedFilter.id),
+                        tint: color(for: savedFilter.color)
+                    ) {
+                        selectedBuiltinFilter = nil
+                        filter = .saved(savedFilter.id)
+                        showingFiltersPopover = false
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(width: 250, alignment: .leading)
+    }
+
+    private func toolbarFilterRow(
+        title: String,
+        icon: String,
+        isSelected: Bool,
+        tint: Color = MetridayTheme.accent,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .frame(width: 18)
+                Text(title)
+                    .lineLimit(1)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                }
+            }
+            .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+            .foregroundStyle(isSelected ? tint : MetridayTheme.graphite)
+            .frame(maxWidth: .infinity, minHeight: 27, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var dateRangeTitle: String {
+        if Calendar.current.isDateInToday(selectedDate) {
+            return "Today"
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: selectedDate)
+    }
+
+    private var deviceToolbarTitle: String {
+        selectedDevice == ActivityDeviceFilter.all ? "Devices" : selectedDevice
+    }
+
+    private var filterToolbarTitle: String {
+        if let selectedBuiltinFilter {
+            return selectedBuiltinFilter.label
+        }
+        switch filter {
+        case .all:
+            return "Filters"
+        case .saved(let id):
+            return filterStore.filter(id)?.name ?? "Filters"
+        case .unassigned, .project:
+            return "Filters"
+        }
     }
 
     private var projectSidebar: some View {
@@ -634,41 +989,10 @@ struct ActivitiesView: View {
                 }
                 Spacer()
                 HStack(spacing: 8) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(MetridayTheme.secondary)
-                        TextField("Search activities", text: $searchText)
-                            .textFieldStyle(.plain)
-                            .frame(width: 150)
-                        if !searchText.isEmpty {
-                            Button {
-                                searchText = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(MetridayTheme.secondary)
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .frame(height: 26)
-                    .background(MetridayTheme.canvas)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-
                     Toggle("Show Idle", isOn: $includeIdle)
                         .toggleStyle(.checkbox)
                         .controlSize(.small)
                         .font(.system(size: 10))
-
-                    Picker("Device", selection: $selectedDevice) {
-                        ForEach(availableDevices, id: \.self) { device in
-                            Text(device).tag(device)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .controlSize(.small)
-                    .frame(width: 125, alignment: .leading)
-                    .accessibilityIdentifier("activities.device-filter")
 
                     Toggle("Group by project", isOn: groupByProjectBinding)
                         .toggleStyle(.checkbox)
@@ -692,41 +1016,13 @@ struct ActivitiesView: View {
                     .accessibilityIdentifier("activities.view-mode")
 
                     Button {
-                        if timeEntryStore.runningTimer == nil {
-                            showingTimerStart = true
-                        } else {
-                            _ = timeEntryStore.stopTimer()
-                        }
-                    } label: {
-                        Label(
-                            timeEntryStore.runningTimer == nil ? "Start Timer" : "Stop Timer",
-                            systemImage: timeEntryStore.runningTimer == nil ? "play.fill" : "stop.fill"
-                        )
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .accessibilityIdentifier("activities.timer")
-
-                    Button {
-                        prepareNewEntry()
-                        showingNewEntry = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .help("New Time Entry")
-                    .accessibilityLabel("New Time Entry")
-                    .accessibilityIdentifier("activities.new-entry")
-
-                    Button {
                         showingEntryOMatic = true
                     } label: {
                         Image(systemName: "wand.and.stars")
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .help("Create Time Entries")
+                    .help("Create Time Entries from activity")
                     .accessibilityLabel("Create Time Entries")
                     .disabled(filteredSegments.allSatisfy { $0.relevance == .idle })
                     .accessibilityIdentifier("activities.entry-o-matic")
@@ -1503,11 +1799,15 @@ struct ActivitiesView: View {
     }
 
     private var filterScopedSegments: [ActivitySegment] {
-        scopedSegments(from: segmentsForSelectedRange)
+        let scoped = scopedSegments(from: segmentsForSelectedRange)
+        guard let selectedBuiltinFilter else { return scoped }
+        return scoped.filter { selectedBuiltinFilter.matches($0) }
     }
 
     private var timelineScopedSegments: [ActivitySegment] {
-        scopedSegments(from: monitor.observedSegments + screenTimeStore.segments)
+        let scoped = scopedSegments(from: monitor.observedSegments + screenTimeStore.segments)
+        guard let selectedBuiltinFilter else { return scoped }
+        return scoped.filter { selectedBuiltinFilter.matches($0) }
     }
 
     private func scopedSegments(from sourceSegments: [ActivitySegment]) -> [ActivitySegment] {
@@ -1528,16 +1828,21 @@ struct ActivitiesView: View {
     }
 
     private var filterTitle: String {
+        let baseTitle: String
         switch filter {
         case .all:
-            return "All Activities"
+            baseTitle = "All Activities"
         case .unassigned:
-            return "Unassigned"
+            baseTitle = "Unassigned"
         case .project(let id):
-            return projectStore.name(for: id)
+            baseTitle = projectStore.name(for: id)
         case .saved(let id):
-            return filterStore.filter(id)?.name ?? "Filter"
+            baseTitle = filterStore.filter(id)?.name ?? "Filter"
         }
+        if let selectedBuiltinFilter {
+            return "\(baseTitle) · \(selectedBuiltinFilter.label)"
+        }
+        return baseTitle
     }
 
     private var availableDevices: [String] {
@@ -2059,6 +2364,114 @@ private enum ActivityFilter: Hashable {
     case unassigned
     case project(UUID)
     case saved(UUID)
+}
+
+private enum ActivityBuiltinFilter: String, CaseIterable, Hashable, Identifiable {
+    case webBrowsing
+    case media
+    case communication
+    case officeBusiness
+    case readingWriting
+    case fileManagement
+    case graphics
+    case development
+    case finance
+    case gaming
+    case socialMedia
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .webBrowsing: return "Web Browsing"
+        case .media: return "Media"
+        case .communication: return "Communication"
+        case .officeBusiness: return "Office & Business"
+        case .readingWriting: return "Reading & Writing"
+        case .fileManagement: return "File Management"
+        case .graphics: return "Graphics"
+        case .development: return "Development"
+        case .finance: return "Finance"
+        case .gaming: return "Gaming"
+        case .socialMedia: return "Social Media"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .webBrowsing: return "globe"
+        case .media: return "play.rectangle"
+        case .communication: return "message"
+        case .officeBusiness: return "briefcase"
+        case .readingWriting: return "book"
+        case .fileManagement: return "folder"
+        case .graphics: return "paintpalette"
+        case .development: return "hammer"
+        case .finance: return "dollarsign.circle"
+        case .gaming: return "gamecontroller"
+        case .socialMedia: return "person.2"
+        }
+    }
+
+    func matches(_ segment: ActivitySegment) -> Bool {
+        let app = segment.appName.lowercased()
+        let bundle = segment.bundleIdentifier.lowercased()
+        let title = segment.windowTitle.lowercased()
+        let resource = segment.resource.lowercased()
+        let haystack = "\(app) \(bundle) \(title) \(resource)"
+        let host = URL(string: segment.resource)?.host?.lowercased() ?? ""
+
+        func containsAny(_ terms: [String]) -> Bool {
+            terms.contains { haystack.contains($0) }
+        }
+
+        switch self {
+        case .webBrowsing:
+            return !host.isEmpty || containsAny([
+                "safari", "chrome", "firefox", "brave", "arc", "edge", "opera", "vivaldi", "browser"
+            ])
+        case .media:
+            return containsAny([
+                "music", "spotify", "podcast", "tv", "youtube", "netflix", "vlc", "video", "plex", "twitch"
+            ])
+        case .communication:
+            return containsAny([
+                "slack", "messages", "mail", "outlook", "teams", "zoom", "discord", "wechat", "telegram", "signal", "skype", "whatsapp"
+            ])
+        case .officeBusiness:
+            return containsAny([
+                "word", "excel", "powerpoint", "keynote", "numbers", "notion", "linear", "clickup", "asana", "office", "spreadsheet", "invoice", "salesforce"
+            ])
+        case .readingWriting:
+            return containsAny([
+                "books", "kindle", "reader", "preview", "notes", "textedit", "ulysses", "ia writer", "obsidian", "scrivener", "writer", "medium", "wikipedia"
+            ])
+        case .fileManagement:
+            return containsAny([
+                "finder", "file manager", "path finder", "transmit", "dropbox", "google drive", "onedrive", "files", "folder"
+            ])
+        case .graphics:
+            return containsAny([
+                "figma", "sketch", "photoshop", "illustrator", "affinity", "pixelmator", "blender", "design", "paint", "canva"
+            ])
+        case .development:
+            return containsAny([
+                "xcode", "terminal", "iterm", "visual studio", "code", "cursor", "sublime", "intellij", "pycharm", "android studio", "git", "github", "developer", "console"
+            ])
+        case .finance:
+            return containsAny([
+                "bank", "finance", "budget", "money", "mint", "quickbooks", "coinbase", "paypal", "stripe", "invoice", "accounting", "trading"
+            ])
+        case .gaming:
+            return containsAny([
+                "steam", "game", "gaming", "epic games", "battle.net", "minecraft", "playstation", "xbox", "roblox"
+            ])
+        case .socialMedia:
+            return containsAny([
+                "facebook", "instagram", "twitter", "x.com", "reddit", "linkedin", "tiktok", "mastodon", "social", "threads", "snapchat", "pinterest"
+            ])
+        }
+    }
 }
 
 private struct ActivityFilterEditorSheet: View {
