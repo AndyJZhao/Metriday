@@ -150,6 +150,7 @@ function useMetridayAPI(dateKey, apiBase) {
     screenTime: { data: [], database_available: false, status: "Screen Time integration not connected" },
     projectRules: [],
     preferences: null,
+    integrations: [],
     weekly: [],
     insights: [],
   });
@@ -188,6 +189,7 @@ function useMetridayAPI(dateKey, apiBase) {
         request(`/v1/screen-time?date=${date}`),
         request("/v1/project-rules"),
         request("/v1/preferences"),
+        request("/v1/integrations"),
       ]);
       const value = (index, fallback) => results[index].status === "fulfilled" ? results[index].value : fallback;
       setSnapshot({
@@ -212,6 +214,7 @@ function useMetridayAPI(dateKey, apiBase) {
         screenTime: value(13, { data: [], database_available: false, status: "Screen Time integration not connected" }),
         projectRules: value(14, { data: [] })?.data || [],
         preferences: value(15, null),
+        integrations: value(16, { data: [] })?.data || [],
       });
       setRefreshVersion((value) => value + 1);
     } catch (error) {
@@ -262,6 +265,23 @@ function useMetridayAPI(dateKey, apiBase) {
       await refresh();
     },
     syncNow: () => mutate("/v1/sync/now"),
+    restoreSync: () => mutate("/v1/sync/restore"),
+    syncIntegration: async (provider) => {
+      await request(`/v1/integrations/${encodeURIComponent(provider)}/sync`, { method: "POST" });
+      await refresh();
+    },
+    exportProjects: () => request("/v1/projects/export"),
+    importProjects: async (archive) => {
+      const result = await request("/v1/projects/import", { method: "POST", body: archive });
+      await refresh();
+      return result;
+    },
+    exportTimeEntries: () => request("/v1/time-entries/export"),
+    importTimeEntries: async (archive) => {
+      const result = await request("/v1/time-entries/import", { method: "POST", body: archive });
+      await refresh();
+      return result;
+    },
     addTimeEntry: async (entry) => {
       await request("/v1/time-entries", { method: "POST", body: JSON.stringify(entry) });
       await refresh();
@@ -680,6 +700,9 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
   });
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [transferBusy, setTransferBusy] = useState(false);
+  const projectsFileRef = useRef(null);
+  const entriesFileRef = useRef(null);
 
   useEffect(() => {
     if (open) {
@@ -693,6 +716,34 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
 
   const preferenceTime = (minutes) => `${String(Math.floor(Number(minutes || 0) / 60)).padStart(2, "0")}:${String(Number(minutes || 0) % 60).padStart(2, "0")}`;
   const updatePreference = (key, value) => setPreferences((current) => ({ ...current, [key]: value }));
+  const exportArchive = async (kind) => {
+    try {
+      setTransferBusy(true);
+      const archive = kind === "projects" ? await api.exportProjects() : await api.exportTimeEntries();
+      downloadReport(`metriday-${kind}-${localDateKey()}.json`, JSON.stringify(archive, null, 2), "application/json;charset=utf-8");
+      setMessage(`${kind === "projects" ? "Projects" : "Time entries"} exported.`);
+    } catch (error) {
+      setMessage(error.message || "Could not export local data.");
+    } finally {
+      setTransferBusy(false);
+    }
+  };
+  const importArchive = async (event, kind) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      setTransferBusy(true);
+      const archive = await file.text();
+      const result = kind === "projects" ? await api.importProjects(archive) : await api.importTimeEntries(archive);
+      const count = kind === "projects" ? `${result?.projectsImported || 0} projects` : `${result?.entriesImported || 0} time entries`;
+      setMessage(`Imported ${count}.`);
+    } catch (error) {
+      setMessage(error.message || "Could not import local data.");
+    } finally {
+      setTransferBusy(false);
+    }
+  };
   const save = async (event) => {
     event.preventDefault();
     const value = String(draft || "").trim();
@@ -743,6 +794,12 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
         <div className="settings-toggle-row"><label><input type="checkbox" checked={Boolean(preferences.allow_local_network_api)} onChange={(event) => updatePreference("allow_local_network_api", event.target.checked)} disabled={!connected || saving} />Allow local network access</label><small>Required for another device to use this Web companion</small></div>
         <label htmlFor="metriday-api-base">Native API base URL</label><div className="settings-input-wrap"><LinkSimple size={18} /><input id="metriday-api-base" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="http://127.0.0.1:8765" /></div>
         <div className="settings-connection-state"><i className={connected ? "connected" : ""} /><span>{connected ? "Native API connected" : "Native API not connected"}</span><small>Local-first · no cloud upload</small></div>
+      </div>
+      <div className="settings-section"><div className="settings-section-heading"><strong>Local data</strong></div><span className="settings-help-text">Projects and time entries remain in the native Application Support store. Archives merge locally; time-entry IDs are deduplicated on import.</span><div className="settings-data-actions"><button type="button" onClick={() => exportArchive("projects")} disabled={!connected || saving || transferBusy}>Export projects</button><button type="button" onClick={() => projectsFileRef.current?.click()} disabled={!connected || saving || transferBusy}>Import projects</button><button type="button" onClick={() => exportArchive("time entries")} disabled={!connected || saving || transferBusy}>Export time entries</button><button type="button" onClick={() => entriesFileRef.current?.click()} disabled={!connected || saving || transferBusy}>Import time entries</button><input ref={projectsFileRef} type="file" accept="application/json,.json" hidden onChange={(event) => importArchive(event, "projects")} /><input ref={entriesFileRef} type="file" accept="application/json,.json" hidden onChange={(event) => importArchive(event, "entries")} /></div></div>
+      <div className="settings-section"><div className="settings-section-heading"><strong>Sync & integrations</strong></div>
+        <div className="settings-toggle-row"><span>{api.sync?.enabled ? "Local sync enabled" : "Local sync not configured"}</span><small>{api.sync?.status || "No sync status"}</small></div>
+        <div className="settings-sync-actions"><button type="button" className="secondary-button" onClick={() => api.syncNow().then(() => setMessage("Sync completed.")).catch((error) => setMessage(error.message || "Sync failed."))} disabled={!connected || saving}>Sync now</button><button type="button" className="secondary-button" onClick={() => api.restoreSync().then(() => setMessage("Latest backup restored.")).catch((error) => setMessage(error.message || "Restore failed."))} disabled={!connected || saving || !api.sync?.backupCount}>Restore latest backup</button></div>
+        <div className="settings-integration-list">{api.integrations?.map((integration) => <div className="settings-integration-row" key={integration.provider}><div><strong>{integration.title || integration.provider}</strong><small>{integration.connected ? integration.workspace || "Connected" : integration.status || "Not connected"}</small></div><button type="button" className="quiet-pill" onClick={() => api.syncIntegration(integration.provider).then(() => setMessage(`${integration.title || integration.provider} sync started.`)).catch((error) => setMessage(error.message || "Integration sync failed."))} disabled={!connected || saving || api.sync?.isWorking}>{integration.connected ? "Sync" : "Connect"}</button></div>)}</div>
       </div>
       <div className="settings-section settings-source-status"><div className="settings-section-heading"><strong>Data sources</strong></div><span><i className={api.calendarEvents?.authorized ? "connected" : ""} />Calendar · {api.calendarEvents?.status || "Not connected"}</span><span><i className={api.reminders?.authorized ? "connected" : ""} />Reminders · {api.reminders?.status || "Not connected"}</span><span><i className={api.screenTime?.database_available ? "connected" : ""} />Screen Time · {api.screenTime?.status || "Not connected"}</span></div>
       {message ? <p className="entry-message" role="status">{message}</p> : null}

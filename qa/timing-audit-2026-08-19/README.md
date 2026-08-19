@@ -29,6 +29,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 23. `23-rules-project-automation.png` — Rules after exposing persisted project automation rules with project, field, comparison, priority, and delete controls.
 24. Review report builder — verified in the running Web companion with nine report presets, Include source selection, Group by aggregation, billing/rounding controls, and CSV/JSON/HTML exports.
 25. Settings — verified in the running Web companion with native-backed tracking, idle, working-hours, privacy, connection, and source-permission controls.
+26. Settings local data — verified with project/time-entry archive export controls and native sync/integration actions; project export completed from the running app.
 
 ## Findings applied
 
@@ -53,3 +54,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Rules now exposes native project automation rules; a saved App / title / domain / URL / keyword match can be created, reordered, and removed from the Web companion while preserving the existing website blocklist.
 - Review reports now has the native report-builder shape: Timesheet, Weekly Snippet, per-project/application/document, detailed, and raw presets; Include and Group by controls change the actual rows and totals instead of being decorative.
 - Settings now reads and writes the native Preferences store through `/v1/preferences`; tracking state, idle threshold, working hours, weekend behavior, sleep handling, LAN exposure, and Calendar/Reminders/Screen Time status are visible in one full settings surface.
+- Settings now exposes local project and time-entry archive transfer, native Sync now / Restore latest backup, and per-provider ClickUp / Linear / Clio sync actions; exports stay local to the browser download and imports are delegated to the native merge/deduplication stores.

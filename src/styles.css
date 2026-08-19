@@ -539,6 +539,16 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .settings-field-row select, .settings-time-row input { min-height: 30px; padding: 0 7px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #343740; font-size: 11px; }
 .settings-time-row { display: flex; align-items: end; gap: 8px; color: var(--muted); font-size: 11px; }
 .settings-time-row label { display: grid; gap: 5px; color: #454a55; }
+.settings-sync-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-sync-actions button { min-height: 30px; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #4a4f5a; cursor: pointer; font-size: 11px; }
+.settings-integration-list { display: grid; gap: 7px; }
+.settings-integration-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid #f0f1f4; }
+.settings-integration-row > div { display: grid; gap: 3px; min-width: 0; }
+.settings-integration-row strong { overflow: hidden; color: #454a55; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.settings-integration-row small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.settings-help-text { color: var(--muted); font-size: 10px; line-height: 1.45; }
+.settings-data-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.settings-data-actions button { min-height: 30px; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #4a4f5a; cursor: pointer; font-size: 10px; }
 .settings-source-status > span { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
 .settings-form button:disabled, .settings-form input:disabled, .settings-form select:disabled { cursor: not-allowed; opacity: 0.55; }
 .settings-install-note { display: flex; gap: 10px; margin-top: 23px; padding-top: 17px; border-top: 1px solid #eceef2; color: var(--accent); }
