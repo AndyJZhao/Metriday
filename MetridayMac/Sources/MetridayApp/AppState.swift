@@ -30,6 +30,7 @@ final class AppState: ObservableObject {
     let phoneCallStore: PhoneCallStore
     let screenTimeStore: ScreenTimeStore
     let localAPIServer: LocalAPIServer
+    let loginItemManager: LoginItemManager
     let syncStore: SyncStore
     let integrationStore: IntegrationStore
     let teamStore: TeamStore
@@ -53,6 +54,7 @@ final class AppState: ObservableObject {
         self.phoneCallStore = PhoneCallStore()
         self.screenTimeStore = ScreenTimeStore()
         self.localAPIServer = LocalAPIServer()
+        self.loginItemManager = LoginItemManager()
         self.blocker = WebBlockerService()
         self.teamStore = TeamStore()
         self.activityMonitor = AppActivityMonitor(
@@ -259,6 +261,13 @@ final class AppState: ObservableObject {
             if let value = body["allow_local_network_api"] as? Bool {
                 preferences.allowLocalNetworkAPI = value
                 localAPIServer.setAllowsLAN(value)
+            }
+            if let value = body["launch_at_login"] as? Bool {
+                if value == loginItemManager.isEnabled {
+                    loginItemManager.refresh()
+                } else {
+                    loginItemManager.setEnabled(value)
+                }
             }
             return .jsonObject(preferencesAPI())
         }
@@ -2152,6 +2161,8 @@ final class AppState: ObservableObject {
             "start_tracking_when_app_opens": preferences.startTrackingWhenAppOpens,
             "auto_stop_timer_on_sleep": preferences.autoStopTimerOnSleep,
             "allow_local_network_api": preferences.allowLocalNetworkAPI,
+            "launch_at_login": loginItemManager.isEnabled,
+            "launch_at_login_status": loginItemManager.statusMessage,
             "tracking": activityMonitor.isTracking,
             "api_endpoint": localAPIServer.endpoint,
             "api_allows_lan": localAPIServer.allowsLAN,

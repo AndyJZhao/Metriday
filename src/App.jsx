@@ -872,6 +872,8 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
     start_tracking_when_app_opens: true,
     auto_stop_timer_on_sleep: true,
     allow_local_network_api: false,
+    launch_at_login: false,
+    launch_at_login_status: "Login item not configured",
   });
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -985,6 +987,7 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
         <div className="settings-toggle-row"><label><input type="checkbox" checked={Boolean(api.status?.tracking)} onChange={() => api.toggleTracking()} disabled={!connected || saving} />Automatic activity tracking</label><small>{connected ? "Window, app, browser, and idle evidence" : "Connect the native app to change tracking"}</small></div>
         <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.start_tracking_when_app_opens)} onChange={(event) => updatePreference("start_tracking_when_app_opens", event.target.checked)} disabled={!connected || saving} />Start tracking when Metriday opens</span></label>
         <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.auto_stop_timer_on_sleep)} onChange={(event) => updatePreference("auto_stop_timer_on_sleep", event.target.checked)} disabled={!connected || saving} />Stop timers when the Mac sleeps</span></label>
+        <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.launch_at_login)} onChange={(event) => updatePreference("launch_at_login", event.target.checked)} disabled={!connected || saving} />Launch Metriday at login</span><small>{preferences.launch_at_login_status || "Login item status unavailable"}</small></label>
         <label className="settings-field-row"><span>Idle detection</span><select value={preferences.idle_threshold_seconds} onChange={(event) => updatePreference("idle_threshold_seconds", Number(event.target.value))} disabled={!connected || saving}><option value={60}>1 min</option><option value={120}>2 min</option><option value={180}>3 min</option><option value={300}>5 min</option><option value={600}>10 min</option></select></label>
       </div>
       <div className="settings-section"><div className="settings-section-heading"><strong>Working hours</strong></div>

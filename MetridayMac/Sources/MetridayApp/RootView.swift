@@ -482,6 +482,7 @@ struct SidebarView: View {
                 phoneCallStore: appState.phoneCallStore,
                 screenTimeStore: appState.screenTimeStore,
                 localAPIServer: appState.localAPIServer,
+                loginItemManager: appState.loginItemManager,
                 syncStore: appState.syncStore,
                 integrationStore: appState.integrationStore,
                 teamStore: appState.teamStore

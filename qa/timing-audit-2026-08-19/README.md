@@ -167,6 +167,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Web weekly analytics now separates the native calendar week (Monday–Sunday) used by Review/Stats from the trailing seven-day range used by Activities, so selecting a mid-week date no longer mixes adjacent weeks.
 - Web Reports now defaults to the selected date's native calendar week and exposes separate This week, Last 7 days, and This month shortcuts instead of conflating the first two ranges.
 - Web Settings now surfaces native Accessibility permission state and can trigger the native accessibility request flow, keeping permission requirements explicit for App / website capture.
+- Web Settings now reads and writes the native Launch at login state; repeated saves with no state change only refresh the status and do not attempt a redundant ServiceManagement unregister/register operation.
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
 78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
@@ -184,3 +185,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 90. Web calendar-week parity — verified Web build, Sites tests, and diff checks after fetching a separate Monday–Sunday range for Review/Stats while preserving trailing-seven-day Activities behavior.
 91. Web Reports date-range parity — verified Web build, Sites tests, and diff checks after matching native Report Builder's calendar-week default and adding distinct This week / Last 7 days shortcuts.
 92. Web Accessibility permission parity — verified native build/smoke, Web build/Sites tests, packaged-app relaunch, and live `/v1/source-preferences` response containing Accessibility state after adding the request-access action.
+93. Web Launch at login parity — verified native/Web build and smoke tests, packaged-app relaunch, live Preferences PATCH with an unchanged disabled state, and the native status response without a redundant registration error.

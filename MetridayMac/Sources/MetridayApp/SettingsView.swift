@@ -13,10 +13,10 @@ struct SettingsSheet: View {
     @ObservedObject var phoneCallStore: PhoneCallStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
     @ObservedObject var localAPIServer: LocalAPIServer
+    @ObservedObject var loginItemManager: LoginItemManager
     @ObservedObject var syncStore: SyncStore
     @ObservedObject var integrationStore: IntegrationStore
     @ObservedObject var teamStore: TeamStore
-    @StateObject private var loginItemManager = LoginItemManager()
     @State private var transferStatus = ""
     @State private var showingExclusionEditor = false
 
