@@ -242,7 +242,7 @@ final class MetridayExportReportCommand: NSScriptCommand {
                 )
                 return destination.path
             } catch {
-                scriptError("Report could not be exported: (error.localizedDescription)")
+                scriptError("Report could not be exported: \(error.localizedDescription)")
                 return nil
             }
         }
