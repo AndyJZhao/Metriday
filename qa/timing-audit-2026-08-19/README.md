@@ -10,6 +10,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 4. `04-activities-primary.png` — Activities after moving the recorded activity list ahead of project and time-entry management.
 5. `05-activities-row-style.png` — Activity rows after removing browser button borders so separators remain light and native-looking.
 6. `06-today-current-state.png` — Today after reconciling the current-block banner with the native API; no scheduled block is no longer replaced by preview content.
+7. `07-review-category-pulse.png` — Review after adding a RescueTime-style category breakdown sourced from the same activity evidence.
 
 ## Findings applied
 
