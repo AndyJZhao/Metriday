@@ -34,6 +34,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 28. Today timer controls — added the running Focus timer's remaining-time display, estimate picker, and ±15 minute start adjustment against the native timer API.
 29. Activities exclusions — verified create/delete of a temporary App exclusion through the Web companion and native persisted exclusion store.
 30. Activities category editing — verified create, edit, color/rule update, and delete of a temporary custom category from the Web companion.
+31. Activities filter editing — verified create, rule/name update, and delete of a temporary saved filter from the Web companion.
 
 ## Findings applied
 
@@ -63,3 +64,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Today now exposes Timing-style timer refinement while a timer is running: set an estimate and move the captured start earlier or later in 15-minute increments without leaving the current block.
 - Activities now separates reusable Filters from Exclusions: Filters narrow the visible evidence, while Exclusions remove matching App / website / item / device captures before they enter the local stream.
 - Custom Categories now support editing as well as creation/deletion; changing a category's role, color, or matching rule updates the native classification store used by the App / Category columns and timeline colors.
+- Saved Activity Filters now support editing as well as creation/deletion; changing a filter name or rule updates the native reusable filter store used by the toolbar and reports context.
