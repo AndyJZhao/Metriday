@@ -301,8 +301,9 @@ function useMetridayAPI(dateKey, apiBase) {
     refresh,
     fetchRange,
     fetchPlan,
-    downloadReportFile: async ({ startDate, endDate, format, include, groupBy, billingFilter, rounding, roundingMinutes }) => {
+    downloadReportFile: async ({ startDate, endDate, format, include, groupBy, billingFilter, rounding, roundingMinutes, projectIDs = [] }) => {
       const params = new URLSearchParams({ start_date: startDate, end_date: endDate, format, include, group_by: groupBy, billing_status: billingFilter, rounding, rounding_minutes: String(roundingMinutes) });
+      if (projectIDs.length > 0) params.set("project_ids", projectIDs.join(","));
       const response = await fetch(`${normalizeApiBase(apiBase)}/v1/reports?${params.toString()}`);
       if (!response.ok) throw new Error((await response.text().catch(() => "")) || "Could not generate the native report.");
       const blob = await response.blob();
@@ -1969,6 +1970,7 @@ function downloadReport(filename, content, type) {
 function WebReportPanel({ api, dateKey }) {
   const [rangeStart, setRangeStart] = useState(offsetDateKey(dateKey, -6));
   const [rangeEnd, setRangeEnd] = useState(dateKey);
+  const [projectIDs, setProjectIDs] = useState([]);
   const [reportPreset, setReportPreset] = useState("timesheet");
   const [includeMode, setIncludeMode] = useState("both");
   const [groupBy, setGroupBy] = useState("exact");
@@ -2016,11 +2018,13 @@ function WebReportPanel({ api, dateKey }) {
       const project = api.projects.find((item) => resourceID(item.id) === resourceID(value));
       return { rate: project?.billing_rate || 0, currency: project?.currency || "USD" };
     };
+    const includesProject = (value) => projectIDs.length === 0 || projectIDs.includes(resourceID(value));
     const rows = [];
     if (includeMode !== "app") dataset.entries.forEach((entry) => {
       const start = new Date(entry.start_date || entry.start);
       const end = new Date(entry.end_date || entry.end);
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start || end <= startBound || start >= endBound) return;
+      if (!includesProject(entry.project)) return;
       if (billingFilter !== "all" && entry.billing_status !== billingFilter) return;
       const clippedStart = start < startBound ? startBound : start;
       const clippedEnd = end > endBound ? endBound : end;
@@ -2031,6 +2035,7 @@ function WebReportPanel({ api, dateKey }) {
     if (includeMode !== "time" && billingFilter === "all") {
       dataset.activities.forEach((activity) => {
         if (activity.relevance === "idle") return;
+        if (!includesProject(activity.projectID)) return;
         const start = reportDateTime(activity.date, activity.startSecond);
         const end = reportDateTime(activity.date, activity.endSecond);
         if (end <= startBound || start >= endBound || end <= start) return;
@@ -2058,7 +2063,7 @@ function WebReportPanel({ api, dateKey }) {
       return groups;
     }, new Map()).values()].sort((left, right) => left.start - right.start);
     return { rows: groupedRows, totalSeconds: groupedRows.reduce((sum, row) => sum + row.seconds, 0), billableSeconds: groupedRows.reduce((sum, row) => sum + row.billableSeconds, 0), amount: groupedRows.reduce((sum, row) => sum + row.amount, 0), currencies: [...new Set(groupedRows.map((row) => row.currency).filter(Boolean))] };
-  }, [api.projects, billingFilter, dataset, groupBy, includeMode, rangeEnd, rangeStart, rounding, roundingInterval]);
+  }, [api.projects, billingFilter, dataset, groupBy, includeMode, projectIDs, rangeEnd, rangeStart, rounding, roundingInterval]);
   const setDatePreset = (preset) => {
     if (preset === "today") {
       setRangeStart(dateKey);
@@ -2099,7 +2104,7 @@ function WebReportPanel({ api, dateKey }) {
   const exportNativeReport = async (format) => {
     try {
       setMessage(`Generating ${format.toUpperCase()}…`);
-      await api.downloadReportFile({ startDate: rangeStart, endDate: rangeEnd, format, include: includeMode, groupBy, billingFilter, rounding, roundingMinutes: roundingInterval });
+      await api.downloadReportFile({ startDate: rangeStart, endDate: rangeEnd, format, include: includeMode, groupBy, billingFilter, rounding, roundingMinutes: roundingInterval, projectIDs });
       setMessage(`${format.toUpperCase()} report exported.`);
     } catch (error) {
       setMessage(error.message || `Could not export ${format.toUpperCase()} report.`);
@@ -2122,6 +2127,7 @@ function WebReportPanel({ api, dateKey }) {
       <label>Rounding<select value={rounding} onChange={(event) => setRounding(event.target.value)}><option value="none">Exact</option><option value="up">Round up</option><option value="down">Round down</option><option value="nearest">Nearest</option></select></label>
       <label>Interval<select value={roundingInterval} onChange={(event) => setRoundingInterval(Number(event.target.value))}><option value={1}>1 min</option><option value={5}>5 min</option><option value={6}>6 min</option><option value={10}>10 min</option><option value={12}>12 min</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label>
     </div>
+    <div className="report-project-filter"><strong>Projects</strong><label><input type="checkbox" checked={projectIDs.length === 0} onChange={() => setProjectIDs([])} />All projects</label>{api.projects.map((project) => <label key={project.id}><input type="checkbox" checked={projectIDs.length === 0 || projectIDs.includes(resourceID(project.id))} onChange={(event) => setProjectIDs((current) => { const id = resourceID(project.id); if (event.target.checked) return current.length === 0 ? [id] : [...new Set([...current, id])]; return current.filter((value) => value !== id); })} />{project.title || project.name}</label>)}</div>
     {message ? <p className="entry-message" role="status">{message}</p> : null}
     <div className="report-metrics"><div><span>Total</span><strong>{formatDurationSeconds(report.totalSeconds)}</strong></div><div><span>Billable</span><strong>{formatDurationSeconds(report.billableSeconds)}</strong></div><div><span>Amount</span><strong>{report.amount.toFixed(2)} {report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD"}</strong></div><div><span>Rows</span><strong>{loading ? "…" : report.rows.length}</strong></div></div>
     {report.rows.length > 0 ? <div className="report-table"><div className="report-table-head"><span>Title</span><span>Project</span><span>Timespan</span><span>Duration</span><span>Billing</span></div>{report.rows.slice(0, 40).map((row, index) => <div className="report-table-row" key={`${row.kind}-${row.start.toISOString()}-${index}`}><strong>{row.title}</strong><span>{row.project}</span><span>{row.start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} {entryClock(row.start)}–{entryClock(row.end)}</span><span>{formatDurationSeconds(row.seconds)}</span><small>{row.billing}</small></div>)}</div> : <div className="entries-empty"><ChartBar size={24} /><span>{loading ? "Loading report data…" : api.connected ? "No rows match this report." : "Connect the native app to generate a report."}</span></div>}
