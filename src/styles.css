@@ -46,7 +46,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-global-header { display: grid; grid-template-columns: minmax(235px, 0.9fr) minmax(600px, 1.6fr); align-items: center; gap: 22px; min-height: 108px; padding: 14px 22px 14px 32px; border-bottom: 1px solid var(--border); background: #fff; }
 .web-global-date { display: grid; gap: 10px; min-width: 0; }
 .web-global-date > strong { overflow: hidden; color: #121318; font-size: 20px; letter-spacing: -0.03em; text-overflow: ellipsis; white-space: nowrap; }
-.web-global-date .date-controls { gap: 5px; }
+.web-global-date .date-controls { gap: 5px; min-height: 42px; padding: 4px 6px; border: 1px solid #dfe1e7; border-radius: 10px; background: #fff; cursor: pointer; }
 .web-global-context { display: grid; grid-template-columns: minmax(200px, 1fr) auto minmax(190px, 0.85fr); align-items: center; gap: 16px; min-width: 0; min-height: 80px; padding: 12px 16px 12px 20px; border: 1px solid #dfe1e7; border-radius: 12px; }
 .web-global-current { display: flex; flex-direction: column; min-width: 0; }
 .web-global-current > span { color: var(--muted); font-size: 11px; }

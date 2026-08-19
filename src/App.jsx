@@ -1107,7 +1107,7 @@ function WebGlobalHeader({ api, setPage, dateKey, setDateKey }) {
       // The page-level controls continue to reflect the native API on the next refresh.
     }
   };
-  return <header className="web-global-header"><div className="web-global-date"><strong>{planDateLabel(dateKey)}</strong><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose selected date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div></div><div className="web-global-context"><div className="web-global-current"><span>Current block</span><strong>{currentTitle}</strong><small>{currentRange} · {focusActive ? "In progress" : currentTask ? "Ready" : "Waiting"}</small></div><button type="button" className={`primary-button web-global-focus ${focusActive ? "active" : ""}`} onClick={toggleFocus} disabled={!api.connected || !currentTask}>{focusActive ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}{focusActive ? "Pause focus" : "Resume focus"}</button><TimerControls api={api} /><div className="web-global-rule"><ShieldCheck size={30} color="#399a55" weight="duotone" /><div><strong>Research Focus</strong><span>{focusActive ? "Blocklist active" : "Blocklist ready"}</span><button type="button" onClick={() => setPage("rules")}>Adjust allowed sites</button></div></div></div></header>;
+  return <header className="web-global-header"><div className="web-global-date"><strong>{planDateLabel(dateKey)}</strong><DateControls dateKey={dateKey} onChange={setDateKey} label="Choose selected date" /></div><div className="web-global-context"><div className="web-global-current"><span>Current block</span><strong>{currentTitle}</strong><small>{currentRange} · {focusActive ? "In progress" : currentTask ? "Ready" : "Waiting"}</small></div><button type="button" className={`primary-button web-global-focus ${focusActive ? "active" : ""}`} onClick={toggleFocus} disabled={!api.connected || !currentTask}>{focusActive ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}{focusActive ? "Pause focus" : "Resume focus"}</button><TimerControls api={api} /><div className="web-global-rule"><ShieldCheck size={30} color="#399a55" weight="duotone" /><div><strong>Research Focus</strong><span>{focusActive ? "Blocklist active" : "Blocklist ready"}</span><button type="button" onClick={() => setPage("rules")}>Adjust allowed sites</button></div></div></div></header>;
 }
 
 function IconButton({ label, children, onClick, className = "", disabled = false }) {
@@ -1116,6 +1116,19 @@ function IconButton({ label, children, onClick, className = "", disabled = false
 
 function DatePickerControl({ dateKey, onChange, label = "Choose date" }) {
   return <label className="date-picker-control" title={label}><CalendarBlank size={20} /><input type="date" value={dateKey} onChange={(event) => { if (event.target.value) onChange(event.target.value); }} aria-label={label} /></label>;
+}
+
+function DateControls({ dateKey, onChange, label = "Choose date" }) {
+  const handleBlankClick = (event) => {
+    if (event.target.closest("button, input, label")) return;
+    onChange(localDateKey());
+  };
+  return <div className="date-controls" onClick={handleBlankClick} title="Click empty space to go to Today" aria-label="Date navigation">
+    <DatePickerControl dateKey={dateKey} onChange={onChange} label={label} />
+    <button type="button" className="quiet-pill" onClick={() => onChange(localDateKey())}>Today</button>
+    <IconButton label="Previous day" onClick={() => onChange(offsetDateKey(dateKey, -1))}><CaretLeft size={18} /></IconButton>
+    <IconButton label="Next day" onClick={() => onChange(offsetDateKey(dateKey, 1))}><CaretRight size={18} /></IconButton>
+  </div>;
 }
 
 function ActionMenu({ label, items, children }) {
