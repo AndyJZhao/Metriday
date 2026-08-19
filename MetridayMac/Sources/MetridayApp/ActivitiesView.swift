@@ -51,6 +51,7 @@ struct ActivitiesView: View {
     @State private var collapsedProjectGroups: Set<String> = []
     @State private var collapsedDeviceGroups: Set<String> = []
     @State private var collapsedUnifiedAppGroups: Set<String> = []
+    @State private var collapsedProjectIDs: Set<UUID> = []
     @State private var selectedDevice = ActivityDeviceFilter.all
     @State private var timelineSelectionStart: Int?
     @State private var timelineSelectionEnd: Int?
@@ -306,44 +307,71 @@ struct ActivitiesView: View {
 
             Divider()
 
-            filterButton(title: "All Activities", icon: "waveform.path", filter: .all)
-            filterButton(title: "Unassigned", icon: "tray", filter: .unassigned)
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 0) {
+                    filterButton(
+                        title: "All Activities",
+                        icon: "waveform.path",
+                        filter: .all,
+                        summarySeconds: allActivitySegments.reduce(0) { $0 + $1.durationSeconds }
+                    )
+                    filterButton(
+                        title: "Unassigned",
+                        icon: "tray",
+                        filter: .unassigned,
+                        summarySeconds: allActivitySegments
+                            .filter { $0.projectID == nil }
+                            .reduce(0) { $0 + $1.durationSeconds }
+                    )
 
-            Divider()
-                .padding(.vertical, 8)
+                    Divider()
+                        .padding(.vertical, 8)
 
-            HStack {
-                Text("Filters")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(MetridayTheme.secondary)
-                Spacer()
-                Button {
-                    editingFilter = nil
-                    showingFilterEditor = true
-                } label: {
-                    Image(systemName: "plus")
+                    HStack {
+                        Text("My Projects")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(MetridayTheme.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 5)
+
+                    ForEach(projectStore.childProjects(of: nil)) { project in
+                        projectTree(project, depth: 0)
+                    }
+
+                    projectDropZone
+
+                    Divider()
+                        .padding(.vertical, 8)
+
+                    HStack {
+                        Text("Filters")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(MetridayTheme.secondary)
+                        Spacer()
+                        Button {
+                            editingFilter = nil
+                            showingFilterEditor = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("New Filter")
+                        .accessibilityIdentifier("activities.new-filter")
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 5)
+
+                    ForEach(filterStore.activeFilters) { savedFilter in
+                        savedFilterButton(savedFilter)
+                    }
                 }
-                .buttonStyle(.borderless)
-                .help("New Filter")
-                .accessibilityIdentifier("activities.new-filter")
+                .padding(.bottom, 10)
             }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 5)
-
-            ForEach(filterStore.activeFilters) { savedFilter in
-                savedFilterButton(savedFilter)
-            }
+            .frame(maxHeight: .infinity)
 
             Divider()
-                .padding(.vertical, 8)
-
-            ForEach(projectStore.childProjects(of: nil)) { project in
-                projectTree(project, depth: 0)
-            }
-
-            projectDropZone
-
-            Spacer(minLength: 12)
 
             HStack(spacing: 8) {
                 Image(systemName: "info.circle")
@@ -354,6 +382,7 @@ struct ActivitiesView: View {
             .foregroundStyle(MetridayTheme.secondary)
             .padding(14)
         }
+        .frame(height: 560)
         .background(MetridayTheme.sidebar)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
@@ -1204,7 +1233,8 @@ struct ActivitiesView: View {
         title: String,
         icon: String,
         filter target: ActivityFilter,
-        tint: Color? = nil
+        tint: Color? = nil,
+        summarySeconds: Int? = nil
     ) -> some View {
         Button {
             filter = target
@@ -1214,6 +1244,11 @@ struct ActivitiesView: View {
                     .frame(width: 18)
                 Text(title)
                 Spacer()
+                if let summarySeconds {
+                    Text(formatMinutes(summarySeconds))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
                 if filter == target {
                     Image(systemName: "checkmark")
                         .font(.system(size: 10, weight: .bold))
@@ -1262,12 +1297,36 @@ struct ActivitiesView: View {
         }
     }
 
+    private func projectDurationSeconds(for projectID: UUID) -> Int {
+        let projectIDs = descendantProjectIDs(including: projectID)
+        return allActivitySegments
+            .filter { segment in
+                guard let segmentProjectID = segment.projectID else { return false }
+                return projectIDs.contains(segmentProjectID)
+            }
+            .reduce(0) { $0 + $1.durationSeconds }
+    }
+
+    private func descendantProjectIDs(including projectID: UUID) -> Set<UUID> {
+        var ids: Set<UUID> = [projectID]
+        var pending: [UUID] = [projectID]
+        while let parentID = pending.popLast() {
+            for child in projectStore.childProjects(of: parentID) where !ids.contains(child.id) {
+                ids.insert(child.id)
+                pending.append(child.id)
+            }
+        }
+        return ids
+    }
+
     private func projectTree(_ project: TrackingProject, depth: Int) -> AnyView {
         AnyView(
             VStack(alignment: .leading, spacing: 0) {
                 projectButton(project, depth: depth)
-                ForEach(projectStore.childProjects(of: project.id)) { child in
-                    projectTree(child, depth: depth + 1)
+                if !collapsedProjectIDs.contains(project.id) {
+                    ForEach(projectStore.childProjects(of: project.id)) { child in
+                        projectTree(child, depth: depth + 1)
+                    }
                 }
             }
         )
@@ -1275,32 +1334,62 @@ struct ActivitiesView: View {
 
     private func projectButton(_ project: TrackingProject, depth: Int = 0) -> some View {
         let target = ActivityFilter.project(project.id)
-        return Button {
-            filter = target
-        } label: {
-            HStack(spacing: 10) {
-                Circle()
-                    .fill(color(for: project.color))
-                    .frame(width: 9, height: 9)
-                Text(project.name)
-                    .lineLimit(1)
-                Spacer()
-                if filter == target {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
+        let children = projectStore.childProjects(of: project.id)
+        let isCollapsed = collapsedProjectIDs.contains(project.id)
+        return HStack(spacing: 0) {
+            if !children.isEmpty {
+                Button {
+                    if isCollapsed {
+                        collapsedProjectIDs.remove(project.id)
+                    } else {
+                        collapsedProjectIDs.insert(project.id)
+                    }
+                } label: {
+                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .frame(width: 14, height: 26)
                 }
+                .buttonStyle(.borderless)
+                .help(isCollapsed ? "Expand \(project.name)" : "Collapse \(project.name)")
+                .accessibilityLabel(isCollapsed ? "Expand \(project.name)" : "Collapse \(project.name)")
+            } else {
+                Spacer()
+                    .frame(width: 14)
             }
-            .font(.system(size: 12, weight: filter == target ? .semibold : .regular))
-            .foregroundStyle(filter == target ? MetridayTheme.accent : MetridayTheme.graphite)
+
+            Button {
+                filter = target
+            } label: {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(color(for: project.color))
+                        .frame(width: 9, height: 9)
+                    Text(project.name)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(formatMinutes(projectDurationSeconds(for: project.id)))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(MetridayTheme.secondary)
+                    if filter == target {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                }
+                .font(.system(size: 12, weight: filter == target ? .semibold : .regular))
+                .foregroundStyle(filter == target ? MetridayTheme.accent : MetridayTheme.graphite)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
             .padding(.leading, 14 + CGFloat(depth * 16))
             .padding(.trailing, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 38)
-            .background(filter == target ? MetridayTheme.accentSoft : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+        .background(filter == target ? MetridayTheme.accentSoft : .clear)
+        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .onTapGesture {
+            filter = target
+        }
         .onTapGesture(count: 2) {
             editingProject = project
         }
@@ -1314,10 +1403,12 @@ struct ActivitiesView: View {
             Button("Archive Project", role: .destructive) {
                 projectStore.archive(project)
                 if filter == target {
-                    filter = .all
-                }
+                filter = .all
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Project \(project.name), \(formatMinutes(projectDurationSeconds(for: project.id)))")
+    }
     }
 
     private func handleActivityDrop(
