@@ -271,8 +271,10 @@ function useMetridayAPI(dateKey, apiBase) {
       link.remove();
       URL.revokeObjectURL(href);
     },
-    startTimer: (title, projectID) => mutate("/v1/timer/start", { title, projectID }),
+    startTimer: (title, projectID, options = {}) => mutate("/v1/timer/start", { title, projectID, ...options }),
     stopTimer: () => mutate("/v1/timer/stop"),
+    setTimerEstimate: (minutes) => mutate("/v1/timer/estimate", { estimatedMinutes: Number(minutes) }),
+    adjustTimer: (minutes) => mutate("/v1/timer/adjust", { minutes: Number(minutes) }),
     toggleTracking: () => mutate(snapshot.status?.tracking ? "/v1/tracking/pause" : "/v1/tracking/resume"),
     updatePreferences: async (preferences) => {
       await request("/v1/preferences", { method: "PATCH", body: JSON.stringify(preferences) });
@@ -861,6 +863,32 @@ function ActionMenu({ label, items, children }) {
   </div>;
 }
 
+function TimerControls({ api }) {
+  const [message, setMessage] = useState("");
+  const timer = api.status?.timer;
+  if (!timer) return null;
+  const remaining = Number(timer.remainingSeconds);
+  const setEstimate = async (event) => {
+    const minutes = Number(event.target.value);
+    if (!minutes) return;
+    try {
+      await api.setTimerEstimate(minutes);
+      setMessage(`${minutes} min estimate saved`);
+    } catch (error) {
+      setMessage(error.message || "Could not set timer estimate.");
+    }
+  };
+  const adjust = async (minutes) => {
+    try {
+      await api.adjustTimer(minutes);
+      setMessage(`${minutes > 0 ? "+" : ""}${minutes} min adjustment saved`);
+    } catch (error) {
+      setMessage(error.message || "Could not adjust timer.");
+    }
+  };
+  return <div className="timer-controls" aria-label="Running timer controls"><span>{Number.isFinite(remaining) ? `${formatDurationSeconds(remaining)} remaining` : "Timer running"}</span><select aria-label="Timer estimate" value={timer.estimatedDurationSeconds ? Math.round(Number(timer.estimatedDurationSeconds) / 60) : ""} onChange={setEstimate}><option value="">Set estimate</option><option value={15}>15 min</option><option value={25}>25 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 hour</option><option value={90}>90 min</option><option value={120}>2 hours</option></select><button type="button" onClick={() => adjust(-15)} aria-label="Move timer start 15 minutes earlier">−15m</button><button type="button" onClick={() => adjust(15)} aria-label="Move timer start 15 minutes later">+15m</button>{message ? <small role="status">{message}</small> : null}</div>;
+}
+
 function TodayHeader({ focusRunning, setFocusRunning, setPage, api, dateKey, setDateKey }) {
   const currentTask = api.status?.currentTask;
   const currentTitle = currentTask?.title || (api.connected ? "No scheduled block" : "GeneZip rebuttal experiment");
@@ -877,7 +905,7 @@ function TodayHeader({ focusRunning, setFocusRunning, setPage, api, dateKey, set
       </div>
       <div className="current-session">
         <div className="session-copy"><span>Current block</span><strong>{currentTitle}</strong><p>{currentRange} <b>·</b> <em>{focusRunning ? "In progress" : currentTask || !api.connected ? "Paused" : "Waiting"}</em></p></div>
-        <button type="button" className="primary-button" onClick={async () => { if (api.connected) { if (focusRunning) await api.stopTimer(); else await api.startTimer(currentTask?.title || "Focused work"); } else setFocusRunning((value) => !value); }}>{focusRunning ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}{focusActionLabel}</button>
+        <div className="session-actions"><button type="button" className="primary-button" onClick={async () => { if (api.connected) { if (focusRunning) await api.stopTimer(); else await api.startTimer(currentTask?.title || "Focused work"); } else setFocusRunning((value) => !value); }}>{focusRunning ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}{focusActionLabel}</button><TimerControls api={api} /></div>
         <div className="focus-rule"><ShieldCheck size={38} color="#39a65a" weight="duotone" /><div><strong>Research Focus</strong><span>{api.connected ? currentApplication : "Blocklist active"}</span><button type="button" onClick={() => setPage("rules")}>Adjust allowed sites</button></div></div>
       </div>
     </header>
