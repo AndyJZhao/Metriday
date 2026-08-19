@@ -301,9 +301,10 @@ function useMetridayAPI(dateKey, apiBase) {
     refresh,
     fetchRange,
     fetchPlan,
-    downloadReportFile: async ({ startDate, endDate, format, include, groupBy, billingFilter, rounding, roundingMinutes, projectIDs = [], durationFormat = "decimalMinutes", includeShortEntries = true, includeCoveredAppUsage = false, roundIndividualEntries = true }) => {
+    downloadReportFile: async ({ startDate, endDate, format, include, groupBy, billingFilter, rounding, roundingMinutes, projectIDs = [], durationFormat = "decimalMinutes", includeShortEntries = true, includeCoveredAppUsage = false, roundIndividualEntries = true, columns = [] }) => {
       const params = new URLSearchParams({ start_date: startDate, end_date: endDate, format, include, group_by: groupBy, billing_status: billingFilter, rounding, rounding_minutes: String(roundingMinutes), duration_format: durationFormat, include_short_entries: String(includeShortEntries), include_covered_app_usage: String(includeCoveredAppUsage), round_individual_entries: String(roundIndividualEntries) });
       if (projectIDs.length > 0) params.set("project_ids", projectIDs.join(","));
+      if (columns.length > 0) params.set("columns", columns.join(","));
       const response = await fetch(`${normalizeApiBase(apiBase)}/v1/reports?${params.toString()}`);
       if (!response.ok) throw new Error((await response.text().catch(() => "")) || "Could not generate the native report.");
       const blob = await response.blob();
@@ -1967,6 +1968,23 @@ function downloadReport(filename, content, type) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+const reportColumnOptions = [
+  ["date", "Date"],
+  ["type", "Type"],
+  ["project", "Project"],
+  ["group", "Group"],
+  ["application", "Application"],
+  ["title", "Title"],
+  ["device", "Device"],
+  ["resource", "URL or Path"],
+  ["start", "Start"],
+  ["end", "End"],
+  ["duration", "Duration"],
+  ["billingStatus", "Billing Status"],
+  ["billingAmount", "Amount"],
+  ["notes", "Notes"],
+];
+
 function WebReportPanel({ api, dateKey }) {
   const [rangeStart, setRangeStart] = useState(offsetDateKey(dateKey, -6));
   const [rangeEnd, setRangeEnd] = useState(dateKey);
@@ -1981,6 +1999,7 @@ function WebReportPanel({ api, dateKey }) {
   const [includeShortEntries, setIncludeShortEntries] = useState(true);
   const [includeCoveredAppUsage, setIncludeCoveredAppUsage] = useState(false);
   const [roundIndividualEntries, setRoundIndividualEntries] = useState(true);
+  const [reportColumns, setReportColumns] = useState(() => reportColumnOptions.map(([key]) => key));
   const [dataset, setDataset] = useState({ activities: [], entries: [] });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -2055,7 +2074,7 @@ function WebReportPanel({ api, dateKey }) {
       const rawSeconds = Math.max(0, (clippedEnd - clippedStart) / 1000);
       const seconds = roundIndividualEntries ? reportRoundSeconds(rawSeconds, rounding, Number(roundingInterval)) : rawSeconds;
       const details = projectDetails(entry.project);
-      rows.push({ kind: "Time entry", title: entry.title || "Untitled", project: projectFor(entry.project), billing: billingLabel(entry.billing_status), currency: details.currency, start: clippedStart, end: clippedEnd, seconds, amount: seconds / 3600 * details.rate, notes: entry.notes || "" });
+      rows.push({ kind: "Time entry", type: entry.is_manual ? "Time Entry" : "Timer", title: entry.title || "Untitled", project: projectFor(entry.project), group: "", application: "", device: "This Mac", resource: entry.notes || "", billing: billingLabel(entry.billing_status), currency: details.currency, start: clippedStart, end: clippedEnd, seconds, amount: seconds / 3600 * details.rate, notes: entry.notes || "" });
     });
     if (includeMode !== "time" && billingFilter === "all") {
       dataset.activities.forEach((activity) => {
@@ -2071,17 +2090,17 @@ function WebReportPanel({ api, dateKey }) {
           if (!includeShortEntries && rawSeconds < 60) return;
           const seconds = roundIndividualEntries ? reportRoundSeconds(rawSeconds, rounding, Number(roundingInterval)) : rawSeconds;
           const details = projectDetails(activity.projectID);
-          rows.push({ kind: "Activity", title: activityLabel(activity), project: projectFor(activity.projectID), billing: activity.relevance || "other", currency: details.currency, start: piece.start, end: piece.end, seconds, amount: seconds / 3600 * details.rate, notes: activity.windowTitle || "" });
+          rows.push({ kind: "Activity", type: "App Usage", title: activity.windowTitle || activity.appName || activity.deviceName || "Activity", project: projectFor(activity.projectID), group: "", application: activity.appName || activity.deviceName || "", device: activity.deviceName || "This Mac", resource: activity.resource || "", billing: "", currency: details.currency, start: piece.start, end: piece.end, seconds, amount: seconds / 3600 * details.rate, notes: "" });
         });
       });
     }
     rows.sort((left, right) => left.start - right.start);
     rows.forEach((row) => { row.billableSeconds = row.billing === "Billable" ? row.seconds : 0; });
     const groupedRows = groupBy === "exact" ? rows : [...rows.reduce((groups, row) => {
-      const application = row.kind === "Activity" ? row.title.split(" · ")[0] : "Time entries";
+      const application = row.kind === "Activity" ? row.application : "Time entries";
       const document = row.notes || row.title;
       const key = groupBy === "project" ? row.project : groupBy === "application" ? application : groupBy === "document" ? document : groupBy === "day" ? row.start.toLocaleDateString() : groupBy === "week" ? `Week of ${row.start.toLocaleDateString()}` : row.start.toLocaleDateString();
-      const current = groups.get(key) || { ...row, kind: "Summary", title: key, seconds: 0, billableSeconds: 0, amount: 0, notes: "" };
+      const current = groups.get(key) || { ...row, kind: "Summary", type: "Grouped", title: "", displayTitle: key, group: key, seconds: 0, billableSeconds: 0, amount: 0, notes: "" };
       current.seconds += row.seconds;
       current.billableSeconds += row.billableSeconds;
       current.amount += row.amount;
@@ -2129,22 +2148,53 @@ function WebReportPanel({ api, dateKey }) {
     if (durationFormat === "decimalMinutes") return (value / 60).toFixed(2) + "m";
     return formatDurationSeconds(value);
   };
-  const exportRows = report.rows.map((row) => ({ kind: row.kind, title: row.title, project: row.project, billing_status: row.billing, currency: row.currency, start: row.start.toISOString(), end: row.end.toISOString(), duration_seconds: row.seconds, amount: Number(row.amount.toFixed(2)), notes: row.notes }));
+  const formatReportExportDuration = (seconds) => {
+    const value = Math.max(0, Math.round(Number(seconds || 0)));
+    if (durationFormat === "hms") return preciseClock(value);
+    if (durationFormat === "seconds") return String(value);
+    if (durationFormat === "decimalHours") return (value / 3600).toFixed(3);
+    if (durationFormat === "decimalMinutes") return (value / 60).toFixed(2);
+    const hours = Math.floor(value / 3600);
+    const minutes = Math.floor(value / 60) % 60;
+    const remainder = value % 60;
+    if (hours > 0) return `${hours}h ${minutes}m ${remainder}s`;
+    if (minutes > 0) return `${minutes}m ${remainder}s`;
+    return `${remainder}s`;
+  };
+  const formatReportExportTime = (value) => value.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  const exportRows = report.rows.map((row) => ({
+    date: localDateKey(row.start),
+    type: row.type || row.kind,
+    project: row.project,
+    group: row.group || "",
+    application: row.application || "",
+    title: row.title,
+    device: row.device || "This Mac",
+    resource: row.resource || "",
+    start: formatReportExportTime(row.start),
+    end: formatReportExportTime(row.end),
+    duration: formatReportExportDuration(row.seconds),
+    billingStatus: row.billing || "",
+    billingAmount: `${row.currency || "USD"} ${row.amount.toFixed(2)}`,
+    notes: row.notes || "",
+  }));
+  const selectedReportColumns = reportColumnOptions.filter(([key]) => reportColumns.includes(key));
   const exportCSV = () => {
-    const headers = ["Kind", "Title", "Project", "Billing Status", "Currency", "Start", "End", "Duration Seconds", "Amount", "Notes"];
-    const csv = [headers, ...exportRows.map((row) => [row.kind, row.title, row.project, row.billing_status, row.currency, row.start, row.end, row.duration_seconds, row.amount, row.notes])].map((line) => line.map(reportCell).join(",")).join("\n");
+    const headers = selectedReportColumns.map(([, label]) => label);
+    const csv = [headers, ...exportRows.map((row) => selectedReportColumns.map(([key]) => row[key]))].map((line) => line.map(reportCell).join(",")).join("\n");
     downloadReport(`metriday-report-${rangeStart}-${rangeEnd}.csv`, csv, "text/csv;charset=utf-8");
   };
-  const exportJSON = () => downloadReport(`metriday-report-${rangeStart}-${rangeEnd}.json`, JSON.stringify({ startDate: rangeStart, endDate: rangeEnd, totalSeconds: report.totalSeconds, billableSeconds: report.billableSeconds, amount: Number(report.amount.toFixed(2)), currencies: report.currencies, rows: exportRows }, null, 2), "application/json");
+  const exportJSON = () => downloadReport(`metriday-report-${rangeStart}-${rangeEnd}.json`, JSON.stringify({ startDate: rangeStart, endDate: rangeEnd, durationFormat, columns: selectedReportColumns.map(([key]) => key), totalSeconds: report.totalSeconds, billableSeconds: report.billableSeconds, amount: Number(report.amount.toFixed(2)), currencies: report.currencies, rows: exportRows.map((row) => Object.fromEntries(selectedReportColumns.map(([key]) => [key, row[key]]))) }, null, 2), "application/json");
   const exportHTML = () => {
-    const tableRows = exportRows.map((row) => `<tr><td>${reportHTMLCell(row.kind)}</td><td>${reportHTMLCell(row.title)}</td><td>${reportHTMLCell(row.project)}</td><td>${reportHTMLCell(row.billing_status)}</td><td>${reportHTMLCell(row.currency)}</td><td>${reportHTMLCell(row.start)}</td><td>${reportHTMLCell(row.end)}</td><td>${reportHTMLCell(row.duration_seconds)}</td><td>${reportHTMLCell(row.amount)}</td></tr>`).join("");
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Metriday report ${rangeStart} to ${rangeEnd}</title><style>body{font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#252832;margin:36px}h1{font-size:24px}p{color:#626978}table{border-collapse:collapse;width:100%;margin-top:24px}th,td{border:1px solid #dfe1e6;padding:8px;text-align:left;font-size:12px}th{background:#f4f5f8}</style></head><body><h1>Metriday report</h1><p>${rangeStart} to ${rangeEnd} · Total ${reportHTMLCell(formatReportDuration(report.totalSeconds))} · Billable ${reportHTMLCell(formatReportDuration(report.billableSeconds))} · Amount ${reportHTMLCell(report.amount.toFixed(2))} ${reportHTMLCell(report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD")}</p><table><thead><tr><th>Kind</th><th>Title</th><th>Project</th><th>Billing</th><th>Currency</th><th>Start</th><th>End</th><th>Duration (s)</th><th>Amount</th></tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const headers = selectedReportColumns.map(([, label]) => `<th>${reportHTMLCell(label)}</th>`).join("");
+    const tableRows = exportRows.map((row) => `<tr>${selectedReportColumns.map(([key]) => `<td>${reportHTMLCell(row[key])}</td>`).join("")}</tr>`).join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Metriday report ${rangeStart} to ${rangeEnd}</title><style>body{font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#252832;margin:36px}h1{font-size:24px}p{color:#626978}table{border-collapse:collapse;width:100%;margin-top:24px}th,td{border:1px solid #dfe1e6;padding:8px;text-align:left;font-size:12px}th{background:#f4f5f8}</style></head><body><h1>Metriday report</h1><p>${rangeStart} to ${rangeEnd} · Total ${reportHTMLCell(formatReportDuration(report.totalSeconds))} · Billable ${reportHTMLCell(formatReportDuration(report.billableSeconds))} · Amount ${reportHTMLCell(report.amount.toFixed(2))} ${reportHTMLCell(report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD")}</p><table><thead><tr>${headers}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
     downloadReport(`metriday-report-${rangeStart}-${rangeEnd}.html`, html, "text/html;charset=utf-8");
   };
   const exportNativeReport = async (format) => {
     try {
       setMessage(`Generating ${format.toUpperCase()}…`);
-      await api.downloadReportFile({ startDate: rangeStart, endDate: rangeEnd, format, include: includeMode, groupBy, billingFilter, rounding, roundingMinutes: roundingInterval, projectIDs, durationFormat, includeShortEntries, includeCoveredAppUsage, roundIndividualEntries });
+      await api.downloadReportFile({ startDate: rangeStart, endDate: rangeEnd, format, include: includeMode, groupBy, billingFilter, rounding, roundingMinutes: roundingInterval, projectIDs, durationFormat, includeShortEntries, includeCoveredAppUsage, roundIndividualEntries, columns: reportColumns });
       setMessage(`${format.toUpperCase()} report exported.`);
     } catch (error) {
       setMessage(error.message || `Could not export ${format.toUpperCase()} report.`);
@@ -2169,9 +2219,10 @@ function WebReportPanel({ api, dateKey }) {
     </div>
     <div className="report-project-filter"><strong>Projects</strong><label><input type="checkbox" checked={projectIDs.length === 0} onChange={() => setProjectIDs([])} />All projects</label>{api.projects.map((project) => <label key={project.id}><input type="checkbox" checked={projectIDs.length === 0 || projectIDs.includes(resourceID(project.id))} onChange={(event) => setProjectIDs((current) => { const id = resourceID(project.id); if (event.target.checked) return current.length === 0 ? [id] : [...new Set([...current, id])]; return current.filter((value) => value !== id); })} />{project.title || project.name}</label>)}</div>
     <div className="report-advanced"><label>Duration<select value={durationFormat} onChange={(event) => setDurationFormat(event.target.value)}><option value="decimalMinutes">Fractional minutes</option><option value="hms">HH:MM:SS</option><option value="human">Xh Ym Zs</option><option value="seconds">Fractional seconds</option><option value="decimalHours">Fractional hours</option></select></label><label><input type="checkbox" checked={includeShortEntries} onChange={(event) => setIncludeShortEntries(event.target.checked)} />Include App usage shorter than 1 minute</label><label><input type="checkbox" checked={includeCoveredAppUsage} onChange={(event) => setIncludeCoveredAppUsage(event.target.checked)} />Include App usage covered by Time Entries</label><label><input type="checkbox" checked={roundIndividualEntries} onChange={(event) => setRoundIndividualEntries(event.target.checked)} disabled={rounding === "none"} />Round individual entries</label></div>
+    <div className="report-columns"><strong>Columns</strong>{reportColumnOptions.map(([key, label]) => <label key={key}><input type="checkbox" checked={reportColumns.includes(key)} disabled={reportColumns.length === 1 && reportColumns.includes(key)} onChange={(event) => setReportColumns((current) => event.target.checked ? [...new Set([...current, key])] : current.filter((value) => value !== key))} />{label}</label>)}</div>
     {message ? <p className="entry-message" role="status">{message}</p> : null}
-    <div className="report-metrics"><div><span>Total</span><strong>{formatDurationSeconds(report.totalSeconds)}</strong></div><div><span>Billable</span><strong>{formatDurationSeconds(report.billableSeconds)}</strong></div><div><span>Amount</span><strong>{report.amount.toFixed(2)} {report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD"}</strong></div><div><span>Rows</span><strong>{loading ? "…" : report.rows.length}</strong></div></div>
-    {report.rows.length > 0 ? <div className="report-table"><div className="report-table-head"><span>Title</span><span>Project</span><span>Timespan</span><span>Duration</span><span>Billing</span></div>{report.rows.slice(0, 40).map((row, index) => <div className="report-table-row" key={`${row.kind}-${row.start.toISOString()}-${index}`}><strong>{row.title}</strong><span>{row.project}</span><span>{row.start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} {entryClock(row.start)}–{entryClock(row.end)}</span><span>{formatDurationSeconds(row.seconds)}</span><small>{row.billing}</small></div>)}</div> : <div className="entries-empty"><ChartBar size={24} /><span>{loading ? "Loading report data…" : api.connected ? "No rows match this report." : "Connect the native app to generate a report."}</span></div>}
+    <div className="report-metrics"><div><span>Total</span><strong>{formatReportDuration(report.totalSeconds)}</strong></div><div><span>Billable</span><strong>{formatReportDuration(report.billableSeconds)}</strong></div><div><span>Amount</span><strong>{report.amount.toFixed(2)} {report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD"}</strong></div><div><span>Rows</span><strong>{loading ? "…" : report.rows.length}</strong></div></div>
+    {report.rows.length > 0 ? <div className="report-table"><div className="report-table-head"><span>Title</span><span>Project</span><span>Timespan</span><span>Duration</span><span>Billing</span></div>{report.rows.slice(0, 40).map((row, index) => <div className="report-table-row" key={`${row.kind}-${row.start.toISOString()}-${index}`}><strong>{row.displayTitle || row.title}</strong><span>{row.project}</span><span>{row.start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} {entryClock(row.start)}–{entryClock(row.end)}</span><span>{formatReportDuration(row.seconds)}</span><small>{row.billing}</small></div>)}</div> : <div className="entries-empty"><ChartBar size={24} /><span>{loading ? "Loading report data…" : api.connected ? "No rows match this report." : "Connect the native app to generate a report."}</span></div>}
   </section>;
 }
 

@@ -562,6 +562,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .report-advanced label { display: inline-flex; align-items: center; gap: 5px; }
 .report-advanced label:first-child { gap: 6px; }
 .report-advanced select { height: 28px; padding: 0 7px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--ink); font-size: 11px; }
+.report-columns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 12px; padding: 10px 12px; border-top: 1px solid #eceef1; color: var(--muted); font-size: 11px; }
+.report-columns strong { color: var(--ink); font-size: 11px; }
+.report-columns label { display: inline-flex; align-items: center; gap: 5px; }
 .report-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 20px; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--border); }
 .report-metrics > div { display: flex; flex-direction: column; gap: 5px; padding: 14px; background: #fbfcff; }
 .report-metrics span { color: var(--muted); font-size: 11px; }

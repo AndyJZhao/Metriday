@@ -2141,6 +2141,14 @@ final class AppState: ObservableObject {
         options.includeShortEntries = apiBoolean(query["include_short_entries"], default: true)
         options.includeCoveredAppUsage = apiBoolean(query["include_covered_app_usage"], default: false)
         options.roundIndividualEntries = apiBoolean(query["round_individual_entries"], default: true)
+        if let rawColumns = query["columns"] {
+            let selected = Set(
+                rawColumns
+                    .split(separator: ",")
+                    .compactMap { ReportColumn(rawValue: String($0).trimmingCharacters(in: .whitespacesAndNewlines)) }
+            )
+            if !selected.isEmpty { options.columns = selected }
+        }
         if let rawProjects = query["projects"] ?? query["project_ids"] {
             options.projectIDs = Set(
                 rawProjects

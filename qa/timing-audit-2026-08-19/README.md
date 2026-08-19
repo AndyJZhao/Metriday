@@ -178,6 +178,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Web Review Projects & Time Entries now applies each project's billing rate to captured activity and time entries, showing the native-style currency amount beside project duration.
 - Web Reports now supports native-style multi-project scope selection; the selected project set filters local preview/export rows and is sent through to native XLSX/PDF generation.
 - Web Reports now exposes native advanced options for duration format, short App usage inclusion, covered App usage absorption, and individual-entry rounding; local preview applies the range/coverage rules and native exports receive the matching query parameters.
+- Web Reports now keeps the native Report Builder column vocabulary and selection semantics across local CSV/JSON/HTML exports and native XLSX/PDF exports; App identity remains metadata while the selected report fields are explicit.
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
 78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
@@ -206,3 +207,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 101. Web Review project billing parity — verified Web build, Sites tests, and diff checks after calculating project amounts from native billing rates for both activity and time-entry seconds.
 102. Web Reports project scope parity — verified Web build, Sites tests, and diff checks after adding the All projects / individual project selector and wiring its scope through local report rows and native export query parameters.
 103. Web Reports advanced options — verified Web build, Sites tests, and diff checks after adding duration format, short-entry, covered-usage, and individual-rounding controls plus local/native export semantics.
+104. Web Reports column selection — verified Web build, Sites tests, Swift debug/release builds, native smoke tests, and packaged-app output after adding the shared ReportColumn query contract and applying selected fields plus duration formatting to local CSV/JSON/HTML and native XLSX/PDF exports.
