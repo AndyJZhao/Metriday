@@ -1922,8 +1922,9 @@ function WebReportPanel({ api, dateKey }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   useEffect(() => {
-    setRangeStart(offsetDateKey(dateKey, -6));
-    setRangeEnd(dateKey);
+    const weekStart = weekStartDateKey(dateKey);
+    setRangeStart(weekStart);
+    setRangeEnd(offsetDateKey(weekStart, 6));
   }, [dateKey]);
   useEffect(() => {
     if (!api.connected || !rangeStart || !rangeEnd || rangeStart > rangeEnd) return;
@@ -2010,6 +2011,10 @@ function WebReportPanel({ api, dateKey }) {
       date.setDate(1);
       setRangeStart(localDateKey(date));
       setRangeEnd(dateKey);
+    } else if (preset === "week") {
+      const weekStart = weekStartDateKey(dateKey);
+      setRangeStart(weekStart);
+      setRangeEnd(offsetDateKey(weekStart, 6));
     } else {
       setRangeStart(offsetDateKey(dateKey, -6));
       setRangeEnd(dateKey);
@@ -2050,7 +2055,7 @@ function WebReportPanel({ api, dateKey }) {
     </div>
     <div className="report-presets">
       <label>Report<select value={reportPreset} onChange={(event) => applyReportPreset(event.target.value)}>{reportPresets.map((preset) => <option value={preset.key} key={preset.key}>{preset.label}</option>)}</select></label>
-      <button type="button" onClick={() => setDatePreset("today")}>Today</button><button type="button" onClick={() => setDatePreset("week")}>Last 7 days</button><button type="button" onClick={() => setDatePreset("month")}>This month</button>
+      <button type="button" onClick={() => setDatePreset("today")}>Today</button><button type="button" onClick={() => setDatePreset("week")}>This week</button><button type="button" onClick={() => setDatePreset("last-seven")}>Last 7 days</button><button type="button" onClick={() => setDatePreset("month")}>This month</button>
       <label>From<input type="date" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} /></label><label>To<input type="date" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} /></label>
     </div>
     <div className="report-filters">
