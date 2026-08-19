@@ -22,6 +22,7 @@ button { color: inherit; }
 button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3px solid rgba(78, 95, 242, 0.28); outline-offset: 2px; }
 
 .app-shell { display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); width: 100%; height: 100vh; min-height: 720px; background: #fff; }
+.app-main { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; height: 100vh; min-height: 720px; background: #fff; }
 .sidebar { position: relative; z-index: 20; display: flex; flex-direction: column; min-width: 0; padding: 24px 10px 16px; border-right: 1px solid var(--border); background: #fbfbfc; }
 .brand-lockup { display: flex; flex-direction: column; gap: 6px; padding: 0 10px 47px; }
 .brand-lockup strong { font-size: 21px; letter-spacing: -0.035em; }
@@ -41,6 +42,23 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .sync-state svg { color: #49a761; }
 
 .page { position: relative; min-width: 0; height: 100vh; min-height: 720px; overflow: hidden; background: #fff; }
+.app-main > .page { height: auto; min-height: 0; }
+.web-global-header { display: grid; grid-template-columns: minmax(235px, 0.9fr) minmax(600px, 1.6fr); align-items: center; gap: 22px; min-height: 108px; padding: 14px 22px 14px 32px; border-bottom: 1px solid var(--border); background: #fff; }
+.web-global-date { display: grid; gap: 10px; min-width: 0; }
+.web-global-date > strong { overflow: hidden; color: #121318; font-size: 20px; letter-spacing: -0.03em; text-overflow: ellipsis; white-space: nowrap; }
+.web-global-date .date-controls { gap: 5px; }
+.web-global-context { display: grid; grid-template-columns: minmax(200px, 1fr) auto minmax(190px, 0.85fr); align-items: center; gap: 16px; min-width: 0; min-height: 80px; padding: 12px 16px 12px 20px; border: 1px solid #dfe1e7; border-radius: 12px; }
+.web-global-current { display: flex; flex-direction: column; min-width: 0; }
+.web-global-current > span { color: var(--muted); font-size: 11px; }
+.web-global-current strong { overflow: hidden; margin-top: 3px; color: #282b34; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.web-global-current small { margin-top: 5px; color: var(--accent); font-size: 11px; }
+.web-global-focus { min-height: 38px; padding: 0 12px; font-size: 12px; }
+.web-global-focus.active { border: 1px solid #cbd1ff; background: #fff; color: var(--accent); }
+.web-global-rule { display: flex; align-items: center; gap: 9px; min-width: 0; padding-left: 16px; border-left: 1px solid var(--border); }
+.web-global-rule > div { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.web-global-rule strong { color: #343943; font-size: 12px; }
+.web-global-rule span { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.web-global-rule button { align-self: flex-start; margin-top: 2px; padding: 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 10px; }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #666b77; cursor: pointer; }
 .icon-button:hover { background: #f0f1f4; color: #282a30; }
 .action-menu { position: relative; display: inline-flex; }
@@ -57,7 +75,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .secondary-button { min-height: 40px; border: 1px solid #d9dce7; background: #fff; color: var(--accent); font-size: 13px; }
 
 /* Today */
-.today-page { display: grid; grid-template-rows: 132px minmax(0, 1fr) 94px; }
+.today-page { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; }
 .today-header { display: grid; grid-template-columns: minmax(300px, 0.9fr) minmax(620px, 1.6fr); align-items: center; gap: 24px; padding: 16px 22px 16px 32px; border-bottom: 1px solid var(--border); }
 .date-heading h1, .plan-header h1 { margin: 0 0 12px; color: #121318; font-size: 24px; line-height: 1.1; letter-spacing: -0.035em; }
 .current-session { display: grid; grid-template-columns: minmax(220px, 1fr) auto minmax(190px, 0.8fr); align-items: center; gap: 18px; min-height: 96px; padding: 13px 16px 13px 20px; border: 1px solid #dfe1e7; border-radius: 12px; }
@@ -275,6 +293,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 
 /* Review and Rules */
 .supporting-page { padding: 38px 44px; overflow: auto; background: #fafbfc; }
+.plan-header .date-controls, .supporting-header .date-controls { display: none; }
 .supporting-header { display: flex; align-items: end; justify-content: space-between; max-width: 1120px; margin: 0 auto 30px; }
 .supporting-header span { color: var(--accent); font-size: 13px; font-weight: 650; }
 .supporting-header h1 { margin: 6px 0 0; font-size: 30px; letter-spacing: -0.04em; }
@@ -639,6 +658,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   .nav-item, .footer-link { justify-content: center; padding: 0; }
   .local-state { display: flex; justify-content: center; padding: 0; }
   .today-header { grid-template-columns: 270px minmax(580px, 1fr); padding-left: 24px; }
+  .web-global-header { grid-template-columns: 220px minmax(0, 1fr); padding-left: 24px; }
+  .web-global-context { grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 0.85fr); gap: 10px; }
   .current-session { grid-template-columns: minmax(190px, 1fr) auto; }
   .focus-rule { display: none; }
   .today-comparison { grid-template-columns: 66px minmax(330px, 0.9fr) minmax(400px, 1.1fr); }
@@ -654,6 +675,12 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   .app-shell { grid-template-columns: 64px minmax(0, 1fr); min-width: 720px; height: auto; min-height: 100vh; }
   .sidebar { position: sticky; top: 0; height: 100vh; }
   .today-page, .page { min-height: 760px; }
+  .web-global-header { grid-template-columns: 200px minmax(0, 1fr); gap: 12px; padding: 12px 16px; }
+  .web-global-context { grid-template-columns: minmax(140px, 1fr) auto minmax(145px, 0.8fr); gap: 8px; padding: 10px 11px; }
+  .web-global-current strong { font-size: 14px; }
+  .web-global-rule { gap: 6px; padding-left: 10px; }
+  .web-global-rule svg { width: 24px; height: 24px; }
+  .web-global-focus { padding: 0 9px; }
   .manual-entry-form { grid-template-columns: minmax(140px, 1fr) 90px 90px minmax(110px, 1fr) 110px auto; }
   .project-create-form { grid-template-columns: minmax(140px, 1fr) 80px 62px 110px auto; }
   .report-metrics { grid-template-columns: repeat(2, 1fr); }

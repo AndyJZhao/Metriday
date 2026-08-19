@@ -895,6 +895,28 @@ function Sidebar({ page, setPage, api, onOpenSettings }) {
   );
 }
 
+function WebGlobalHeader({ api, setPage, dateKey, setDateKey }) {
+  const currentTask = api.status?.currentTask;
+  const timerRunning = Boolean(api.status?.timer);
+  const currentTitle = currentTask?.title || "No scheduled block";
+  const currentRange = Number.isFinite(currentTask?.start_minute) && Number.isFinite(currentTask?.end_minute)
+    ? formatRange(currentTask.start_minute, currentTask.end_minute)
+    : "No scheduled time";
+  const currentApplication = api.status?.currentApplication && api.status.currentApplication !== "Waiting for activity"
+    ? api.status.currentApplication
+    : "Waiting for activity";
+  const toggleFocus = async () => {
+    if (!api.connected) return;
+    try {
+      if (timerRunning) await api.stopTimer();
+      else await api.startTimer(currentTask?.title || "Focused work");
+    } catch {
+      // The page-level controls continue to reflect the native API on the next refresh.
+    }
+  };
+  return <header className="web-global-header"><div className="web-global-date"><strong>{planDateLabel(dateKey)}</strong><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose selected date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div></div><div className="web-global-context"><div className="web-global-current"><span>Current block</span><strong>{currentTitle}</strong><small>{currentRange} · {timerRunning ? "In progress" : currentTask ? "Ready" : "Waiting"}</small></div><button type="button" className={`primary-button web-global-focus ${timerRunning ? "active" : ""}`} onClick={toggleFocus} disabled={!api.connected}>{timerRunning ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}{timerRunning ? "Pause focus" : "Start focus"}</button><div className="web-global-rule"><ShieldCheck size={30} color="#399a55" weight="duotone" /><div><strong>Research Focus</strong><span>{api.focusActive ? "Blocklist active" : currentApplication}</span><button type="button" onClick={() => setPage("rules")}>Adjust allowed sites</button></div></div></div></header>;
+}
+
 function IconButton({ label, children, onClick, className = "", disabled = false }) {
   return <button type="button" className={`icon-button ${className}`} aria-label={label} title={label} onClick={onClick} disabled={disabled}>{children}</button>;
 }
@@ -1045,8 +1067,6 @@ function ActualTrack({ activities, connected, onRecord }) {
 }
 
 function TodayPage({ setPage, api, dateKey, setDateKey }) {
-  const [focusRunning, setFocusRunning] = useState(Boolean(api.status?.timer));
-  useEffect(() => setFocusRunning(Boolean(api.status?.timer)), [api.status?.timer?.id]);
   const recordActivity = async (block) => {
     const start = localEntryDateSeconds(dateKey, block.startSecond);
     const end = localEntryDateSeconds(dateKey, block.endSecond);
@@ -1063,7 +1083,6 @@ function TodayPage({ setPage, api, dateKey, setDateKey }) {
   const nowStyle = showNow ? { top: `${56 + ((now.minute - DAY_START) / 60) * HOUR_HEIGHT}px` } : { display: "none" };
   return (
     <main className="page today-page">
-      <TodayHeader focusRunning={focusRunning} setFocusRunning={setFocusRunning} setPage={setPage} api={api} dateKey={dateKey} setDateKey={setDateKey} />
       <div className="today-comparison"><div className="timeline-label-column"><HourLabels /></div><PlannedTrack tasks={api.plan?.tasks} connected={api.connected} /><ActualTrack activities={api.activities} connected={api.connected} onRecord={recordActivity} /><div className="now-marker" style={nowStyle} aria-label={`Current time ${now.label}`}><span /></div></div>
       <TodayInsightBar api={api} setPage={setPage} />
       {api.connected ? <WebActivityInsights insights={api.insights} dateKey={dateKey} /> : null}
@@ -2213,5 +2232,5 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const api = useMetridayAPI(dateKey, apiBase);
   const content = useMemo(() => page === "plan" ? <PlanPage tasks={tasks} setTasks={setTasks} api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "activities" ? <ActivitiesPage api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "stats" ? <StatsPage api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "reports" ? <ReportsPage api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "teams" ? <TeamsPage api={api} /> : page === "review" ? <ReviewPage api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "rules" ? <RulesPageLive api={api} /> : <TodayPage setPage={setPage} api={api} dateKey={dateKey} setDateKey={setDateKey} />, [api, page, tasks, dateKey]);
-  return <div className="app-shell"><Sidebar page={page} setPage={setPage} api={api} onOpenSettings={() => setSettingsOpen(true)} />{content}<ConnectionSettings open={settingsOpen} api={api} apiBase={apiBase} connected={api.connected} onSave={setApiBase} onClose={() => setSettingsOpen(false)} /></div>;
+  return <div className="app-shell"><Sidebar page={page} setPage={setPage} api={api} onOpenSettings={() => setSettingsOpen(true)} /><div className="app-main"><WebGlobalHeader api={api} setPage={setPage} dateKey={dateKey} setDateKey={setDateKey} />{content}</div><ConnectionSettings open={settingsOpen} api={api} apiBase={apiBase} connected={api.connected} onSave={setApiBase} onClose={() => setSettingsOpen(false)} /></div>;
 }
