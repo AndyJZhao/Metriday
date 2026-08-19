@@ -788,8 +788,8 @@ final class AppState: ObservableObject {
                    let status = BillingStatus(rawValue: billing) {
                     updated.defaultBillingStatus = status
                 }
-                if let parent = body["parent"] as? String {
-                    updated.parentID = apiProjectID(parent)
+                if body.keys.contains("parent") {
+                    updated.parentID = apiProjectIDValue(body["parent"])
                 }
                 projectStore.updateProject(updated)
                 return .jsonObject(["data": officialProject(projectStore.project(projectID) ?? updated)])

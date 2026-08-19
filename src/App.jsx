@@ -1727,33 +1727,69 @@ function projectTitleFor(projects, value) {
   return projects.find((project) => resourceID(project.id) === id)?.title || "Unassigned";
 }
 
+function projectParentID(project) {
+  return resourceID(project?.parent || project?.parent_id || project?.parentID);
+}
+
+function projectOptionRows(projects, excludedID = "") {
+  const excluded = new Set();
+  const markDescendants = (parentID) => {
+    projects.filter((project) => projectParentID(project) === parentID).forEach((project) => {
+      const id = resourceID(project.id);
+      if (excluded.has(id)) return;
+      excluded.add(id);
+      markDescendants(id);
+    });
+  };
+  if (excludedID) {
+    excluded.add(excludedID);
+    markDescendants(excludedID);
+  }
+  const rows = [];
+  const visit = (parentID, depth) => {
+    projects
+      .filter((project) => !excluded.has(resourceID(project.id)) && projectParentID(project) === parentID)
+      .sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")))
+      .forEach((project) => {
+        const id = resourceID(project.id);
+        rows.push({ project, depth });
+        visit(id, depth + 1);
+      });
+  };
+  visit("", 0);
+  return rows;
+}
+
 function ProjectPanel({ api, onAssignActivity }) {
   const [title, setTitle] = useState("");
   const [rate, setRate] = useState("0");
   const [currency, setCurrency] = useState("USD");
   const [billingStatus, setBillingStatus] = useState("billable");
+  const [parentID, setParentID] = useState("");
   const [editing, setEditing] = useState(null);
   const [message, setMessage] = useState("");
   const [dropTarget, setDropTarget] = useState(null);
   const projects = [...api.projects].sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
+  const parentOptions = projectOptionRows(api.projects);
   const create = async (event) => {
     event.preventDefault();
     if (!title.trim()) return;
     try {
-      await api.createProject({ title: title.trim(), billing_rate: Number(rate) || 0, currency: currency.trim().toUpperCase() || "USD", default_billing_status: billingStatus });
+      await api.createProject({ title: title.trim(), parent: parentID || null, billing_rate: Number(rate) || 0, currency: currency.trim().toUpperCase() || "USD", default_billing_status: billingStatus });
       setTitle("");
       setRate("0");
+      setParentID("");
       setMessage("Project saved locally.");
     } catch (error) {
       setMessage(error.message || "Could not save the project.");
     }
   };
-  const beginEdit = (project) => setEditing({ id: project.id, title: project.title || "", rate: String(project.billing_rate || 0), currency: project.currency || "USD", billingStatus: project.default_billing_status || "billable" });
+  const beginEdit = (project) => setEditing({ id: project.id, title: project.title || "", parentID: projectParentID(project), rate: String(project.billing_rate || 0), currency: project.currency || "USD", billingStatus: project.default_billing_status || "billable" });
   const saveEdit = async (event) => {
     event.preventDefault();
     if (!editing?.title.trim()) return;
     try {
-      await api.updateProject(editing.id, { title: editing.title.trim(), billing_rate: Number(editing.rate) || 0, currency: editing.currency.trim().toUpperCase() || "USD", default_billing_status: editing.billingStatus });
+      await api.updateProject(editing.id, { title: editing.title.trim(), parent: editing.parentID || null, billing_rate: Number(editing.rate) || 0, currency: editing.currency.trim().toUpperCase() || "USD", default_billing_status: editing.billingStatus });
       setEditing(null);
       setMessage("Project updated locally.");
     } catch (error) {
@@ -1782,7 +1818,26 @@ function ProjectPanel({ api, onAssignActivity }) {
       setMessage(error.message || "Could not assign the activity.");
     }
   };
-  return <section id="web-projects-panel" className="projects-panel"><div className="activities-list-heading"><div><h2>Projects & clients</h2><p>Drag an App / Category row here to assign its activity to a project.</p></div><span className="api-badge online">{projects.length} active</span></div><form className="project-create-form" onSubmit={create}><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Project or client name" aria-label="Project name" /><input type="number" min="0" step="0.01" value={rate} onChange={(event) => setRate(event.target.value)} placeholder="Rate" aria-label="Project billing rate" /><input value={currency} onChange={(event) => setCurrency(event.target.value)} maxLength={3} aria-label="Project currency" /><select value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)} aria-label="Project default billing status"><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option></select><button type="submit" disabled={!api.connected}><Plus size={17} />Add project</button></form>{message ? <p className="entry-message" role="status">{message}</p> : null}{projects.length > 0 ? <div className="project-table">{projects.map((project) => editing?.id === project.id ? <form className="project-row project-edit-row" key={project.id} onSubmit={saveEdit}><input value={editing.title} onChange={(event) => setEditing((value) => ({ ...value, title: event.target.value }))} aria-label={`Edit ${project.title} name`} /><input type="number" min="0" step="0.01" value={editing.rate} onChange={(event) => setEditing((value) => ({ ...value, rate: event.target.value }))} aria-label={`Edit ${project.title} rate`} /><input value={editing.currency} onChange={(event) => setEditing((value) => ({ ...value, currency: event.target.value }))} maxLength={3} aria-label={`Edit ${project.title} currency`} /><select value={editing.billingStatus} onChange={(event) => setEditing((value) => ({ ...value, billingStatus: event.target.value }))} aria-label={`Edit ${project.title} billing status`}><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option></select><span className="project-actions"><button type="submit" aria-label="Save project"><Check size={16} /></button><IconButton label="Cancel project edit" onClick={() => setEditing(null)}><X size={15} /></IconButton></span></form> : <div className={`project-row ${dropTarget === project.id ? "drop-target" : ""}`} key={project.id} onDragOver={(event) => { event.preventDefault(); setDropTarget(project.id); }} onDragLeave={() => setDropTarget(null)} onDrop={(event) => dropOnProject(event, project)}><span className="project-dot" /><strong>{project.title}</strong><span>{project.currency || "USD"} {Number(project.billing_rate || 0).toFixed(2)}/h</span><small>{billingLabel(project.default_billing_status)}</small><span className="project-actions"><IconButton label={`Edit ${project.title}`} onClick={() => beginEdit(project)}><NotePencil size={15} /></IconButton><IconButton label={`Archive ${project.title}`} onClick={() => remove(project)}><Trash size={15} /></IconButton></span></div>)}</div> : <div className="entries-empty"><FolderSimple size={24} /><span>{api.connected ? "Create a project to organize time and billing." : "Connect the native app to manage projects."}</span></div>}</section>;
+  return <section id="web-projects-panel" className="projects-panel">
+    <div className="activities-list-heading"><div><h2>Projects & clients</h2><p>Drag an App / Category row here to assign its activity to a project.</p></div><span className="api-badge online">{projects.length} active</span></div>
+    <form className="project-create-form" onSubmit={create}>
+      <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Project or client name" aria-label="Project name" />
+      <select value={parentID} onChange={(event) => setParentID(event.target.value)} aria-label="Project parent"><option value="">Top level</option>{parentOptions.map(({ project, depth }) => <option value={resourceID(project.id)} key={project.id}>{"— ".repeat(depth)}{project.title}</option>)}</select>
+      <input type="number" min="0" step="0.01" value={rate} onChange={(event) => setRate(event.target.value)} placeholder="Rate" aria-label="Project billing rate" />
+      <input value={currency} onChange={(event) => setCurrency(event.target.value)} maxLength={3} aria-label="Project currency" />
+      <select value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)} aria-label="Project default billing status"><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option></select>
+      <button type="submit" disabled={!api.connected}><Plus size={17} />Add project</button>
+    </form>
+    {message ? <p className="entry-message" role="status">{message}</p> : null}
+    {projects.length > 0 ? <div className="project-table">{projects.map((project) => editing?.id === project.id ? <form className="project-row project-edit-row" key={project.id} onSubmit={saveEdit}>
+      <input value={editing.title} onChange={(event) => setEditing((value) => ({ ...value, title: event.target.value }))} aria-label={`Edit ${project.title} name`} />
+      <select value={editing.parentID} onChange={(event) => setEditing((value) => ({ ...value, parentID: event.target.value }))} aria-label={`Edit ${project.title} parent`}><option value="">Top level</option>{projectOptionRows(api.projects, resourceID(project.id)).map(({ project: option, depth }) => <option value={resourceID(option.id)} key={option.id}>{"— ".repeat(depth)}{option.title}</option>)}</select>
+      <input type="number" min="0" step="0.01" value={editing.rate} onChange={(event) => setEditing((value) => ({ ...value, rate: event.target.value }))} aria-label={`Edit ${project.title} rate`} />
+      <input value={editing.currency} onChange={(event) => setEditing((value) => ({ ...value, currency: event.target.value }))} maxLength={3} aria-label={`Edit ${project.title} currency`} />
+      <select value={editing.billingStatus} onChange={(event) => setEditing((value) => ({ ...value, billingStatus: event.target.value }))} aria-label={`Edit ${project.title} billing status`}><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option></select>
+      <span className="project-actions"><button type="submit" aria-label="Save project"><Check size={16} /></button><IconButton label="Cancel project edit" onClick={() => setEditing(null)}><X size={15} /></IconButton></span>
+    </form> : <div className={`project-row ${dropTarget === project.id ? "drop-target" : ""}`} key={project.id} onDragOver={(event) => { event.preventDefault(); setDropTarget(project.id); }} onDragLeave={() => setDropTarget(null)} onDrop={(event) => dropOnProject(event, project)}><span className="project-dot" /><strong>{project.title}</strong><span>{projectParentID(project) ? `↳ ${projectTitleFor(projects, projectParentID(project))}` : "Top level"}</span><span>{project.currency || "USD"} {Number(project.billing_rate || 0).toFixed(2)}/h</span><small>{billingLabel(project.default_billing_status)}</small><span className="project-actions"><IconButton label={`Edit ${project.title}`} onClick={() => beginEdit(project)}><NotePencil size={15} /></IconButton><IconButton label={`Archive ${project.title}`} onClick={() => remove(project)}><Trash size={15} /></IconButton></span></div>)}</div> : <div className="entries-empty"><FolderSimple size={24} /><span>{api.connected ? "Create a project to organize time and billing." : "Connect the native app to manage projects."}</span></div>}
+  </section>;
 }
 
 function TimeEntryEditRow({ entry, api, dateKey, projects, onCancel, dialog = false }) {
@@ -2719,11 +2774,19 @@ function WebActivityFiltersMenu({ open, filters, projectFilterID, savedFilterID,
 }
 
 function WebActivityProjectSidebar({ projects, filters, activities, projectFilterID, savedFilterID, onProjectFilter, onSavedFilter }) {
+  const [collapsedProjectIDs, setCollapsedProjectIDs] = useState(() => new Set());
   const activeActivities = activities.filter((activity) => activityCategory(activity).key !== "idle");
   const secondsFor = (items) => items.reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
-  const projectRows = projects.map((project) => ({ project, activities: activeActivities.filter((activity) => resourceID(activity.projectID) === resourceID(project.id)) }));
-  const sidebarButton = (active, onClick, icon, title, detail) => <button type="button" className={`activity-project-filter ${active ? "active" : ""}`} onClick={onClick}><span className="activity-project-filter-icon">{icon}</span><span><strong>{title}</strong><small>{detail}</small></span></button>;
-  return <aside className="activity-project-sidebar" aria-label="Activity projects and filters"><div className="activity-project-sidebar-heading"><h2>Projects</h2><span>{formatDurationSeconds(secondsFor(activeActivities))}</span><button type="button" className="activity-project-new" aria-label="New project" title="New project" onClick={() => { const panel = document.getElementById("web-projects-panel"); panel?.scrollIntoView({ behavior: "smooth", block: "center" }); window.setTimeout(() => panel?.querySelector('input[aria-label="Project name"]')?.focus(), 250); }}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(projectFilterID === "all" && savedFilterID === "all", () => onProjectFilter("all"), <Waveform size={16} />, "All Activities", `${activeActivities.length} segments`)}{sidebarButton(projectFilterID === "unassigned", () => onProjectFilter("unassigned"), <TrayIcon />, "Unassigned", `${activeActivities.filter((activity) => !activity.projectID).length} segments`)}{projectRows.length > 0 ? <div className="activity-project-sidebar-label">My Projects</div> : null}{projectRows.map(({ project, activities: projectActivities }) => sidebarButton(projectFilterID === resourceID(project.id), () => onProjectFilter(resourceID(project.id)), <FolderSimple size={16} />, project.title, `${projectActivities.length} · ${formatDurationSeconds(secondsFor(projectActivities))}`))}</div><div className="activity-project-sidebar-divider" /><div className="activity-project-sidebar-heading"><h2>Filters</h2><span>{filters.length}</span></div><div className="activity-project-filter-list">{sidebarButton(savedFilterID === "all" && projectFilterID === "all", () => onSavedFilter("all"), <SlidersHorizontal size={16} />, "All activity", "No saved filter")}{filters.map((filter) => sidebarButton(savedFilterID === resourceID(filter.id), () => onSavedFilter(resourceID(filter.id)), <Waveform size={16} />, filter.name, `${(filter.rules || []).length} rule${(filter.rules || []).length === 1 ? "" : "s"}`))}</div><p className="activity-project-sidebar-hint">Drag an App / Category row to a project below to assign it.</p></aside>;
+  const projectActivitiesFor = (project) => activeActivities.filter((activity) => resourceID(activity.projectID) === resourceID(project.id));
+  const sidebarButton = (active, onClick, icon, title, detail, style = {}) => <button type="button" className={`activity-project-filter ${active ? "active" : ""}`} style={style} onClick={onClick}><span className="activity-project-filter-icon">{icon}</span><span><strong>{title}</strong><small>{detail}</small></span></button>;
+  const projectTree = (parentID = "", depth = 0) => projects.filter((project) => projectParentID(project) === parentID).sort((left, right) => String(left.title || "").localeCompare(String(right.title || ""))).map((project) => {
+    const id = resourceID(project.id);
+    const children = projects.some((candidate) => projectParentID(candidate) === id);
+    const collapsed = collapsedProjectIDs.has(id);
+    const projectActivities = projectActivitiesFor(project);
+    return <div className="activity-project-tree-node" key={id}><div className="activity-project-tree-row">{children ? <button type="button" className="activity-project-disclosure" aria-label={`${collapsed ? "Expand" : "Collapse"} ${project.title}`} onClick={() => setCollapsedProjectIDs((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })}><CaretDown size={13} className={collapsed ? "collapsed" : ""} /></button> : <span className="activity-project-disclosure-placeholder" />}{sidebarButton(projectFilterID === id, () => onProjectFilter(id), <FolderSimple size={16} />, project.title, `${projectActivities.length} · ${formatDurationSeconds(secondsFor(projectActivities))}`, { paddingLeft: `${7 + depth * 12}px` })}</div>{children && !collapsed ? projectTree(id, depth + 1) : null}</div>;
+  });
+  return <aside className="activity-project-sidebar" aria-label="Activity projects and filters"><div className="activity-project-sidebar-heading"><h2>Projects</h2><span>{formatDurationSeconds(secondsFor(activeActivities))}</span><button type="button" className="activity-project-new" aria-label="New project" title="New project" onClick={() => { const panel = document.getElementById("web-projects-panel"); panel?.scrollIntoView({ behavior: "smooth", block: "center" }); window.setTimeout(() => panel?.querySelector('input[aria-label="Project name"]')?.focus(), 250); }}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(projectFilterID === "all" && savedFilterID === "all", () => onProjectFilter("all"), <Waveform size={16} />, "All Activities", `${activeActivities.length} segments`)}{sidebarButton(projectFilterID === "unassigned", () => onProjectFilter("unassigned"), <TrayIcon />, "Unassigned", `${activeActivities.filter((activity) => !activity.projectID).length} segments`)}{projects.length > 0 ? <div className="activity-project-sidebar-label">My Projects</div> : null}{projectTree()}</div><div className="activity-project-sidebar-divider" /><div className="activity-project-sidebar-heading"><h2>Filters</h2><span>{filters.length}</span></div><div className="activity-project-filter-list">{sidebarButton(savedFilterID === "all" && projectFilterID === "all", () => onSavedFilter("all"), <SlidersHorizontal size={16} />, "All activity", "No saved filter")}{filters.map((filter) => sidebarButton(savedFilterID === resourceID(filter.id), () => onSavedFilter(resourceID(filter.id)), <Waveform size={16} />, filter.name, `${(filter.rules || []).length} rule${(filter.rules || []).length === 1 ? "" : "s"}`))}</div><p className="activity-project-sidebar-hint">Drag an App / Category row to a project below to assign it.</p></aside>;
 }
 
 function TrayIcon() {
