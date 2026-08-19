@@ -2257,36 +2257,50 @@ function WebActivityCategoriesPanel({ api }) {
   const [name, setName] = useState("");
   const [role, setRole] = useState("focused");
   const [color, setColor] = useState("blue");
-  const [field, setField] = useState("application");
-  const [comparison, setComparison] = useState("contains");
-  const [pattern, setPattern] = useState("");
+  const [matchMode, setMatchMode] = useState("any");
+  const [rules, setRules] = useState(() => [{ field: "application", comparison: "contains", pattern: "", case_sensitive: false }]);
   const [editingID, setEditingID] = useState(null);
+  const [message, setMessage] = useState("");
   const fields = { application: "Application", bundleIdentifier: "Bundle identifier", windowTitle: "Window title", resource: "URL or path", domain: "Domain", keyword: "Keyword", device: "Device" };
+  const comparisons = { contains: "contains", equals: "is", beginsWith: "begins with", endsWith: "ends with", matchesRegex: "matches regex" };
+  const emptyRule = () => ({ field: "application", comparison: "contains", pattern: "", case_sensitive: false });
+  const resetEditor = () => {
+    setName("");
+    setRole("focused");
+    setColor("blue");
+    setMatchMode("any");
+    setRules([emptyRule()]);
+    setEditingID(null);
+    setMessage("");
+  };
   const submit = async (event) => {
     event.preventDefault();
-    if (!name.trim() || !pattern.trim() || !api.connected) return;
+    const normalizedRules = rules
+      .map((rule) => ({ ...rule, pattern: String(rule.pattern || "").trim(), case_sensitive: Boolean(rule.case_sensitive) }))
+      .filter((rule) => rule.pattern);
+    if (!name.trim() || !normalizedRules.length || !api.connected) return;
     try {
-      const payload = { name: name.trim(), role, color, match_mode: "any", rules: [{ field, comparison, pattern: pattern.trim(), case_sensitive: false }] };
+      const payload = { name: name.trim(), role, color, match_mode: matchMode, rules: normalizedRules };
       if (editingID) await api.updateActivityCategory(editingID, payload);
       else await api.createActivityCategory(payload);
-      setName("");
-      setPattern("");
-      setEditingID(null);
+      resetEditor();
+      setMessage("Category saved locally.");
     } catch (error) {
-      // Keep the panel usable while the shared API connection state recovers.
+      setMessage(error.message || "Could not save category.");
     }
   };
   const beginEdit = (category) => {
-    const rule = category.rules?.[0] || {};
     setEditingID(resourceID(category.id));
     setName(category.name || "");
     setRole(category.role || "other");
     setColor(category.color || "graphite");
-    setField(rule.field || "application");
-    setComparison(rule.comparison || "contains");
-    setPattern(rule.pattern || "");
+    setMatchMode(category.match_mode || "any");
+    setRules((category.rules || []).map((rule) => ({ field: rule.field || "application", comparison: rule.comparison || "contains", pattern: rule.pattern || "", case_sensitive: Boolean(rule.case_sensitive) })));
+    setMessage("");
   };
-  return <section className="web-source-panel web-categories-panel" aria-label="Activity Categories"><div className="web-source-heading"><div><h2>Categories</h2><p>App, website, and item colors come from these matching categories.</p></div><span className="api-badge">{api.categories.length} active</span></div><form className="web-category-form" onSubmit={submit}><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Category name" aria-label="Activity category name" /><select value={role} onChange={(event) => setRole(event.target.value)} aria-label="Activity category role"><option value="focused">Focused</option><option value="distracting">Distracting</option><option value="other">Other</option><option value="idle">Idle</option></select><select value={color} onChange={(event) => setColor(event.target.value)} aria-label="Activity category color"><option value="blue">Deep blue</option><option value="red">Red</option><option value="green">Green</option><option value="orange">Orange</option><option value="purple">Purple</option><option value="graphite">Graphite</option></select><select value={field} onChange={(event) => setField(event.target.value)} aria-label="Activity category field">{Object.entries(fields).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={comparison} onChange={(event) => setComparison(event.target.value)} aria-label="Activity category comparison"><option value="contains">contains</option><option value="equals">is</option><option value="beginsWith">begins with</option><option value="endsWith">ends with</option><option value="matchesRegex">matches regex</option></select><input value={pattern} onChange={(event) => setPattern(event.target.value)} placeholder="Matching value" aria-label="Activity category value" /><button type="submit" disabled={!api.connected || !name.trim() || !pattern.trim()}>{editingID ? <Check size={16} /> : <Plus size={16} />}{editingID ? "Save changes" : "Save category"}</button>{editingID ? <button type="button" className="quiet-pill" onClick={() => { setEditingID(null); setName(""); setPattern(""); }}>Cancel</button> : null}</form><div className="web-category-list">{api.categories.map((category) => <div className="web-category-row" key={category.id}><span className="web-category-swatch" style={{ background: activityCategoryStyle({ color: category.color }).color }} /><div><strong>{category.name}</strong><small>{category.is_system ? `Built-in fallback · ${category.role}` : `${(category.rules || []).length} rule${(category.rules || []).length === 1 ? "" : "s"} · ${category.role}`}</small></div>{category.is_system ? <span className="web-category-system">Built-in</span> : <span className="web-category-actions"><IconButton label={`Edit ${category.name}`} onClick={() => beginEdit(category)}><NotePencil size={15} /></IconButton><IconButton label={`Delete ${category.name}`} onClick={() => api.deleteActivityCategory(category.id)}><Trash size={15} /></IconButton></span>}</div>)}</div></section>;
+  const updateRule = (index, patch) => setRules((current) => current.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule));
+  const removeRule = (index) => setRules((current) => current.filter((_, ruleIndex) => ruleIndex !== index));
+  return <section className="web-source-panel web-categories-panel" aria-label="Activity Categories"><div className="web-source-heading"><div><h2>Categories</h2><p>App, website, and item colors come from these matching categories.</p></div><span className="api-badge">{api.categories.length} active</span></div><form className="web-category-form" onSubmit={submit}><div className="web-category-primary-fields"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Category name" aria-label="Activity category name" /><select value={role} onChange={(event) => setRole(event.target.value)} aria-label="Activity category role"><option value="focused">Focused</option><option value="distracting">Distracting</option><option value="other">Other</option><option value="idle">Idle</option></select><select value={color} onChange={(event) => setColor(event.target.value)} aria-label="Activity category color"><option value="blue">Deep blue</option><option value="red">Red</option><option value="green">Green</option><option value="orange">Orange</option><option value="purple">Purple</option><option value="graphite">Graphite</option></select></div><div className="web-category-rules"><div className="web-category-rules-heading"><div><strong>Matching rules</strong><small>Rules are evaluated before the built-in category fallbacks.</small></div><label>Match<select value={matchMode} onChange={(event) => setMatchMode(event.target.value)} aria-label="Activity category match mode"><option value="any">Any rule</option><option value="all">All rules</option></select></label></div><div className="web-category-rule-list">{rules.map((rule, index) => <div className="web-category-rule-row" key={`${index}-${rule.field}`}><select value={rule.field} onChange={(event) => updateRule(index, { field: event.target.value })} aria-label={`Category rule ${index + 1} field`}>{Object.entries(fields).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={rule.comparison} onChange={(event) => updateRule(index, { comparison: event.target.value })} aria-label={`Category rule ${index + 1} comparison`}>{Object.entries(comparisons).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><input value={rule.pattern} onChange={(event) => updateRule(index, { pattern: event.target.value })} placeholder="Matching value" aria-label={`Category rule ${index + 1} value`} /><button type="button" className="web-category-remove-rule" onClick={() => removeRule(index)} aria-label={`Remove category rule ${index + 1}`}><Trash size={14} /></button></div>)}</div><button type="button" className="web-category-add-rule" onClick={() => setRules((current) => [...current, emptyRule()])}><Plus size={15} />Add rule</button></div><div className="web-category-form-actions">{message ? <small role="status">{message}</small> : null}<span>{editingID ? <button type="button" className="quiet-pill" onClick={resetEditor}>Cancel</button> : null}<button type="submit" disabled={!api.connected || !name.trim() || !rules.some((rule) => String(rule.pattern || "").trim())}>{editingID ? <Check size={16} /> : <Plus size={16} />}{editingID ? "Save changes" : "Save category"}</button></span></div></form><div className="web-category-list">{api.categories.map((category) => <div className="web-category-row" key={category.id}><span className="web-category-swatch" style={{ background: activityCategoryStyle({ color: category.color }).color }} /><div><strong>{category.name}</strong><small>{category.is_system ? `Built-in fallback · ${category.role}` : `${(category.rules || []).length} rule${(category.rules || []).length === 1 ? "" : "s"} · ${category.match_mode === "all" ? "all" : "any"} · ${category.role}`}</small></div>{category.is_system ? <span className="web-category-system">Built-in</span> : <span className="web-category-actions"><IconButton label={`Edit ${category.name}`} onClick={() => beginEdit(category)}><NotePencil size={15} /></IconButton><IconButton label={`Delete ${category.name}`} onClick={() => api.deleteActivityCategory(category.id)}><Trash size={15} /></IconButton></span>}</div>)}</div></section>;
 }
 
 function WebActivityDisplayMenu({ open, onToggle, preferences, devices, onChange }) {
