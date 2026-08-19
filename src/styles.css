@@ -382,6 +382,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-filter-form input, .web-filter-form select { min-height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #353941; font-size: 11px; }
 .web-filter-form button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 11px; border: 1px solid var(--accent); border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font-size: 11px; font-weight: 650; }
 .web-filter-form button:disabled { cursor: not-allowed; opacity: 0.5; }
+.exclusion-case-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+.exclusion-case-toggle input { min-height: 0; accent-color: var(--accent); }
 .web-filter-row { grid-template-columns: 30px minmax(0, 1fr) 90px 32px; }
 .web-category-form { display: grid; grid-template-columns: minmax(120px, 1fr) 110px 110px 140px 120px minmax(130px, 1fr) auto; gap: 8px; margin-top: 16px; }
 .web-category-form input, .web-category-form select { min-height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #353941; font-size: 11px; }
