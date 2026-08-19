@@ -161,8 +161,10 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Plan adjacent-day timeline columns now use the full visible column as a date-selection target on native and Web, with keyboard activation on the Web companion; the selected day’s timeline keeps its existing task selection and drag/drop behavior.
 - Web Activity Categories now supports the native multi-rule editor, including Any / All matching, rule addition/removal, and persistence of every App / website / item matching rule alongside its custom category color.
 - Web Category matching now exposes native `Full website URL`, `Start time`, and `Day of week` fields plus `is like` / `is not`; domain, keyword, and time-derived values use the same candidate semantics as native matching.
+- Web Saved Filters now matches native filter editing: multiple rules, Any / All mode, filter color, case-sensitive matching, and the full native field/comparison set are persisted through the shared API.
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
 78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
 79. Web Activity Category rule parity — verified that Web category creation and editing serializes all non-empty rules and the selected Any / All match mode through the shared native API, while Focused / Distracting colors remain category-owned.
 80. Web Category field parity — verified that the shared Web matcher now derives domain, full URL, keyword, start-time, and weekday candidates consistently with native ActivityFilterStore semantics.
+81. Web Saved Filter rule parity — verified that Web filter creation/editing preserves every non-empty rule, match mode, color, and case-sensitive flag, and that existing filters render all of their rules without collapsing to the first one.

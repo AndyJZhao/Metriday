@@ -589,6 +589,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-category-rules-heading select { min-height: 29px; }
 .web-category-rule-list { display: grid; gap: 7px; }
 .web-category-rule-row { display: grid; grid-template-columns: minmax(130px, 0.8fr) minmax(120px, 0.8fr) minmax(150px, 1.4fr) 30px; gap: 7px; }
+.web-filter-editor .web-category-primary-fields { grid-template-columns: minmax(180px, 1fr) 130px; }
+.web-filter-editor .web-category-rule-row { grid-template-columns: minmax(130px, 0.8fr) minmax(120px, 0.8fr) minmax(150px, 1.2fr) auto 30px; }
+.web-filter-editor .exclusion-case-toggle { min-height: 32px; }
 .web-category-rule-row input, .web-category-rule-row select { min-width: 0; min-height: 32px; }
 .web-category-form button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 11px; border: 1px solid var(--accent); border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font-size: 11px; font-weight: 650; }
 .web-category-form .web-category-add-rule, .web-category-form .web-category-remove-rule { border-color: var(--border); background: #fff; color: #4a4f5a; }

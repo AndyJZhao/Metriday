@@ -2211,34 +2211,49 @@ function WebScreenTimePanel({ api }) {
 
 function WebActivityFiltersPanel({ api }) {
   const [name, setName] = useState("");
-  const [field, setField] = useState("application");
-  const [comparison, setComparison] = useState("contains");
-  const [pattern, setPattern] = useState("");
+  const [color, setColor] = useState("purple");
+  const [matchMode, setMatchMode] = useState("any");
+  const [rules, setRules] = useState(() => [{ field: "application", comparison: "contains", pattern: "", case_sensitive: false }]);
   const [editingID, setEditingID] = useState(null);
-  const fields = { application: "Application", bundleIdentifier: "Bundle identifier", windowTitle: "Window title", resource: "URL or path", domain: "Domain", keyword: "Keyword", device: "Device" };
+  const [message, setMessage] = useState("");
+  const fields = { application: "Application", bundleIdentifier: "Bundle identifier", windowTitle: "Window title", resource: "URL or path", domain: "Domain", fullURL: "Full website URL", keyword: "Keyword", device: "Device", startTime: "Start time", dayOfWeek: "Day of week" };
+  const comparisons = { contains: "contains", equals: "is", beginsWith: "begins with", endsWith: "ends with", like: "is like", isNot: "is not", matchesRegex: "matches regex" };
+  const emptyRule = () => ({ field: "application", comparison: "contains", pattern: "", case_sensitive: false });
+  const resetEditor = () => {
+    setName("");
+    setColor("purple");
+    setMatchMode("any");
+    setRules([emptyRule()]);
+    setEditingID(null);
+    setMessage("");
+  };
   const submit = async (event) => {
     event.preventDefault();
-    if (!name.trim() || !pattern.trim() || !api.connected) return;
+    const normalizedRules = rules
+      .map((rule) => ({ ...rule, pattern: String(rule.pattern || "").trim(), case_sensitive: Boolean(rule.case_sensitive) }))
+      .filter((rule) => rule.pattern);
+    if (!name.trim() || !normalizedRules.length || !api.connected) return;
     try {
-      const payload = { name: name.trim(), color: "purple", match_mode: "any", rules: [{ field, comparison, pattern: pattern.trim(), case_sensitive: false }] };
+      const payload = { name: name.trim(), color, match_mode: matchMode, rules: normalizedRules };
       if (editingID) await api.updateActivityFilter(editingID, payload);
       else await api.createActivityFilter(payload);
-      setName("");
-      setPattern("");
-      setEditingID(null);
+      resetEditor();
+      setMessage("Filter saved locally.");
     } catch (error) {
-      // The shared Activities refresh surface already exposes connection errors.
+      setMessage(error.message || "Could not save filter.");
     }
   };
   const beginEdit = (filter) => {
-    const rule = filter.rules?.[0] || {};
     setEditingID(resourceID(filter.id));
     setName(filter.name || "");
-    setField(rule.field || "application");
-    setComparison(rule.comparison || "contains");
-    setPattern(rule.pattern || "");
+    setColor(filter.color || "purple");
+    setMatchMode(filter.match_mode || "any");
+    setRules((filter.rules || []).map((rule) => ({ field: rule.field || "application", comparison: rule.comparison || "contains", pattern: rule.pattern || "", case_sensitive: Boolean(rule.case_sensitive) })));
+    setMessage("");
   };
-  return <section className="web-source-panel web-filters-panel" aria-label="Activity Filters"><div className="web-source-heading"><div><h2>Filters</h2><p>Save reusable App, website, and device rules for this activity stream.</p></div><span className="api-badge">{api.filters.length} saved</span></div><form className="web-filter-form" onSubmit={submit}><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Filter name" aria-label="Activity filter name" /><select value={field} onChange={(event) => setField(event.target.value)} aria-label="Activity filter field">{Object.entries(fields).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={comparison} onChange={(event) => setComparison(event.target.value)} aria-label="Activity filter comparison"><option value="contains">contains</option><option value="equals">is</option><option value="beginsWith">begins with</option><option value="endsWith">ends with</option><option value="matchesRegex">matches regex</option></select><input value={pattern} onChange={(event) => setPattern(event.target.value)} placeholder="Value" aria-label="Activity filter value" /><button type="submit" disabled={!api.connected || !name.trim() || !pattern.trim()}>{editingID ? <Check size={16} /> : <Plus size={16} />}{editingID ? "Save changes" : "Save filter"}</button>{editingID ? <button type="button" className="quiet-pill" onClick={() => { setEditingID(null); setName(""); setPattern(""); }}>Cancel</button> : null}</form>{api.filters.length > 0 ? <div className="web-source-list">{api.filters.map((filter) => <div className="web-source-row web-filter-row" key={filter.id}><span className="web-source-icon" style={{ color: activityCategoryStyle({ color: filter.color }).color }}><Waveform size={17} /></span><div><strong>{filter.name}</strong><small>{(filter.rules || []).map((rule) => `${fields[rule.field] || rule.field} ${rule.comparison} “${rule.pattern}”`).join(` ${filter.match_mode === "all" ? "and" : "or"} `)}</small></div><span>{filter.match_mode === "all" ? "All rules" : "Any rule"}</span><span className="web-category-actions"><IconButton label={`Edit ${filter.name}`} onClick={() => beginEdit(filter)}><NotePencil size={15} /></IconButton><IconButton label={`Delete ${filter.name}`} onClick={() => api.deleteActivityFilter(filter.id)}><Trash size={15} /></IconButton></span></div>)}</div> : <div className="web-source-empty"><Waveform size={22} /><span>No saved filters yet. Add one to reuse the same activity rule on this Mac.</span></div>}</section>;
+  const updateRule = (index, patch) => setRules((current) => current.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule));
+  const removeRule = (index) => setRules((current) => current.filter((_, ruleIndex) => ruleIndex !== index));
+  return <section className="web-source-panel web-filters-panel" aria-label="Activity Filters"><div className="web-source-heading"><div><h2>Filters</h2><p>Save reusable App, website, and device rules for this activity stream.</p></div><span className="api-badge">{api.filters.length} saved</span></div><form className="web-category-form web-filter-editor" onSubmit={submit}><div className="web-category-primary-fields"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Filter name" aria-label="Activity filter name" /><select value={color} onChange={(event) => setColor(event.target.value)} aria-label="Activity filter color"><option value="blue">Blue</option><option value="red">Red</option><option value="green">Green</option><option value="orange">Orange</option><option value="purple">Purple</option><option value="graphite">Graphite</option></select></div><div className="web-category-rules"><div className="web-category-rules-heading"><div><strong>Matching rules</strong><small>Filters never change project assignments.</small></div><label>Match<select value={matchMode} onChange={(event) => setMatchMode(event.target.value)} aria-label="Activity filter match mode"><option value="any">Any rule</option><option value="all">All rules</option></select></label></div><div className="web-category-rule-list">{rules.map((rule, index) => <div className="web-category-rule-row" key={`${index}-${rule.field}`}><select value={rule.field} onChange={(event) => updateRule(index, { field: event.target.value })} aria-label={`Activity filter rule ${index + 1} field`}>{Object.entries(fields).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={rule.comparison} onChange={(event) => updateRule(index, { comparison: event.target.value })} aria-label={`Activity filter rule ${index + 1} comparison`}>{Object.entries(comparisons).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><input value={rule.pattern} onChange={(event) => updateRule(index, { pattern: event.target.value })} placeholder="Matching value" aria-label={`Activity filter rule ${index + 1} value`} /><label className="exclusion-case-toggle"><input type="checkbox" checked={Boolean(rule.case_sensitive)} onChange={(event) => updateRule(index, { case_sensitive: event.target.checked })} />Case-sensitive</label><button type="button" className="web-category-remove-rule" onClick={() => removeRule(index)} aria-label={`Remove activity filter rule ${index + 1}`}><Trash size={14} /></button></div>)}</div><button type="button" className="web-category-add-rule" onClick={() => setRules((current) => [...current, emptyRule()])}><Plus size={15} />Add rule</button></div><div className="web-category-form-actions">{message ? <small role="status">{message}</small> : null}<span>{editingID ? <button type="button" className="quiet-pill" onClick={resetEditor}>Cancel</button> : null}<button type="submit" disabled={!api.connected || !name.trim() || !rules.some((rule) => String(rule.pattern || "").trim())}>{editingID ? <Check size={16} /> : <Plus size={16} />}{editingID ? "Save changes" : "Save filter"}</button></span></div></form>{api.filters.length > 0 ? <div className="web-source-list">{api.filters.map((filter) => <div className="web-source-row web-filter-row" key={filter.id}><span className="web-source-icon" style={{ color: activityCategoryStyle({ color: filter.color }).color }}><Waveform size={17} /></span><div><strong>{filter.name}</strong><small>{(filter.rules || []).map((rule) => `${fields[rule.field] || rule.field} ${comparisons[rule.comparison] || rule.comparison} “${rule.pattern}”${rule.case_sensitive ? " · Case-sensitive" : ""}`).join(` ${filter.match_mode === "all" ? "and" : "or"} `)}</small></div><span>{filter.match_mode === "all" ? "All rules" : "Any rule"}</span><span className="web-category-actions"><IconButton label={`Edit ${filter.name}`} onClick={() => beginEdit(filter)}><NotePencil size={15} /></IconButton><IconButton label={`Delete ${filter.name}`} onClick={() => api.deleteActivityFilter(filter.id)}><Trash size={15} /></IconButton></span></div>)}</div> : <div className="web-source-empty"><Waveform size={22} /><span>No saved filters yet. Add one to reuse the same activity rule on this Mac.</span></div>}</section>;
 }
 
 function WebActivityExclusionsPanel({ api }) {
