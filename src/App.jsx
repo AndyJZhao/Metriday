@@ -148,6 +148,7 @@ function useMetridayAPI(dateKey, apiBase) {
     calendarEvents: { data: [], authorized: false, status: "Calendar access not connected" },
     reminders: { data: [], authorized: false, status: "Reminders access not connected" },
     screenTime: { data: [], database_available: false, status: "Screen Time integration not connected" },
+    projectRules: [],
     weekly: [],
     insights: [],
   });
@@ -184,6 +185,7 @@ function useMetridayAPI(dateKey, apiBase) {
         request(`/v1/calendar-events?date=${date}`),
         request(`/v1/reminders?date=${date}`),
         request(`/v1/screen-time?date=${date}`),
+        request("/v1/project-rules"),
       ]);
       const value = (index, fallback) => results[index].status === "fulfilled" ? results[index].value : fallback;
       setSnapshot({
@@ -206,6 +208,7 @@ function useMetridayAPI(dateKey, apiBase) {
         calendarEvents: value(11, { data: [], authorized: false, status: "Calendar access not connected" }),
         reminders: value(12, { data: [], authorized: false, status: "Reminders access not connected" }),
         screenTime: value(13, { data: [], database_available: false, status: "Screen Time integration not connected" }),
+        projectRules: value(14, { data: [] })?.data || [],
       });
       setRefreshVersion((value) => value + 1);
     } catch (error) {
@@ -310,6 +313,18 @@ function useMetridayAPI(dateKey, apiBase) {
     },
     deleteActivityCategory: async (id) => {
       await request(`/v1/categories/${resourceID(id)}`, { method: "DELETE" });
+      await refresh();
+    },
+    createProjectRule: async (rule) => {
+      await request("/v1/project-rules", { method: "POST", body: JSON.stringify(rule) });
+      await refresh();
+    },
+    deleteProjectRule: async (id) => {
+      await request(`/v1/project-rules/${resourceID(id)}`, { method: "DELETE" });
+      await refresh();
+    },
+    moveProjectRule: async (id, offset) => {
+      await request(`/v1/project-rules/${resourceID(id)}`, { method: "PATCH", body: JSON.stringify({ offset }) });
       await refresh();
     },
     savePlan: async (markdown, date = dateKey || localDateKey()) => {
@@ -718,8 +733,8 @@ function Sidebar({ page, setPage, api, onOpenSettings }) {
   );
 }
 
-function IconButton({ label, children, onClick, className = "" }) {
-  return <button type="button" className={`icon-button ${className}`} aria-label={label} title={label} onClick={onClick}>{children}</button>;
+function IconButton({ label, children, onClick, className = "", disabled = false }) {
+  return <button type="button" className={`icon-button ${className}`} aria-label={label} title={label} onClick={onClick} disabled={disabled}>{children}</button>;
 }
 
 function DatePickerControl({ dateKey, onChange, label = "Choose date" }) {
@@ -1681,6 +1696,26 @@ function RulesPage() {
   return <main className="page supporting-page rules-page"><header className="supporting-header"><div><span>Focus rules</span><h1>Research Focus</h1></div><button type="button" className={`status-pill ${locked ? "active" : ""}`} onClick={() => setLocked((value) => !value)}><LockSimple size={17} />{locked ? "Locked mode on" : "Flexible mode"}</button></header><div className="rules-layout"><section className="rule-overview"><ShieldCheck size={54} color="#3da65a" weight="duotone" /><h2>Protect deep-work blocks</h2><p>This rule starts with scheduled research tasks and stays local to this Mac.</p><div className="rule-meta"><span><Clock size={18} />Runs with calendar blocks</span><span><Laptop size={18} />Local processing</span><span><Browsers size={18} />All browsers</span></div></section><section className="site-list-section"><div className="site-list-heading"><div><h2>Blocked sites</h2><p>Attempts are recorded as distraction evidence.</p></div><strong>{blocked.length}</strong></div><div className="site-list">{blocked.map((site) => <div key={site}><GlobeSimple size={20} /><span>{site}</span><IconButton label={`Allow ${site}`} onClick={() => { setBlocked((items) => items.filter((item) => item !== site)); setAllowed((items) => [...items, site]); }}><X size={15} /></IconButton></div>)}</div><form onSubmit={(event) => { event.preventDefault(); if (draft.trim() && !blocked.includes(draft.trim())) setBlocked((items) => [...items, draft.trim()]); setDraft(""); }}><GlobeSimple size={19} /><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add a distracting domain" aria-label="Add blocked website" /><button type="submit"><Plus size={17} />Add</button></form></section><section className="site-list-section allowed-section"><div className="site-list-heading"><div><h2>Allowed research</h2><p>Always available inside this focus rule.</p></div><strong>{allowed.length}</strong></div><div className="site-list">{allowed.map((site) => <div key={site}><CheckCircle size={20} weight="fill" /><span>{site}</span></div>)}</div></section></div></main>;
 }
 
+function WebProjectRulesPanel({ api }) {
+  const [projectID, setProjectID] = useState("");
+  const [field, setField] = useState("application");
+  const [comparison, setComparison] = useState("contains");
+  const [pattern, setPattern] = useState("");
+  const fields = { application: "Application", bundleIdentifier: "Bundle identifier", titleContains: "Title contains", resourceContains: "URL or path contains", domain: "Domain", fullURL: "Full website URL", keyword: "Keyword", startTime: "Start time", dayOfWeek: "Day of week" };
+  const projects = api.projects || [];
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!projectID || !pattern.trim() || !api.connected) return;
+    try {
+      await api.createProjectRule({ project_id: projectID, field, comparison, pattern: pattern.trim(), case_sensitive: false });
+      setPattern("");
+    } catch (error) {
+      // Keep the form available while the shared API connection state recovers.
+    }
+  };
+  return <section className="project-rules-panel"><div className="project-rules-heading"><div><h2>Project automation rules</h2><p>Assign future App, title, domain, URL, or keyword activity to a project.</p></div><span className="api-badge">{api.projectRules.length} saved</span></div><form className="project-rules-form" onSubmit={submit}><select value={projectID} onChange={(event) => setProjectID(event.target.value)} aria-label="Project rule project"><option value="">Choose project</option>{projects.map((project) => <option key={project.id} value={resourceID(project.id)}>{project.title || project.name}</option>)}</select><select value={field} onChange={(event) => setField(event.target.value)} aria-label="Project rule field">{Object.entries(fields).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={comparison} onChange={(event) => setComparison(event.target.value)} aria-label="Project rule comparison"><option value="contains">contains</option><option value="equals">is</option><option value="beginsWith">begins with</option><option value="endsWith">ends with</option><option value="like">is like</option><option value="matchesRegex">matches regex</option></select><input value={pattern} onChange={(event) => setPattern(event.target.value)} placeholder="Matching value" aria-label="Project rule value" /><button type="submit" disabled={!api.connected || !projectID || !pattern.trim()}><Plus size={16} />Add Rule</button></form>{api.projectRules.length > 0 ? <div className="project-rules-list">{api.projectRules.map((rule, index) => <div className="project-rule-row" key={rule.id}><span className="web-source-icon"><Sparkle size={17} /></span><div><strong>{rule.project_name || projectTitleFor(projects, rule.project_id)}</strong><small>{fields[rule.field] || rule.field} {rule.comparison} “{rule.pattern}”</small></div><span className="project-rule-order"><IconButton label="Move rule up" onClick={() => api.moveProjectRule(rule.id, -1)} disabled={index === 0}><CaretLeft size={15} className="rotate-up" /></IconButton><IconButton label="Move rule down" onClick={() => api.moveProjectRule(rule.id, 1)} disabled={index === api.projectRules.length - 1}><CaretRight size={15} className="rotate-down" /></IconButton></span><IconButton label={`Delete rule for ${rule.project_name || "project"}`} onClick={() => api.deleteProjectRule(rule.id)}><Trash size={15} /></IconButton></div>)}</div> : <div className="project-rules-empty"><Sparkle size={22} /><span>No project automation rules yet. Assign an activity in Activities, then save its matching pattern here.</span></div>}</section>;
+}
+
 function RulesPageLive({ api }) {
   const [locked, setLocked] = useState(true);
   const [blocked, setBlocked] = useState(["youtube.com", "x.com", "reddit.com"]);
@@ -1722,7 +1757,7 @@ function RulesPageLive({ api }) {
     if (api.connected) api.deleteWebRule(item.id).catch((error) => setMessage(error.message || "Could not remove the site."));
     else setAllowed((items) => items.filter((domain) => domain !== item.domain));
   };
-  return <main className="page supporting-page rules-page"><header className="supporting-header"><div><span>{api.connected ? "Native Focus rules" : "Focus rules"}</span><h1>Research Focus</h1></div><button type="button" className={`status-pill ${focusActive ? "active" : ""}`} onClick={toggleFocus}><LockSimple size={17} />{focusActive ? "Locked mode on" : "Flexible mode"}</button></header><div className="rules-layout"><section className="rule-overview"><ShieldCheck size={54} color="#3da65a" weight="duotone" /><h2>Protect deep-work blocks</h2><p>{api.connected ? "Changes are saved to the native Metriday blocklist on this Mac." : "This rule starts with scheduled research tasks and stays local to this Mac."}</p><div className="rule-meta"><span><Clock size={18} />Runs with calendar blocks</span><span><Laptop size={18} />Local processing</span><span><Browsers size={18} />Safari + Chrome</span></div></section><section className="site-list-section"><div className="site-list-heading"><div><h2>Blocked sites</h2><p>Attempts are recorded as distraction evidence.</p></div><strong>{blockedItems.length}</strong></div><div className="site-list">{blockedItems.map((item) => <div key={item.id}><GlobeSimple size={20} /><span>{item.domain}</span><IconButton label={`Allow ${item.domain}`} onClick={() => allowDomain(item)}><X size={15} /></IconButton></div>)}</div><form onSubmit={addDomain}><GlobeSimple size={19} /><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add a distracting domain" aria-label="Add blocked website" /><button type="submit"><Plus size={17} />Add</button></form></section><section className="site-list-section allowed-section"><div className="site-list-heading"><div><h2>Allowed research</h2><p>Always available inside this focus rule.</p></div><strong>{allowedItems.length}</strong></div><div className="site-list">{allowedItems.map((item) => <div key={item.id}><CheckCircle size={20} weight="fill" /><span>{item.domain}</span><IconButton label={`Remove ${item.domain}`} onClick={() => removeDomain(item)}><X size={15} /></IconButton></div>)}</div></section></div>{message ? <p className="entry-message rules-message" role="status">{message}</p> : null}</main>;
+  return <main className="page supporting-page rules-page"><header className="supporting-header"><div><span>{api.connected ? "Native Focus rules" : "Focus rules"}</span><h1>Research Focus</h1></div><button type="button" className={`status-pill ${focusActive ? "active" : ""}`} onClick={toggleFocus}><LockSimple size={17} />{focusActive ? "Locked mode on" : "Flexible mode"}</button></header><div className="rules-layout"><section className="rule-overview"><ShieldCheck size={54} color="#3da65a" weight="duotone" /><h2>Protect deep-work blocks</h2><p>{api.connected ? "Changes are saved to the native Metriday blocklist on this Mac." : "This rule starts with scheduled research tasks and stays local to this Mac."}</p><div className="rule-meta"><span><Clock size={18} />Runs with calendar blocks</span><span><Laptop size={18} />Local processing</span><span><Browsers size={18} />Safari + Chrome</span></div></section><section className="site-list-section"><div className="site-list-heading"><div><h2>Blocked sites</h2><p>Attempts are recorded as distraction evidence.</p></div><strong>{blockedItems.length}</strong></div><div className="site-list">{blockedItems.map((item) => <div key={item.id}><GlobeSimple size={20} /><span>{item.domain}</span><IconButton label={`Allow ${item.domain}`} onClick={() => allowDomain(item)}><X size={15} /></IconButton></div>)}</div><form onSubmit={addDomain}><GlobeSimple size={19} /><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add a distracting domain" aria-label="Add blocked website" /><button type="submit"><Plus size={17} />Add</button></form></section><section className="site-list-section allowed-section"><div className="site-list-heading"><div><h2>Allowed research</h2><p>Always available inside this focus rule.</p></div><strong>{allowedItems.length}</strong></div><div className="site-list">{allowedItems.map((item) => <div key={item.id}><CheckCircle size={20} weight="fill" /><span>{item.domain}</span><IconButton label={`Remove ${item.domain}`} onClick={() => removeDomain(item)}><X size={15} /></IconButton></div>)}</div></section></div><WebProjectRulesPanel api={api} />{message ? <p className="entry-message rules-message" role="status">{message}</p> : null}</main>;
 }
 
 export function App() {

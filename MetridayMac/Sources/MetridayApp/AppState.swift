@@ -227,6 +227,49 @@ final class AppState: ObservableObject {
             return .jsonObject(response)
         }
 
+        if request.method == "GET", path == "/v1/project-rules" {
+            return .jsonObject([
+                "data": projectStore.rules.map(apiProjectRule),
+                "status": projectStore.statusMessage
+            ])
+        }
+
+        if request.method == "POST", path == "/v1/project-rules" {
+            guard let body = apiBody(request),
+                  let projectID = apiProjectID((body["project_id"] as? String) ?? (body["project"] as? String) ?? ""),
+                  let field = (body["field"] as? String).flatMap(ProjectRuleField.init(rawValue:)),
+                  let pattern = body["pattern"] as? String,
+                  let comparison = (body["comparison"] as? String).flatMap(ProjectRuleComparison.init(rawValue:)),
+                  let ruleID = projectStore.addRule(
+                    projectID: projectID,
+                    field: field,
+                    pattern: pattern,
+                    isCaseSensitive: body["case_sensitive"] as? Bool ?? false,
+                    comparison: comparison
+                  ),
+                  let rule = projectStore.rules.first(where: { $0.id == ruleID }) else {
+                return .error("Project rule needs a project, field, comparison, and pattern", statusCode: 400)
+            }
+            return .jsonObject(["data": apiProjectRule(rule)], statusCode: 201)
+        }
+
+        if path.hasPrefix("/v1/project-rules/") {
+            let rawID = String(path.dropFirst("/v1/project-rules/".count))
+            guard let ruleID = UUID(uuidString: rawID),
+                  let rule = projectStore.rules.first(where: { $0.id == ruleID }) else {
+                return .error("Project rule not found", statusCode: 404)
+            }
+            if request.method == "PATCH" || request.method == "PUT" {
+                let offset = (apiBody(request)?["offset"] as? Int) ?? 0
+                if offset != 0 { projectStore.moveRule(rule, by: offset) }
+                return .jsonObject(["data": apiProjectRule(rule)])
+            }
+            if request.method == "DELETE" {
+                projectStore.removeRule(rule)
+                return .empty()
+            }
+        }
+
         if request.method == "GET", path == "/v1/rules" {
             return .jsonObject([
                 "data": blocker.rules.map(officialWebRule),
@@ -1335,6 +1378,10 @@ final class AppState: ObservableObject {
                     "POST /v1/categories",
                     "PATCH /v1/categories/{id}",
                     "DELETE /v1/categories/{id}",
+                    "GET /v1/project-rules",
+                    "POST /v1/project-rules",
+                    "PATCH /v1/project-rules/{id}",
+                    "DELETE /v1/project-rules/{id}",
                     "GET /v1/exclusions",
                     "POST /v1/exclusions",
                     "GET /v1/teams",
@@ -2110,6 +2157,19 @@ final class AppState: ObservableObject {
             "id": rule.id.uuidString,
             "domain": rule.domain,
             "allowed": rule.isAllowed
+        ]
+    }
+
+    private func apiProjectRule(_ rule: ProjectRule) -> [String: Any] {
+        [
+            "id": rule.id.uuidString,
+            "project_id": rule.projectID.uuidString,
+            "project": "/projects/\(rule.projectID.uuidString)",
+            "project_name": projectStore.name(for: rule.projectID),
+            "field": rule.field.rawValue,
+            "comparison": rule.comparison.rawValue,
+            "pattern": rule.pattern,
+            "case_sensitive": rule.isCaseSensitive
         ]
     }
 
