@@ -502,6 +502,14 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-activity-timeline-block { position: absolute; top: 22px; height: 52px; min-width: 2px; padding: 0; border-width: 1px; border-style: solid; border-radius: 4px; background: #f7f8fa; cursor: pointer; }
 .web-activity-timeline-block:hover { z-index: 3; filter: saturate(1.15); box-shadow: 0 0 0 2px rgba(78, 95, 242, 0.13); }
 .web-activity-timeline-block span { display: block; width: 100%; height: 100%; border-radius: inherit; background: currentColor; opacity: 0.2; }
+.web-activity-timeline-track.horizontal { height: 112px; }
+.web-activity-timeline-overlay { position: absolute; min-width: 3px; padding: 0; border: 1px solid; border-radius: 3px; background: rgba(255, 255, 255, 0.74); cursor: pointer; z-index: 2; }
+.web-activity-timeline-overlay:hover { z-index: 3; box-shadow: 0 0 0 2px rgba(78, 95, 242, 0.13); }
+.web-activity-timeline-overlay.time-entry { top: 80px; height: 12px; background: rgba(215, 123, 34, 0.12); }
+.web-activity-timeline-overlay.calendar-event { top: 96px; height: 12px; border-style: dashed; background: rgba(78, 95, 242, 0.11); }
+.web-activity-timeline-overlay span { display: block; width: 100%; height: 100%; border-radius: inherit; }
+.web-activity-timeline-track.vertical .web-activity-timeline-overlay { left: 12%; width: 76%; }
+.web-activity-timeline-track.vertical .web-activity-timeline-overlay.time-entry, .web-activity-timeline-track.vertical .web-activity-timeline-overlay.calendar-event { top: auto; height: auto; }
 .web-activity-timeline-selection { position: absolute; top: 5px; bottom: 5px; z-index: 4; border: 1px solid var(--accent); border-radius: 5px; background: rgba(78, 95, 242, 0.14); pointer-events: none; }
 .timeline-orientation-toggle { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 8px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #555b66; cursor: pointer; font-size: 11px; font-weight: 650; }
 .timeline-orientation-toggle:hover { border-color: #cbd1ff; background: #f3f4ff; color: var(--accent); }
