@@ -31,10 +31,14 @@ struct MetridayApp: App {
                     .keyboardShortcut("3", modifiers: [.command])
                 Button("Stats") { appState.section = .stats }
                     .keyboardShortcut("4", modifiers: [.command])
-                Button("Review") { appState.section = .review }
+                Button("Reports") { appState.section = .reports }
                     .keyboardShortcut("5", modifiers: [.command])
-                Button("Rules") { appState.section = .rules }
+                Button("Teams") { appState.section = .teams }
                     .keyboardShortcut("6", modifiers: [.command])
+                Button("Review") { appState.section = .review }
+                    .keyboardShortcut("7", modifiers: [.command])
+                Button("Rules") { appState.section = .rules }
+                    .keyboardShortcut("8", modifiers: [.command])
             }
             CommandMenu("Focus") {
                 Button(appState.focusIsActive ? "Pause Focus" : "Start Focus") {

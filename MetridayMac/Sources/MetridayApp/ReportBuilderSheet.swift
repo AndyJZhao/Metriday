@@ -24,7 +24,8 @@ struct ReportBuilderSheet: View {
         monitor: AppActivityMonitor,
         screenTimeStore: ScreenTimeStore,
         timeEntryStore: TimeEntryStore,
-        projectStore: ProjectStore
+        projectStore: ProjectStore,
+        initialPreset: ReportPreset = .custom
     ) {
         self.monitor = monitor
         self.screenTimeStore = screenTimeStore
@@ -33,6 +34,7 @@ struct ReportBuilderSheet: View {
         _rangePreset = State(initialValue: .custom)
         _startDate = State(initialValue: Calendar.current.startOfDay(for: initialStartDate))
         _endDate = State(initialValue: Calendar.current.startOfDay(for: initialEndDate))
+        _preset = State(initialValue: initialPreset)
     }
 
     var body: some View {
@@ -77,6 +79,11 @@ struct ReportBuilderSheet: View {
         }
         .padding(24)
         .frame(width: 620, height: 660)
+        .onAppear {
+            if preset != .custom, options.groupBy == .none {
+                applyPreset(preset)
+            }
+        }
     }
 
     private var settingsPanel: some View {

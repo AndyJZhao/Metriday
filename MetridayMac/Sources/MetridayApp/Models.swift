@@ -5,6 +5,8 @@ enum AppSection: String, CaseIterable, Identifiable {
     case plan = "Plan"
     case activities = "Activities"
     case stats = "Stats"
+    case reports = "Reports"
+    case teams = "Teams"
     case review = "Review"
     case rules = "Rules"
 
@@ -16,6 +18,8 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .plan: "square.and.pencil"
         case .activities: "waveform.path"
         case .stats: "chart.bar.xaxis"
+        case .reports: "doc.text"
+        case .teams: "person.3"
         case .review: "checkmark.seal"
         case .rules: "shield"
         }

@@ -67,6 +67,8 @@ Timeline colors are explained inline: filled deep-blue/red/gray blocks are Focus
 
 Activity rows follow a RescueTime-style App / Category layout. App identity is shown with a graphite icon on a light-gray tile, while the category owns the visual color: Focused uses the deep-blue accent, Distracting uses red, and Other/Idle use neutral tones. The same category palette is used for category summaries and app-usage timeline blocks; project color remains reserved for the separate Project lane.
 
+Reports and Teams are now first-class native sections. Reports exposes Timing-style report presets, a configurable builder entry point, weekly project totals, and export-format affordances; Teams keeps local team ownership, member management, project counts, and tracked totals in the same macOS shell.
+
 The running timer controls support Timing-style ±1/±5/±15-minute start corrections, alignment to the previous entry boundary, estimate check-ins, and visible remaining time.
 
 Activities also includes an Entry-O-Matic flow. It previews generated entries from visible app usage, merges segments across a configurable maximum gap, discards sessions shorter than the selected minimum, subtracts existing entries by default, and offers an explicit overwrite mode before writing anything.
