@@ -344,30 +344,90 @@ function activityContext(activity) {
 }
 
 function liveActivityBlocks(activities) {
-  return activities
+  const normalized = activities
     .map((activity) => {
       const start = Math.max(DAY_START, Math.floor(Number(activity.startSecond || 0) / 60));
       const end = Math.min(DAY_END, Math.ceil(Number(activity.endSecond || 0) / 60));
       if (end <= start) return null;
-      const kind = activityCategory(activity).key;
+      const category = activityCategory(activity);
       return {
         id: activity.id || `${start}-${end}-${activity.appName}`,
         start,
         end,
-        kind,
-        label: kind === "idle" ? "Idle" : activityLabel(activity),
-        detail: kind === "idle" ? "No significant activity" : formatRange(start, end),
-        rows: kind === "idle" ? null : [{
-          minutes: `${Math.max(1, end - start)}m`,
-          icon: activityIcon(activity),
-          label: activityLabel(activity),
-          time: formatRange(start, end),
-          kind,
-        }],
+        kind: category.key,
+        label: category.key === "idle" ? "Idle" : activityLabel(activity),
+        icon: category.key === "idle" ? null : activityIcon(activity),
       };
     })
     .filter(Boolean)
-    .sort((left, right) => left.start - right.start);
+    .sort((left, right) => left.start - right.start || left.end - right.end);
+
+  const blocks = [];
+  for (const activity of normalized) {
+    const previous = blocks[blocks.length - 1];
+    const canMerge = previous
+      && activity.start <= previous.end + 1
+      && activity.end - previous.start <= 20;
+
+    if (!canMerge) {
+      blocks.push({
+        id: activity.id,
+        start: activity.start,
+        end: activity.end,
+        kind: activity.kind,
+        label: activity.kind === "idle" ? "Idle" : activity.label,
+        detail: activity.kind === "idle" ? "No significant activity" : formatRange(activity.start, activity.end),
+        kinds: new Set([activity.kind]),
+        rowMap: new Map([[`${activity.kind}|${activity.label}`, {
+          icon: activity.icon,
+          label: activity.label,
+          start: activity.start,
+          end: activity.end,
+          seconds: Math.max(1, (activity.end - activity.start) * 60),
+          kind: activity.kind,
+        }]]),
+      });
+      continue;
+    }
+
+    previous.end = Math.max(previous.end, activity.end);
+    previous.kinds.add(activity.kind);
+    previous.kind = previous.kinds.size === 1 ? activity.kind : "mixed";
+    const rowKey = `${activity.kind}|${activity.label}`;
+    const row = previous.rowMap.get(rowKey);
+    if (row) {
+      row.end = Math.max(row.end, activity.end);
+      row.seconds += Math.max(1, (activity.end - activity.start) * 60);
+    } else {
+      previous.rowMap.set(rowKey, {
+        icon: activity.icon,
+        label: activity.label,
+        start: activity.start,
+        end: activity.end,
+        seconds: Math.max(1, (activity.end - activity.start) * 60),
+        kind: activity.kind,
+      });
+    }
+  }
+
+  return blocks.map((block) => ({
+    id: block.id,
+    start: block.start,
+    end: block.end,
+    kind: block.kind,
+    label: block.label,
+    detail: block.kind === "idle" ? block.detail : formatRange(block.start, block.end),
+    rows: block.kinds.size === 1 && block.kinds.has("idle") ? null : [...block.rowMap.values()]
+      .sort((left, right) => right.seconds - left.seconds)
+      .slice(0, 5)
+      .map((row) => ({
+        minutes: formatDurationSeconds(row.seconds),
+        icon: row.icon,
+        label: row.label,
+        time: formatRange(row.start, row.end),
+        kind: row.kind,
+      })),
+  }));
 }
 
 function planTaskFromAPI(task, index) {
