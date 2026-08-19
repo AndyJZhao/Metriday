@@ -228,3 +228,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 116. Web Activities row actions — verified activity rows preserve full-row detail and keyboard hit targets while adding independent project assignment, activity-derived rule creation, drag payloads, and native-style double-click Time Entry creation.
 117. Web Saved Filter row editing — verified a single click remains filter selection while a double click opens the matching saved filter editor, mirroring the native sidebar gesture split.
 118. Web Activities callback wiring — verified the Activities sidebar, row project actions, and double-click Time Entry path use explicit React props/API references with no global window bridge.
+119. Web Plan four-day timeline — verified the Web Plan continuous timeline now matches native’s selected date plus the following three dates, with matching neighbor-plan fetches and no Day / Week mode control.

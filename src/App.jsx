@@ -1494,7 +1494,7 @@ function CalendarPanel({ tasks, neighborPlans, selectedTaskId, setSelectedTaskId
   const monthDays = Array.from({ length: cellCount }, (_, index) => localDateKey(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), index - leadingDays + 1, 12)));
   const monthTitle = visibleMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const selectedDateLabel = new Date(`${dateKey}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-  const timelineDays = [-1, 0, 1].map((offset) => offsetDateKey(dateKey, offset));
+  const timelineDays = Array.from({ length: 4 }, (_, offset) => offsetDateKey(dateKey, offset));
   return (
     <section className="calendar-panel" aria-label="Calendar and continuous timeline">
       <div className="calendar-toolbar"><div className="month-navigation"><IconButton label="Previous month" onClick={() => setVisibleMonth((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1, 12))}><CaretLeft size={16} /></IconButton><strong>{monthTitle}</strong><IconButton label="Next month" onClick={() => setVisibleMonth((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1, 12))}><CaretRight size={16} /></IconButton></div><ActionMenu label="Calendar options" items={calendarItems}><DotsThree size={21} /></ActionMenu></div>
@@ -1529,7 +1529,7 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
       return undefined;
     }
     let cancelled = false;
-    const dates = [offsetDateKey(dateKey, -1), offsetDateKey(dateKey, 1)];
+    const dates = [1, 2, 3].map((offset) => offsetDateKey(dateKey, offset));
     Promise.all(dates.map(async (day) => {
       try {
         const plan = await api.fetchPlan(day);
