@@ -304,6 +304,31 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activities-timer:disabled { cursor: not-allowed; opacity: 0.55; }
 .activities-timer-message { max-width: 1120px; margin: -10px auto 16px; }
 .activities-page-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; max-width: 1120px; margin: -10px auto 20px; }
+.activities-workspace { display: grid; grid-template-columns: 236px minmax(0, 1fr); align-items: start; gap: 18px; max-width: 1120px; margin: 0 auto; }
+.activities-workspace-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; width: 100%; min-width: 0; }
+.activities-workspace-main > * { width: 100%; min-width: 0; }
+.activities-workspace-main .web-filter-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.activities-workspace-main .web-category-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.activities-workspace-main .activity-table-head, .activities-workspace-main .activity-table-row { grid-template-columns: minmax(150px, 1.2fr) 100px 110px minmax(100px, 0.8fr); gap: 8px; }
+.activities-workspace-main .project-create-form { grid-template-columns: minmax(0, 1fr) 90px 68px 110px auto; }
+.activities-workspace-main .manual-entry-form { grid-template-columns: minmax(120px, 1fr) 80px 80px minmax(90px, 1fr) 90px auto; }
+.activities-workspace-main > .web-activity-timeline, .activities-workspace-main > .web-source-panel, .activities-workspace-main > .activities-list, .activities-workspace-main > .projects-panel, .activities-workspace-main > .time-entries-panel { max-width: none; margin: 0; }
+.activity-project-sidebar { position: sticky; top: 12px; display: flex; flex-direction: column; max-height: calc(100vh - 160px); overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #fbfbfc; }
+.activity-project-sidebar-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 15px 14px 11px; }
+.activity-project-sidebar-heading h2 { margin: 0; color: #343943; font-size: 15px; }
+.activity-project-sidebar-heading span { color: var(--muted); font-size: 10px; }
+.activity-project-filter-list { display: grid; gap: 2px; padding: 0 7px; }
+.activity-project-filter { display: flex; align-items: center; width: 100%; min-height: 42px; gap: 8px; padding: 5px 7px; border: 0; border-radius: 7px; background: transparent; color: #4d525d; cursor: pointer; text-align: left; }
+.activity-project-filter:hover, .activity-project-filter.active { background: var(--accent-soft); color: var(--accent); }
+.activity-project-filter-icon { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: 0 0 22px; color: var(--muted); }
+.activity-project-filter.active .activity-project-filter-icon { color: var(--accent); }
+.activity-project-filter > span:last-child { display: grid; min-width: 0; gap: 2px; }
+.activity-project-filter strong { overflow: hidden; color: inherit; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.activity-project-filter small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.activity-project-sidebar-label { padding: 12px 8px 5px; color: var(--muted); font-size: 10px; font-weight: 650; }
+.activity-project-sidebar-divider { height: 1px; margin: 10px 14px 0; background: var(--border); }
+.activity-project-sidebar-hint { margin: auto 14px 14px; padding-top: 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; line-height: 1.45; }
+.tray-icon { display: block; width: 14px; height: 11px; border: 1.5px solid currentColor; border-radius: 2px 2px 4px 4px; }
 .activity-view-switcher { display: inline-flex; align-items: center; min-height: 36px; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: #f6f7f9; }
 .activity-view-switcher button { min-height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 650; }
 .activity-view-switcher button.active { background: #fff; color: var(--accent); box-shadow: 0 1px 3px rgba(32, 38, 66, 0.12); }
@@ -702,6 +727,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   .app-shell { grid-template-columns: 64px minmax(0, 1fr); min-width: 720px; height: auto; min-height: 100vh; }
   .sidebar { position: sticky; top: 0; height: 100vh; }
   .today-page, .page { min-height: 760px; }
+  .activities-workspace { grid-template-columns: minmax(0, 1fr); }
+  .activity-project-sidebar { position: static; max-height: none; }
   .web-global-header { grid-template-columns: 200px minmax(0, 1fr); gap: 12px; padding: 12px 16px; }
   .web-global-context { grid-template-columns: minmax(140px, 1fr) auto minmax(145px, 0.8fr); gap: 8px; padding: 10px 11px; }
   .web-global-current strong { font-size: 14px; }
