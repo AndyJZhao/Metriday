@@ -610,6 +610,7 @@ struct GlobalTopHeader: View {
 
 struct PageDateHeader: View {
     @EnvironmentObject private var appState: AppState
+    @State private var showingDatePicker = false
 
     var title: String
     var subtitle: String? = nil
@@ -629,7 +630,30 @@ struct PageDateHeader: View {
             }
             Spacer()
             if showsDateControls {
-                HStack(spacing: 0) {
+                HStack(spacing: 7) {
+                    Button {
+                        showingDatePicker.toggle()
+                    } label: {
+                        Image(systemName: "calendar")
+                            .frame(width: 30, height: 30)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Choose date")
+                    .accessibilityIdentifier("\(title.lowercased()).date-picker")
+                    .popover(isPresented: $showingDatePicker, arrowEdge: .bottom) {
+                        DatePicker(
+                            "Choose date",
+                            selection: Binding(
+                                get: { appState.selectedDate },
+                                set: { appState.selectDate($0); showingDatePicker = false }
+                            ),
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
+                        .padding(12)
+                    }
+
+                    HStack(spacing: 0) {
                     Button {
                         appState.moveSelectedDate(byDays: -1)
                     } label: {
@@ -679,6 +703,7 @@ struct PageDateHeader: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Date range")
                 .accessibilityIdentifier("\(title.lowercased()).date-range")
+                }
             }
         }
     }
