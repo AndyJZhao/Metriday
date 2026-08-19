@@ -238,3 +238,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 126. Web report preset semantics — verified Web Timesheet, Week + Day, Time Per Project, and Time Per Document presets now map to native include/group behavior, including native-compatible Week + Day grouping.
 127. Native shared PageDateHeader hit target — verified Stats, Reports, Review, and Activities shared date banners now route empty-area clicks to Today while keeping the calendar picker and previous/next controls independent; native debug/release builds and smoke tests passed.
 128. Web report grouping parity — verified Web exposes the full native ReportGroupBy set and computes month/year/hour plus top-level, second-level, and hierarchical project keys before local aggregation.
+129. Web productivity weighting parity — verified Stats and Review now use the assigned project productivity score when present, falling back to Focused=100, Other=50, and Distracting=0 like native.

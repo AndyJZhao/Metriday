@@ -635,6 +635,17 @@ function activityCategoryStyle(category) {
   return palette[category?.color] || palette.graphite;
 }
 
+function activityProductivityValue(activity, projects = []) {
+  const projectID = resourceID(activity?.projectID);
+  const project = projectID ? projects.find((item) => resourceID(item.id) === projectID) : null;
+  if (project) {
+    const raw = Number(project.productivity ?? (Number(project.productivity_score || 0) * 100));
+    if (Number.isFinite(raw)) return Math.max(-100, Math.min(100, raw));
+  }
+  const category = activityCategory(activity).key;
+  return category === "focused" ? 100 : category === "distracting" ? 0 : 50;
+}
+
 function activityFilterValues(activity, field) {
   const startSecond = Math.max(0, Number(activity?.startSecond || 0));
   const startMinute = Math.floor(startSecond / 60);
@@ -2023,7 +2034,7 @@ function ReviewPage({ api, dateKey, setDateKey, setPage }) {
   const distractedSeconds = api.activities.filter((activity) => activity.relevance === "distracted").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
   const totalActive = relatedSeconds + distractedSeconds + api.activities.filter((activity) => activity.relevance === "other").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
   const taskRelated = totalActive > 0 ? Math.round((relatedSeconds / totalActive) * 100) : 0;
-  const productivityScore = totalActive > 0 ? Math.round(api.activities.filter((activity) => activity.relevance !== "idle").reduce((total, activity) => total + (activityCategory(activity).key === "focused" ? 100 : activityCategory(activity).key === "distracting" ? 0 : 50) * Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0) / totalActive) : 0;
+  const productivityScore = totalActive > 0 ? Math.round(api.activities.filter((activity) => activity.relevance !== "idle").reduce((total, activity) => total + activityProductivityValue(activity, api.projects) * Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0) / totalActive) : 0;
   const deepWork = api.connected ? formatDurationSeconds(relatedSeconds) : "22h 14m";
   const distraction = api.connected ? formatDurationSeconds(distractedSeconds) : "91%";
   const categoryActivities = api.connected
@@ -3395,10 +3406,7 @@ function StatsPage({ api, dateKey, setDateKey, setPage }) {
   const [projectUnit, setProjectUnit] = useState("hour");
   const days = (api.calendarWeekly.length >= 7 ? api.calendarWeekly : api.weekly).slice(-7);
   const secondsForActivity = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
-  const productivityValue = (activity) => {
-    const category = activityCategory(activity).key;
-    return category === "focused" ? 100 : category === "distracting" ? 0 : 50;
-  };
+  const productivityValue = (activity) => activityProductivityValue(activity, api.projects);
   const dayRows = days.map((day) => {
     const activities = (day.activities || []).filter((activity) => activityCategory(activity).key !== "idle");
     const active = activities.reduce((total, activity) => total + secondsForActivity(activity), 0);
