@@ -16,7 +16,8 @@ struct ReportsView: View {
             VStack(alignment: .leading, spacing: 22) {
                 PageDateHeader(
                     title: "Reports",
-                    subtitle: "Build, preview, and export detailed time reports"
+                    subtitle: "Build, preview, and export detailed time reports",
+                    showsDateControls: true
                 )
 
                 HStack(spacing: 14) {

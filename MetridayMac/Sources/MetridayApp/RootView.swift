@@ -609,8 +609,11 @@ struct GlobalTopHeader: View {
 }
 
 struct PageDateHeader: View {
+    @EnvironmentObject private var appState: AppState
+
     var title: String
     var subtitle: String? = nil
+    var showsDateControls = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -625,6 +628,68 @@ struct PageDateHeader: View {
                 }
             }
             Spacer()
+            if showsDateControls {
+                HStack(spacing: 0) {
+                    Button {
+                        appState.moveSelectedDate(byDays: -1)
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 30, height: 30)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Previous day")
+                    .accessibilityIdentifier("\(title.lowercased()).date-previous")
+
+                    Divider()
+                        .frame(height: 19)
+
+                    Button {
+                        appState.goToToday()
+                    } label: {
+                        Text(dateRangeTitle)
+                            .font(.system(size: 12, weight: .semibold))
+                            .frame(minWidth: 86, minHeight: 30)
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Today")
+                    .accessibilityIdentifier("\(title.lowercased()).date-today")
+
+                    Divider()
+                        .frame(height: 19)
+
+                    Button {
+                        appState.moveSelectedDate(byDays: 1)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .frame(width: 30, height: 30)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Next day")
+                    .accessibilityIdentifier("\(title.lowercased()).date-next")
+                }
+                .padding(.horizontal, 4)
+                .background(MetridayTheme.canvas)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(MetridayTheme.line, lineWidth: 1)
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Date range")
+                .accessibilityIdentifier("\(title.lowercased()).date-range")
+            }
         }
+    }
+
+    private var dateRangeTitle: String {
+        if Calendar.current.isDateInToday(appState.selectedDate) {
+            return "Today"
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: appState.selectedDate)
     }
 }

@@ -24,7 +24,8 @@ struct StatsView: View {
             VStack(alignment: .leading, spacing: 22) {
                 PageDateHeader(
                     title: "Stats",
-                    subtitle: "See when, where, and how your time was spent"
+                    subtitle: "See when, where, and how your time was spent",
+                    showsDateControls: true
                 )
 
                 HStack(spacing: 10) {

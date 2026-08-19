@@ -26,7 +26,8 @@ struct ReviewView: View {
             VStack(alignment: .leading, spacing: 24) {
                 PageDateHeader(
                     title: "Review",
-                    subtitle: "Understand where your planned time actually went"
+                    subtitle: "Understand where your planned time actually went",
+                    showsDateControls: true
                 )
 
                 HStack(spacing: 16) {
