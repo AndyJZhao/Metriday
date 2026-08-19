@@ -1625,13 +1625,19 @@ struct ActivitiesView: View {
         .onDrag {
             NSItemProvider(object: segment.id.uuidString as NSString)
         }
-        .onTapGesture(count: 2) {
-            prepareNewEntry(startMinute: segment.startMinute, endMinute: segment.endMinute)
-            showingNewEntry = true
-        }
-        .onTapGesture {
-            selectedActivity = segment
-        }
+        .gesture(
+            TapGesture(count: 2)
+                .exclusively(before: TapGesture())
+                .onEnded { result in
+                    switch result {
+                    case .first:
+                        prepareNewEntry(startMinute: segment.startMinute, endMinute: segment.endMinute)
+                        showingNewEntry = true
+                    case .second:
+                        selectedActivity = segment
+                    }
+                }
+        )
         .contextMenu {
             Button("Create Time Entry") {
                 prepareNewEntry(startMinute: segment.startMinute, endMinute: segment.endMinute)
