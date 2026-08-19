@@ -44,6 +44,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 38. Activities Entry-O-Matic — verified the native-shaped conversion dialog, project scope, minimum-duration and maximum-gap controls, overlap replacement toggle, preview recalculation, billing/notes fields, and create action against the selected App / Category evidence.
 39. Activities project workspace — verified the native-shaped Projects / Unassigned / Filters sidebar, project and saved-filter selection, filtered timeline/list counts, and no horizontal overflow at the desktop viewport.
 40. Activities entry workflow — verified native-shaped New Time Entry and Start Timer sheets, project/billing/notes fields, timer estimate choices, recent-entry surface, validation, and cancel paths without creating QA data.
+41. Activities toolbar popovers — verified native-shaped Devices and Filters popovers, device visibility state, Focused / Distracting / Other / Idle selection, saved-filter entries, automatic close after selection, and continued filtering of the same activity evidence.
 
 ## Findings applied
 
@@ -85,3 +86,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Activities now exposes Entry-O-Matic conversion: visible non-idle App / Category segments are merged by configurable gap, existing time can be subtracted or replaced, and the preview maps directly to native time-entry creation payloads.
 - Activities now keeps project and saved-filter navigation beside the timeline, with full-width rows that filter the same App / Category evidence and preserve the project assignment drop workflow.
 - Activities now exposes native-shaped New Time Entry and Start Timer sheets from the primary toolbar; direct timer starts are replaced by explicit title, project, billing, notes, and estimate configuration.
+- Activities now groups device and filter selection into native-style popovers; Display remains focused on presentation settings while Devices and Filters own their respective scope choices.
