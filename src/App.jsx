@@ -306,6 +306,24 @@ function actualBlockStyle(block) {
   return timelineBlockStyle(block.start, block.end, block.end - block.start < 30 ? 4 : 34);
 }
 
+function preciseClock(totalSeconds) {
+  const value = Math.max(0, Math.round(Number(totalSeconds || 0)));
+  const hours = Math.floor(value / 3600) % 24;
+  const minutes = Math.floor((value % 3600) / 60);
+  const seconds = value % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function preciseDuration(totalSeconds) {
+  const value = Math.max(0, Math.round(Number(totalSeconds || 0)));
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  const seconds = value % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
 function activityLabel(activity) {
   const app = activity.appName || activity.deviceName || "Activity";
   const detail = activity.windowTitle || activity.resource || "";
@@ -355,14 +373,18 @@ function liveActivityBlocks(activities) {
   const primaryKind = (totals) => [...totals.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || "other";
   const normalized = activities
     .map((activity) => {
-      const start = Math.max(DAY_START, Math.floor(Number(activity.startSecond || 0) / 60));
-      const end = Math.min(DAY_END, Math.ceil(Number(activity.endSecond || 0) / 60));
+      const rawStartSecond = Math.max(DAY_START * 60, Number(activity.startSecond || 0));
+      const rawEndSecond = Math.min(DAY_END * 60, Number(activity.endSecond || 0));
+      const start = Math.max(DAY_START, Math.floor(rawStartSecond / 60));
+      const end = Math.min(DAY_END, Math.ceil(rawEndSecond / 60));
       if (end <= start) return null;
       const category = activityCategory(activity);
       return {
         id: activity.id || `${start}-${end}-${activity.appName}`,
         start,
         end,
+        startSecond: rawStartSecond,
+        endSecond: rawEndSecond,
         kind: category.key,
         label: category.key === "idle" ? "Idle" : activityLabel(activity),
         icon: category.key === "idle" ? null : activityIcon(activity),
@@ -383,17 +405,19 @@ function liveActivityBlocks(activities) {
         id: activity.id,
         start: activity.start,
         end: activity.end,
+        startSecond: activity.startSecond,
+        endSecond: activity.endSecond,
         kind: activity.kind,
         label: activity.kind === "idle" ? "Idle" : activity.label,
         detail: activity.kind === "idle" ? "No significant activity" : formatRange(activity.start, activity.end),
         kinds: new Set([activity.kind]),
-        categorySeconds: new Map([[activity.kind, Math.max(1, (activity.end - activity.start) * 60)]]),
+        categorySeconds: new Map([[activity.kind, Math.max(1, activity.endSecond - activity.startSecond)]]),
         rowMap: new Map([[`${activity.kind}|${activity.label}`, {
           icon: activity.icon,
           label: activity.label,
           start: activity.start,
           end: activity.end,
-          seconds: Math.max(1, (activity.end - activity.start) * 60),
+          seconds: Math.max(1, activity.endSecond - activity.startSecond),
           kind: activity.kind,
         }]]),
       });
@@ -401,24 +425,26 @@ function liveActivityBlocks(activities) {
     }
 
     previous.end = Math.max(previous.end, activity.end);
+    previous.startSecond = Math.min(previous.startSecond, activity.startSecond);
+    previous.endSecond = Math.max(previous.endSecond, activity.endSecond);
     previous.kinds.add(activity.kind);
     previous.categorySeconds.set(
       activity.kind,
-      (previous.categorySeconds.get(activity.kind) || 0) + Math.max(1, (activity.end - activity.start) * 60)
+      (previous.categorySeconds.get(activity.kind) || 0) + Math.max(1, activity.endSecond - activity.startSecond)
     );
     previous.kind = primaryKind(previous.categorySeconds);
     const rowKey = `${activity.kind}|${activity.label}`;
     const row = previous.rowMap.get(rowKey);
     if (row) {
       row.end = Math.max(row.end, activity.end);
-      row.seconds += Math.max(1, (activity.end - activity.start) * 60);
+      row.seconds += Math.max(1, activity.endSecond - activity.startSecond);
     } else {
       previous.rowMap.set(rowKey, {
         icon: activity.icon,
         label: activity.label,
         start: activity.start,
         end: activity.end,
-        seconds: Math.max(1, (activity.end - activity.start) * 60),
+        seconds: Math.max(1, activity.endSecond - activity.startSecond),
         kind: activity.kind,
       });
     }
@@ -428,6 +454,8 @@ function liveActivityBlocks(activities) {
     id: block.id,
     start: block.start,
     end: block.end,
+    startSecond: block.startSecond,
+    endSecond: block.endSecond,
     kind: block.kind,
     label: block.label,
     detail: block.kind === "idle" ? block.detail : formatRange(block.start, block.end),
@@ -628,12 +656,25 @@ function ActualRows({ block }) {
   ); })}</div>;
 }
 
+function ActualHoverCard({ block }) {
+  const categoryLabel = block.kind === "focused" ? "Focused" : block.kind === "distracting" ? "Distracting" : block.kind === "idle" ? "Idle" : "Other";
+  const appLabel = block.rows?.[0]?.label || block.label;
+  return <div className="actual-hover-card" role="tooltip">
+    <strong className="actual-hover-time">{preciseClock(block.startSecond)}</strong>
+    <span className="actual-hover-duration">({preciseDuration(block.endSecond - block.startSecond)})</span>
+    <div className="actual-hover-meta"><span>App:</span><b>{appLabel}</b></div>
+    <div className="actual-hover-meta"><span>Category:</span><i className={`hover-category-dot ${block.kind}`} /><b>{categoryLabel}</b></div>
+    <div className="actual-hover-meta"><span>Project:</span><i className="hover-project-dot" /><b>None</b><small>From the app usage</small></div>
+  </div>;
+}
+
 function ActualTrack({ activities, connected }) {
+  const [hoveredBlockId, setHoveredBlockId] = useState(null);
   const blocks = connected && activities.length > 0 ? liveActivityBlocks(activities) : actualBlocks;
   return (
     <section className="today-track actual-track" aria-label="Actual activity timeline">
       <div className="track-heading"><strong>Actual</strong><span>{connected ? "Live from Metriday" : "What actually happened"}</span></div>
-      <div className="track-canvas"><GridLines />{blocks.map((block) => <div key={block.id} className={`actual-block ${block.kind}`} style={actualBlockStyle(block)} title={`${block.label} · ${block.detail}`}><ActualRows block={block} /></div>)}</div>
+      <div className="track-canvas"><GridLines />{blocks.map((block) => <div key={block.id} className={`actual-block ${block.kind}`} style={actualBlockStyle(block)} title={`${block.label} · ${block.detail}`} onMouseEnter={() => setHoveredBlockId(block.id)} onMouseLeave={() => setHoveredBlockId(null)}><ActualRows block={block} />{hoveredBlockId === block.id ? <ActualHoverCard block={block} /> : null}</div>)}</div>
     </section>
   );
 }
