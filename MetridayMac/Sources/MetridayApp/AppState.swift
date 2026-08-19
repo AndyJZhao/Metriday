@@ -407,7 +407,7 @@ final class AppState: ObservableObject {
             let activityDays = dates.map { date in
                 (
                     date: date,
-                    segments: activityMonitor.segments(for: date) + screenTimeStore.segments(for: date)
+                    segments: effectiveActivitySegments(for: date)
                 )
             }
             return .text(
@@ -886,11 +886,11 @@ final class AppState: ObservableObject {
         if request.method == "GET", path == "/v1/activities" {
             let date = apiDate(from: request.query["date"]) ?? selectedDate
             do {
-                let activities = activityMonitor.segments(for: date) + screenTimeStore.segments(for: date)
-                return .json(try JSONEncoder().encode(activities.sorted {
+                let activities = rawActivitySegments(for: date).sorted {
                     if $0.startSecond == $1.startSecond { return $0.endSecond < $1.endSecond }
                     return $0.startSecond < $1.startSecond
-                }))
+                }
+                return .json(try JSONSerialization.data(withJSONObject: activities.map { apiActivity($0, date: date) }))
             } catch {
                 return .error("Activities could not be encoded", statusCode: 500)
             }
@@ -924,7 +924,7 @@ final class AppState: ObservableObject {
 
         if request.method == "GET", path == "/v1/insights" {
             let date = apiDate(from: request.query["date"]) ?? selectedDate
-            let segments = activityMonitor.segments(for: date) + screenTimeStore.segments(for: date)
+            let segments = effectiveActivitySegments(for: date)
             let insights = ActivityInsights.generate(from: segments)
             let data = insights.map { insight -> [String: Any] in
                 let sourceLabel: String
@@ -969,7 +969,7 @@ final class AppState: ObservableObject {
             let activityDays = dates.map { date in
                 (
                     date: date,
-                    segments: activityMonitor.segments(for: date) + screenTimeStore.segments(for: date)
+                    segments: effectiveActivitySegments(for: date)
                 )
             }
             let reportEnd = calendar.date(byAdding: .day, value: 1, to: endDate) ?? endDate
@@ -1715,6 +1715,39 @@ final class AppState: ObservableObject {
             cursor = next
         }
         return dates
+    }
+
+    private func rawActivitySegments(for date: Date) -> [ActivitySegment] {
+        activityMonitor.segments(for: date) + screenTimeStore.segments(for: date)
+    }
+
+    private func effectiveActivitySegments(for date: Date) -> [ActivitySegment] {
+        categoryStore.applyingCategories(
+            to: rawActivitySegments(for: date),
+            filterStore: filterStore,
+            date: date
+        )
+    }
+
+    private func apiActivity(_ segment: ActivitySegment, date: Date) -> [String: Any] {
+        let category = categoryStore.category(for: segment, filterStore: filterStore, date: date)
+        return [
+            "id": segment.id.uuidString,
+            "appName": segment.appName,
+            "bundleIdentifier": segment.bundleIdentifier,
+            "deviceName": segment.deviceName,
+            "windowTitle": segment.windowTitle,
+            "resource": segment.resource,
+            "startMinute": segment.startMinute,
+            "endMinute": segment.endMinute,
+            "startSecond": segment.startSecond,
+            "endSecond": segment.endSecond,
+            "relevance": category.role.relevance.rawValue,
+            "categoryName": category.name,
+            "categoryRole": category.role.rawValue,
+            "categoryColor": category.color.rawValue,
+            "projectID": segment.projectID.map { $0.uuidString } ?? NSNull()
+        ]
     }
 
     private func reportOptions(from query: [String: String]) -> ReportOptions {

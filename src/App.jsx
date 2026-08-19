@@ -342,6 +342,10 @@ function activityIcon(activity) {
 }
 
 function activityCategory(activity) {
+  const categoryRole = String(activity?.categoryRole || "").toLowerCase();
+  if (["focused", "distracting", "other", "idle"].includes(categoryRole)) {
+    return { key: categoryRole, label: activity.categoryName || categoryRole[0].toUpperCase() + categoryRole.slice(1) };
+  }
   switch (activity?.relevance) {
     case "related":
       return { key: "focused", label: "Focused" };
