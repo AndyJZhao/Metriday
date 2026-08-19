@@ -656,7 +656,7 @@ struct PlanCalendarPane: View {
                 TimelineHourLabels()
                     .frame(width: 44)
 
-                ForEach(Array(visibleDates.enumerated()), id: \.element) { index, _ in
+                ForEach(Array(visibleDates.enumerated()), id: \.element) { index, date in
                     ZStack(alignment: .topLeading) {
                         CompactTimelineGrid()
                             .overlay {
@@ -703,6 +703,14 @@ struct PlanCalendarPane: View {
                     .overlay(alignment: .leading) {
                         Rectangle().fill(MetridayTheme.line).frame(width: 1)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if index > 0 {
+                            appState.selectDate(date)
+                        }
+                    }
+                    .accessibilityAddTraits(index > 0 ? .isButton : [])
+                    .accessibilityLabel(index > 0 ? "Open plan for \(shortDay(date))" : "Selected day timeline")
                     .dropDestination(for: String.self) { identifiers, location in
                         guard index == 0,
                               let identifier = identifiers.first,

@@ -158,5 +158,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Web Today Actual evidence now preserves the App / Category / Project relationship already present in native activity data; project information is no longer hard-coded to `None` in hover details or silently dropped when recording time.
 - Web Today Actual aggregation now treats Category boundaries as visual boundaries, preserving the user-selected App / website / item category color instead of allowing a neighboring category to overwrite it.
 - Web Activity detail recording now preserves an assigned Project instead of silently creating an unassigned Time Entry.
+- Plan adjacent-day timeline columns now use the full visible column as a date-selection target on native and Web, with keyboard activation on the Web companion; the selected day’s timeline keeps its existing task selection and drag/drop behavior.
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
+78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
