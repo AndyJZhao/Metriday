@@ -1191,6 +1191,76 @@ final class AppState: ObservableObject {
             ])
         }
 
+        if request.method == "POST", path == "/v1/calendar-events" {
+            guard let body = apiBody(request),
+                  let title = stringArgument(body, "title"),
+                  let startValue = stringArgument(body, "start"),
+                  let endValue = stringArgument(body, "end"),
+                  let start = parseCommandDate(startValue),
+                  let end = parseCommandDate(endValue),
+                  end > start else {
+                return .error("Calendar event needs a title and valid start/end", statusCode: 400)
+            }
+            let notes = stringArgument(body, "notes") ?? ""
+            guard calendarStore.createEvent(title: title, start: start, end: end, notes: notes) else {
+                return .error(calendarStore.statusMessage, statusCode: 403)
+            }
+            let date = apiDate(from: stringArgument(body, "date")) ?? start
+            calendarStore.loadEvents(for: date)
+            return .jsonObject([
+                "date": apiDayKey(date),
+                "data": calendarStore.events.map(apiCalendarEvent),
+                "authorized": calendarStore.isAuthorized,
+                "status": calendarStore.statusMessage
+            ])
+        }
+
+        if path.hasPrefix("/v1/calendar-events/"),
+           let eventID = path.split(separator: "/").last.map(String.init),
+           (request.method == "PATCH" || request.method == "PUT") {
+            guard let body = apiBody(request),
+                  let title = stringArgument(body, "title"),
+                  let startValue = stringArgument(body, "start"),
+                  let endValue = stringArgument(body, "end"),
+                  let start = parseCommandDate(startValue),
+                  let end = parseCommandDate(endValue),
+                  end > start else {
+                return .error("Calendar event needs a title and valid start/end", statusCode: 400)
+            }
+            guard calendarStore.updateEvent(
+                id: eventID,
+                title: title,
+                start: start,
+                end: end,
+                notes: stringArgument(body, "notes") ?? ""
+            ) else {
+                return .error(calendarStore.statusMessage, statusCode: 403)
+            }
+            let date = apiDate(from: stringArgument(body, "date")) ?? start
+            calendarStore.loadEvents(for: date)
+            return .jsonObject([
+                "date": apiDayKey(date),
+                "data": calendarStore.events.map(apiCalendarEvent),
+                "authorized": calendarStore.isAuthorized,
+                "status": calendarStore.statusMessage
+            ])
+        }
+
+        if request.method == "DELETE", path.hasPrefix("/v1/calendar-events/"),
+           let eventID = path.split(separator: "/").last.map(String.init) {
+            guard calendarStore.deleteEvent(id: eventID) else {
+                return .error(calendarStore.statusMessage, statusCode: 403)
+            }
+            let date = apiDate(from: request.query["date"]) ?? selectedDate
+            calendarStore.loadEvents(for: date)
+            return .jsonObject([
+                "date": apiDayKey(date),
+                "data": calendarStore.events.map(apiCalendarEvent),
+                "authorized": calendarStore.isAuthorized,
+                "status": calendarStore.statusMessage
+            ])
+        }
+
         if request.method == "GET", path == "/v1/reminders" {
             let date = apiDate(from: request.query["date"]) ?? selectedDate
             reminderStore.loadCompleted(for: date)

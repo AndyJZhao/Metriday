@@ -474,6 +474,21 @@ function useMetridayAPI(dateKey, apiBase) {
       await request(`/v1/plans?date=${date}`, { method: "PUT", body: JSON.stringify({ markdown }) });
       await refresh();
     },
+    createCalendarEvent: async (event) => {
+      const result = await request("/v1/calendar-events", { method: "POST", body: JSON.stringify(event) });
+      await refresh();
+      return result;
+    },
+    updateCalendarEvent: async (id, event) => {
+      const result = await request(`/v1/calendar-events/${encodeURIComponent(resourceID(id))}`, { method: "PATCH", body: JSON.stringify(event) });
+      await refresh();
+      return result;
+    },
+    deleteCalendarEvent: async (id, date = dateKey || localDateKey()) => {
+      const result = await request(`/v1/calendar-events/${encodeURIComponent(resourceID(id))}?date=${date}`, { method: "DELETE" });
+      await refresh();
+      return result;
+    },
     assignActivity: async (id, projectID, date = dateKey || localDateKey()) => {
       await request(`/v1/activities/${resourceID(id)}?date=${date}`, { method: "PATCH", body: JSON.stringify({ projectID: projectID || null }) });
       await refresh();
@@ -1543,8 +1558,28 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
       .catch(() => setToast("Local change kept; sync failed"));
   };
   const scheduleTask = (id, start, end) => { const nextTasks = tasks.map((task) => task.id === id ? { ...task, start, end } : task); persistTasks(nextTasks, "Markdown updated · " + formatRange(start, end) + " added"); setLastUpdatedId(id); setSelectedTaskId(id); };
-  const dropTask = (id, offsetY, modifiers = {}) => { const raw = DAY_START + (offsetY / HOUR_HEIGHT) * 60; const start = Math.max(DAY_START, Math.min(DAY_END - 30, Math.round(raw / 15) * 15)); const task = tasks.find((item) => item.id === id); if (!task) return; const end = Math.min(start + (task.start != null ? Math.max(task.end - task.start, 30) : 60), DAY_END); if (modifiers.altKey) { setToast("Event drop reserved for a later calendar integration"); return; } if (modifiers.metaKey) { scheduleTask(id, start, end); return; } setPendingSchedule({ id, start, end, title: task.title }); };
-  const confirmSchedule = (kind) => { if (!pendingSchedule) return; if (kind === "time-block") scheduleTask(pendingSchedule.id, pendingSchedule.start, pendingSchedule.end); else setToast("Event scheduling is reserved for a later calendar integration"); setPendingSchedule(null); };
+  const createCalendarEvent = async (id, start, end) => {
+    const task = tasks.find((item) => item.id === id);
+    if (!task || !api.connected || typeof api.createCalendarEvent !== "function") return;
+    if (!api.calendarEvents?.authorized) {
+      try {
+        await api.requestSourceAccess?.("calendar");
+        setToast("Calendar access requested");
+      } catch (error) {
+        setToast(error.message || "Could not request Calendar access");
+      }
+      return;
+    }
+    try {
+      await api.createCalendarEvent({ date: planDate, title: task.title, start: localEntryDateSeconds(planDate, start * 60), end: localEntryDateSeconds(planDate, end * 60) });
+      setToast("Calendar Event created · " + formatRange(start, end));
+      setSelectedTaskId(id);
+    } catch (error) {
+      setToast(error.message || "Could not create Calendar Event");
+    }
+  };
+  const dropTask = (id, offsetY, modifiers = {}) => { const raw = DAY_START + (offsetY / HOUR_HEIGHT) * 60; const start = Math.max(DAY_START, Math.min(DAY_END - 30, Math.round(raw / 15) * 15)); const task = tasks.find((item) => item.id === id); if (!task) return; const end = Math.min(start + (task.start != null ? Math.max(task.end - task.start, 30) : 60), DAY_END); if (modifiers.altKey) { void createCalendarEvent(id, start, end); return; } if (modifiers.metaKey) { scheduleTask(id, start, end); return; } setPendingSchedule({ id, start, end, title: task.title }); };
+  const confirmSchedule = (kind) => { if (!pendingSchedule) return; if (kind === "time-block") { scheduleTask(pendingSchedule.id, pendingSchedule.start, pendingSchedule.end); setPendingSchedule(null); return; } void createCalendarEvent(pendingSchedule.id, pendingSchedule.start, pendingSchedule.end); setPendingSchedule(null); };
   const taskDragStart = (event, id) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/task-id", id); setSelectedTaskId(id); };
   const pointerMoveStart = (event, id) => {
     event.preventDefault();
@@ -1582,7 +1617,7 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
   return (
     <main className="page plan-page"><header className="plan-header"><h1>Plan <span>·</span> {planDateLabel(planDate)}</h1><div className="date-controls"><DatePickerControl dateKey={planDate} onChange={setDateKey} label="Choose Plan date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div></header>
       <div className="plan-workspace"><MarkdownEditor tasks={tasks} markdown={markdown} planDate={planDate} onMarkdownChange={updateMarkdown} onMarkdownCommit={commitMarkdown} onTaskDragStart={taskDragStart} onPointerDragStart={pointerMoveStart} onSelectTask={setSelectedTaskId} onComplete={completeTask} /><CalendarPanel tasks={tasks} neighborPlans={neighborPlans} selectedTaskId={selectedTaskId} setSelectedTaskId={setSelectedTaskId} onDropTask={dropTask} onMoveStart={pointerMoveStart} onComplete={completeTask} onUnschedule={unscheduleTask} onResizeStart={resizeStart} dateKey={planDate} onSelectDate={setDateKey} connected={api.connected} /></div>
-      {pendingSchedule ? <div className="schedule-choice-backdrop" role="presentation" onClick={() => setPendingSchedule(null)}><section className="schedule-choice-dialog" role="dialog" aria-modal="true" aria-labelledby="schedule-choice-title" onClick={(event) => event.stopPropagation()}><div><span>Schedule task</span><h2 id="schedule-choice-title">{pendingSchedule.title}</h2><p>{formatRange(pendingSchedule.start, pendingSchedule.end)} · Choose how this drop should be recorded.</p></div><div className="schedule-choice-actions"><button type="button" className="secondary-button" onClick={() => confirmSchedule("event")} disabled>Event <small>Later</small></button><button type="button" className="primary-button" onClick={() => confirmSchedule("time-block")}>Time Block</button></div><button type="button" className="schedule-choice-cancel" onClick={() => setPendingSchedule(null)}>Cancel</button></section></div> : null}
+      {pendingSchedule ? <div className="schedule-choice-backdrop" role="presentation" onClick={() => setPendingSchedule(null)}><section className="schedule-choice-dialog" role="dialog" aria-modal="true" aria-labelledby="schedule-choice-title" onClick={(event) => event.stopPropagation()}><div><span>Schedule task</span><h2 id="schedule-choice-title">{pendingSchedule.title}</h2><p>{formatRange(pendingSchedule.start, pendingSchedule.end)} · Choose how this drop should be recorded.</p></div><div className="schedule-choice-actions"><button type="button" className="secondary-button" onClick={() => confirmSchedule("event")}>{api.calendarEvents?.authorized ? "Add Event" : "Connect Calendar"} <small>{api.calendarEvents?.authorized ? "Event" : "Permission"}</small></button><button type="button" className="primary-button" onClick={() => confirmSchedule("time-block")}>Time Block</button></div><button type="button" className="schedule-choice-cancel" onClick={() => setPendingSchedule(null)}>Cancel</button></section></div> : null}
       {toast ? <div className="toast" role="status"><CheckCircle size={20} weight="fill" /><span>{toast}</span><IconButton label="Dismiss" onClick={() => setToast("")}><X size={15} /></IconButton></div> : null}
     </main>
   );
@@ -2431,10 +2466,52 @@ function WebPhoneCallsPanel({ api, onRecord }) {
   return <section className="web-source-panel" aria-label="Phone Calls"><div className="web-source-heading"><div><h2>Phone Calls</h2><p>Read-only call history that can be recorded as local time evidence.</p></div><div className="web-source-actions"><span className={`api-badge ${payload.database_available ? "online" : ""}`}>{payload.database_available ? `${calls.length} calls` : "Not connected"}</span>{!payload.database_available && api.requestSourceAccess ? <button type="button" className="quiet-pill" onClick={() => api.requestSourceAccess("phone-calls")}>Connect</button> : null}<button type="button" className="quiet-pill" onClick={api.refresh}>Refresh</button></div></div>{calls.length > 0 ? <div className="web-source-list">{calls.map((call) => <div className="web-source-row" key={call.id} role={onRecord ? "button" : undefined} tabIndex={onRecord ? 0 : undefined} aria-label={onRecord ? "Record phone call " + (call.address || "this call") : undefined} onClick={(event) => { if (event.target.closest("button")) return; onRecord?.(call); }} onKeyDown={(event) => { if (event.target.closest("button")) return; if (onRecord && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onRecord(call); } }}><span className="web-source-icon"><Clock size={18} /></span><div><strong>{call.address || "Phone call"}</strong><small>{call.service_provider || "Call history"} · {formatCallTime(call.start)}–{formatCallTime(call.end)}</small></div><span>{formatDurationSeconds(Number(call.duration_seconds || 0))}</span>{onRecord ? <button type="button" className="quiet-pill" onClick={() => onRecord(call)}>Record</button> : null}<IconButton label={`Hide calls from ${call.address || "this address"}`} onClick={() => api.hidePhoneCallAddress(call.address, true)}><X size={15} /></IconButton></div>)}</div> : <div className="web-source-empty"><Clock size={22} /><span>{payload.status || "No phone calls for this date."}</span></div>}</section>;
 }
 
-function WebCalendarEventsPanel({ api, onRecord }) {
+function localDateTimeInput(value) {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function WebCalendarEventDialog({ event, api, dateKey, onClose }) {
+  const [title, setTitle] = useState(event?.title || "");
+  const [start, setStart] = useState(() => localDateTimeInput(event?.start));
+  const [end, setEnd] = useState(() => localDateTimeInput(event?.end));
+  const [notes, setNotes] = useState(event?.notes || "");
+  const [message, setMessage] = useState("");
+  const save = async (submitEvent) => {
+    submitEvent.preventDefault();
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (!title.trim() || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
+      setMessage("Enter a title and a valid time range.");
+      return;
+    }
+    try {
+      await api.updateCalendarEvent(event.id, { date: dateKey, title: title.trim(), start: startDate.toISOString(), end: endDate.toISOString(), notes });
+      onClose();
+    } catch (error) {
+      setMessage(error.message || "Could not update the Calendar Event.");
+    }
+  };
+  const remove = async () => {
+    if (!window.confirm(`Delete “${event.title || "Calendar Event"}”?`)) return;
+    try {
+      await api.deleteCalendarEvent(event.id, dateKey);
+      onClose();
+    } catch (error) {
+      setMessage(error.message || "Could not delete the Calendar Event.");
+    }
+  };
+  return <div className="dialog-backdrop" role="presentation" onClick={onClose}><form className="entry-dialog calendar-event-dialog" role="dialog" aria-modal="true" aria-labelledby="calendar-event-dialog-title" onClick={(clickEvent) => clickEvent.stopPropagation()} onSubmit={save}><div className="dialog-heading"><div><span>Calendar Event</span><h2 id="calendar-event-dialog-title">Edit Event</h2></div><IconButton label="Close Calendar Event editor" onClick={onClose}><X size={18} /></IconButton></div><label>Title<input value={title} onChange={(changeEvent) => setTitle(changeEvent.target.value)} autoFocus /></label><div className="entry-dialog-grid"><label>Start<input type="datetime-local" value={start} onChange={(changeEvent) => setStart(changeEvent.target.value)} /></label><label>End<input type="datetime-local" value={end} onChange={(changeEvent) => setEnd(changeEvent.target.value)} /></label></div><label>Notes<textarea value={notes} onChange={(changeEvent) => setNotes(changeEvent.target.value)} rows={3} /></label>{message ? <p className="entry-message" role="status">{message}</p> : null}<div className="dialog-actions"><button type="button" className="quiet-pill danger-pill" onClick={remove}>Delete</button><span /><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button">Save</button></div></form></div>;
+}
+
+function WebCalendarEventsPanel({ api, onRecord, dateKey }) {
   const payload = api.calendarEvents || {};
   const events = Array.isArray(payload.data) ? payload.data : [];
+  const eventDateKey = dateKey || payload.date || localDateKey();
   const [message, setMessage] = useState("");
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const record = async (event) => {
     if (onRecord) {
       onRecord(event);
@@ -2451,7 +2528,7 @@ function WebCalendarEventsPanel({ api, onRecord }) {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   };
-  return <section className="web-source-panel" aria-label="Calendar Events"><div className="web-source-heading"><div><h2>Calendar Events</h2><p>Read-only calendar events can seed a local time entry after access is granted.</p></div><div className="web-source-actions"><span className={`api-badge ${payload.authorized ? "online" : ""}`}>{payload.authorized ? `${events.length} events` : "Not connected"}</span>{!payload.authorized && api.requestSourceAccess ? <button type="button" className="quiet-pill" onClick={() => api.requestSourceAccess("calendar")}>Connect</button> : null}<button type="button" className="quiet-pill" onClick={api.refresh}>Refresh</button></div></div>{events.length > 0 ? <div className="web-source-list">{events.map((event) => <div className="web-source-row" key={event.id} role="button" tabIndex={0} aria-label={"Record calendar event " + event.title} onClick={(clickEvent) => { if (clickEvent.target.closest("button")) return; record(event); }} onKeyDown={(keyboardEvent) => { if (keyboardEvent.target.closest("button")) return; if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") { keyboardEvent.preventDefault(); record(event); } }}><span className="web-source-icon"><CalendarBlank size={18} /></span><div><strong>{event.title}</strong><small>{event.calendar || "Calendar"} · {time(event.start)}–{time(event.end)}{event.location ? ` · ${event.location}` : ""}</small></div><button type="button" className="quiet-pill" onClick={() => record(event)}>Record</button></div>)}</div> : <div className="web-source-empty"><CalendarBlank size={22} /><span>{payload.status || "No calendar events for this date."}</span></div>}{message ? <p className="entry-message" role="status">{message}</p> : null}</section>;
+  return <><section className="web-source-panel" aria-label="Calendar Events"><div className="web-source-heading"><div><h2>Calendar Events</h2><p>Calendar events can be recorded as local time or edited when their calendar is writable.</p></div><div className="web-source-actions"><span className={`api-badge ${payload.authorized ? "online" : ""}`}>{payload.authorized ? `${events.length} events` : "Not connected"}</span>{!payload.authorized && api.requestSourceAccess ? <button type="button" className="quiet-pill" onClick={() => api.requestSourceAccess("calendar")}>Connect</button> : null}<button type="button" className="quiet-pill" onClick={api.refresh}>Refresh</button></div></div>{events.length > 0 ? <div className="web-source-list">{events.map((event) => <div className="web-source-row" key={event.id} role="button" tabIndex={0} aria-label={"Record calendar event " + event.title} onClick={(clickEvent) => { if (clickEvent.target.closest("button")) return; record(event); }} onKeyDown={(keyboardEvent) => { if (keyboardEvent.target.closest("button")) return; if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") { keyboardEvent.preventDefault(); record(event); } }}><span className="web-source-icon"><CalendarBlank size={18} /></span><div><strong>{event.title}</strong><small>{event.calendar || "Calendar"} · {time(event.start)}–{time(event.end)}{event.location ? ` · ${event.location}` : ""}</small></div><button type="button" className="quiet-pill" onClick={() => record(event)}>Record</button>{event.is_editable ? <button type="button" className="quiet-pill" onClick={() => setSelectedEvent(event)}>Edit</button> : null}</div>)}</div> : <div className="web-source-empty"><CalendarBlank size={22} /><span>{payload.status || "No calendar events for this date."}</span></div>}{message ? <p className="entry-message" role="status">{message}</p> : null}</section>{selectedEvent ? <WebCalendarEventDialog event={selectedEvent} api={api} dateKey={eventDateKey} onClose={() => setSelectedEvent(null)} /> : null}</>;
 }
 
 function WebRemindersPanel({ api, onRecord }) {
