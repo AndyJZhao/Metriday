@@ -3,6 +3,9 @@ import SwiftUI
 struct TodayView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var store: MarkdownStore
+    @ObservedObject var monitor: AppActivityMonitor
+    @ObservedObject var timeEntryStore: TimeEntryStore
+    @ObservedObject var screenTimeStore: ScreenTimeStore
 
     var body: some View {
         VStack(spacing: 0) {
@@ -71,90 +74,261 @@ struct TodayView: View {
 
     private var actualColumn: some View {
         VStack(spacing: 0) {
-            TimelineColumnHeader(title: "Actual", subtitle: "What actually happened")
+            ActivityColumnHeader(monitor: monitor, recordedEntryCount: visibleTimeEntries.count)
             ZStack(alignment: .topLeading) {
                 TimelineGrid()
-                actualBlock(start: 480, end: 540) {
-                    ActivityRow(minutes: 60, title: "Idle", range: "08:00–09:00", symbol: nil, relevance: .idle)
-                }
-                actualBlock(start: 540, end: 625, related: true) {
-                    VStack(spacing: 0) {
-                        ActivityRow(minutes: 85, title: "VS Code", range: "09:00–09:45", symbol: "chevron.left.forwardslash.chevron.right", relevance: .related)
-                        ActivityRow(minutes: nil, title: "Terminal", range: "09:45–10:25", symbol: "terminal", relevance: .related)
+                ForEach(visibleActivitySegments) { segment in
+                    actualBlock(segment: segment) {
+                        ActivityRow(
+                            minutes: segment.duration,
+                            title: segment.displayTitle,
+                            range: TimeFormat.range(start: segment.startMinute, end: segment.endMinute),
+                            symbol: symbol(for: segment),
+                            relevance: segment.relevance
+                        )
                     }
                 }
-                actualBlock(start: 630, end: 720, related: true) {
-                    VStack(spacing: 0) {
-                        ActivityRow(minutes: 90, title: "arXiv PDF", range: "10:30–11:15", symbol: "doc.richtext", relevance: .related)
-                        ActivityRow(minutes: nil, title: "Notes", range: "11:15–12:00", symbol: "note.text", relevance: .related)
-                    }
+                ForEach(visibleTimeEntries) { entry in
+                    recordedTimeBlock(entry)
                 }
-                actualBlock(start: 720, end: 780) {
-                    ActivityRow(minutes: 60, title: "Lunch / Break", range: "12:00–13:00", symbol: nil, relevance: .idle)
+                if Calendar.current.isDateInToday(appState.selectedDate) {
+                    currentTimeLine
                 }
-                actualBlock(start: 780, end: 835, related: true) {
-                    ActivityRow(minutes: 55, title: "VS Code", range: "13:00–13:55", symbol: "chevron.left.forwardslash.chevron.right", relevance: .related)
-                }
-                currentActualBlock
-                actualBlock(start: 960, end: 1080) {
-                    ActivityRow(minutes: 120, title: "Idle", range: "16:00–18:00", symbol: nil, relevance: .idle)
-                }
-                actualBlock(start: 1080, end: 1140) {
-                    ActivityRow(minutes: 60, title: "Idle", range: "18:00–19:00", symbol: nil, relevance: .idle)
-                }
-                currentTimeLine
             }
             .frame(height: TimelineMetrics.totalHeight)
         }
     }
 
-    private func actualBlock<Content: View>(start: Int, end: Int, related: Bool = false, @ViewBuilder content: () -> Content) -> some View {
-        content()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .background(related ? MetridayTheme.successSoft : Color(red: 0.976, green: 0.977, blue: 0.982))
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(MetridayTheme.line, lineWidth: 1))
-            .frame(height: TimelineMetrics.height(start: start, end: end))
-            .padding(.horizontal, 10)
-            .offset(y: TimelineMetrics.y(for: start))
+    private var visibleTimeEntries: [VisibleTimeEntry] {
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: appState.selectedDate)
+        let timelineStart = dayStart.addingTimeInterval(TimeInterval(TimelineMetrics.startMinute * 60))
+        let timelineEnd = dayStart.addingTimeInterval(TimeInterval(TimelineMetrics.endMinute * 60))
+
+        return timeEntryStore.materializedEntries().compactMap { entry in
+            let start = max(entry.start, timelineStart)
+            let end = min(entry.end, timelineEnd)
+            guard end > start else { return nil }
+            return VisibleTimeEntry(
+                id: entry.id,
+                title: entry.title,
+                startSecond: Int(start.timeIntervalSince(dayStart)),
+                endSecond: Int(end.timeIntervalSince(dayStart)),
+                isRunning: timeEntryStore.runningTimer?.id == entry.id
+            )
+        }
+        .sorted { $0.startSecond < $1.startSecond }
     }
 
-    private var currentActualBlock: some View {
-        VStack(spacing: 0) {
-            ActivityRow(minutes: 8, title: "Idle", range: "14:00–14:08", symbol: nil, relevance: .idle)
-            ActivityRow(minutes: 71, title: "VS Code", range: "14:08–15:19", symbol: "chevron.left.forwardslash.chevron.right", relevance: .related)
-            ActivityRow(minutes: 12, title: "YouTube", range: "15:19–15:31", symbol: "play.rectangle.fill", relevance: .distracted)
-            ActivityRow(minutes: 21, title: "Terminal", range: "15:31–15:52", symbol: "terminal", relevance: .related)
+    private func recordedTimeBlock(_ entry: VisibleTimeEntry) -> some View {
+        let height = TimelineMetrics.height(startSecond: entry.startSecond, endSecond: entry.endSecond)
+        return HStack {
+            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Image(systemName: entry.isRunning ? "timer" : "clock")
+                    Text(entry.title)
+                        .lineLimit(1)
+                }
+                .font(.system(size: 11, weight: .semibold))
+                Text(TimeFormat.range(
+                    start: entry.startSecond / 60,
+                    end: Int(ceil(Double(entry.endSecond) / 60.0))
+                ))
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+            }
+            .padding(.horizontal, 10)
+            .frame(width: 188, height: height, alignment: .topLeading)
+            .background(Color.white.opacity(0.94))
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(entry.isRunning ? MetridayTheme.accent : MetridayTheme.warning, lineWidth: 1.2)
+            )
         }
-        .frame(maxWidth: .infinity, alignment: .top)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(MetridayTheme.accent, lineWidth: 1.5))
+        .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.horizontal, 10)
-        .offset(y: TimelineMetrics.y(for: 840))
+        .offset(y: TimelineMetrics.y(forSecond: entry.startSecond))
+    }
+
+    private var visibleActivitySegments: [ActivitySegment] {
+        let sourceSegments = monitor.observedSegments + screenTimeStore.segments
+        let clipped: [ActivitySegment] = sourceSegments.compactMap { segment in
+            let timelineStart = TimelineMetrics.startMinute * 60
+            let timelineEnd = TimelineMetrics.endMinute * 60
+            let start = max(timelineStart, segment.startSecond)
+            let end = min(timelineEnd, segment.endSecond)
+            guard end > start else { return nil }
+            return ActivitySegment(
+                id: segment.id,
+                appName: segment.appName,
+                bundleIdentifier: segment.bundleIdentifier,
+                deviceName: segment.deviceName,
+                windowTitle: segment.windowTitle,
+                resource: segment.resource,
+                startMinute: start / 60,
+                endMinute: Int(ceil(Double(end) / 60.0)),
+                startSecond: start,
+                endSecond: end,
+                relevance: segment.relevance
+            )
+        }
+        return condensedActivitySegments(clipped)
+    }
+
+    private func condensedActivitySegments(_ segments: [ActivitySegment]) -> [ActivitySegment] {
+        var result: [ActivitySegment] = []
+        let maximumRun = 20 * 60
+        let maximumGap = 45
+
+        for segment in segments.sorted(by: { $0.startSecond < $1.startSecond }) {
+            guard let lastIndex = result.indices.last else {
+                result.append(segment)
+                continue
+            }
+
+            let last = result[lastIndex]
+            let canMerge = last.relevance == segment.relevance
+                && segment.startSecond - last.endSecond <= maximumGap
+                && segment.endSecond - last.startSecond <= maximumRun
+            guard canMerge else {
+                result.append(segment)
+                continue
+            }
+
+            let sameActivity = last.appName == segment.appName
+                && last.bundleIdentifier == segment.bundleIdentifier
+                && last.windowTitle == segment.windowTitle
+            result[lastIndex].endSecond = max(last.endSecond, segment.endSecond)
+            if !sameActivity {
+                result[lastIndex].appName = condensedTitle(for: segment.relevance)
+                result[lastIndex].bundleIdentifier = "com.metriday.mixed"
+                result[lastIndex].windowTitle = ""
+            }
+        }
+        return result
+    }
+
+    private func condensedTitle(for relevance: ActivityRelevance) -> String {
+        switch relevance {
+        case .related:
+            return "Mixed work activity"
+        case .distracted:
+            return "Mixed distraction"
+        case .other:
+            return "Mixed activity"
+        case .idle:
+            return "Idle"
+        }
+    }
+
+    private func symbol(for segment: ActivitySegment) -> String? {
+        switch segment.bundleIdentifier {
+        case "com.microsoft.VSCode", "com.apple.dt.Xcode":
+            return "chevron.left.forwardslash.chevron.right"
+        case "com.apple.Terminal", "com.googlecode.iterm2":
+            return "terminal"
+        case "com.google.Chrome", "com.apple.Safari", "com.brave.Browser", "com.operasoftware.Opera":
+            return "globe"
+        case "com.apple.Preview":
+            return "doc.richtext"
+        case "com.apple.Notes", "md.obsidian":
+            return "note.text"
+        case "com.metriday.idle":
+            return nil
+        default:
+            return "rectangle.on.rectangle"
+        }
+    }
+
+    @ViewBuilder
+    private func actualBlock<Content: View>(segment: ActivitySegment, @ViewBuilder content: () -> Content) -> some View {
+        let height = TimelineMetrics.height(startSecond: segment.startSecond, endSecond: segment.endSecond)
+        if segment.relevance == .idle {
+            ZStack(alignment: .topLeading) {
+                Rectangle()
+                    .fill(Color.black.opacity(0.025))
+                if segment.durationSeconds >= 30 * 60 {
+                    Text("\(segment.duration)m idle")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.top, 5)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: max(3, height))
+            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .padding(.horizontal, 10)
+            .offset(y: TimelineMetrics.y(forSecond: segment.startSecond))
+            .help("\(segment.displayTitle) · \(segment.duration)m")
+        } else if segment.durationSeconds < 30 * 60 {
+            Rectangle()
+                .fill(activityColor(for: segment.relevance))
+                .frame(maxWidth: .infinity)
+                .frame(height: max(3, height))
+                .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                .padding(.horizontal, 10)
+                .offset(y: TimelineMetrics.y(forSecond: segment.startSecond))
+                .help("\(segment.displayTitle) · \(segment.duration)m")
+        } else {
+            content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(activityColor(for: segment.relevance).opacity(0.8))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(MetridayTheme.line, lineWidth: 1))
+                .frame(height: height)
+                .padding(.horizontal, 10)
+                .offset(y: TimelineMetrics.y(forSecond: segment.startSecond))
+        }
+    }
+
+    private func activityColor(for relevance: ActivityRelevance) -> Color {
+        switch relevance {
+        case .related:
+            return MetridayTheme.successSoft
+        case .distracted:
+            return MetridayTheme.danger.opacity(0.16)
+        case .other:
+            return Color(red: 0.88, green: 0.89, blue: 0.92)
+        case .idle:
+            return Color(red: 0.94, green: 0.945, blue: 0.955)
+        }
     }
 
     private var currentTimeLine: some View {
         Rectangle()
             .fill(MetridayTheme.accent)
             .frame(height: 1)
-            .offset(y: TimelineMetrics.y(for: 952))
+            .offset(y: TimelineMetrics.y(for: currentMinute))
+    }
+
+    private var currentMinute: Int {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: .now)
+        return (components.hour ?? 0) * 60 + (components.minute ?? 0)
     }
 
     private var insightBar: some View {
-        HStack(spacing: 14) {
+        let summary = ActivitySummary(segments: monitor.observedSegments + screenTimeStore.segments)
+        return HStack(spacing: 14) {
             Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.system(size: 23))
                 .foregroundStyle(MetridayTheme.accent)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 12) {
-                    Text("Started 8 min late").fontWeight(.semibold)
+                    Text(summary.activeMinutes > 0 ? "\(summary.activeMinutes)m active" : "Waiting for activity")
+                        .fontWeight(.semibold)
                     Text("·").foregroundStyle(MetridayTheme.secondary)
-                    Text("82% task-related").fontWeight(.semibold).foregroundStyle(MetridayTheme.success)
+                    Text("\(summary.taskRelatedPercentage)% task-related")
+                        .fontWeight(.semibold)
+                        .foregroundStyle(MetridayTheme.success)
                     Text("·").foregroundStyle(MetridayTheme.secondary)
-                    Text("Estimate likely +25 min").fontWeight(.semibold).foregroundStyle(MetridayTheme.warning)
+                    Text("\(summary.distractedMinutes)m distraction")
+                        .fontWeight(.semibold)
+                        .foregroundStyle(summary.distractedMinutes > 0 ? MetridayTheme.danger : MetridayTheme.secondary)
                 }
-                Text("YouTube 12m was outside Research Focus. Blocking is available for the active task.")
+                Text(insightText(summary: summary))
                     .font(.system(size: 11))
                     .foregroundStyle(MetridayTheme.secondary)
             }
@@ -166,5 +340,91 @@ struct TodayView: View {
         .padding(.horizontal, 18)
         .frame(height: 68)
         .metridayPanel(radius: 10)
+    }
+
+    private func insightText(summary: ActivitySummary) -> String {
+        if !monitor.accessibilityTrusted {
+            return "App usage is being captured locally. Allow Accessibility access to include window titles and document context."
+        }
+        if summary.totalMinutes == 0 {
+            return "Metriday will group foreground app and window activity here as you work."
+        }
+        if summary.distractedMinutes > 0 {
+            return "\(summary.idleMinutes)m idle is excluded from the focus score. Distraction is visible in the actual timeline."
+        }
+        return "\(summary.idleMinutes)m idle is excluded from the focus score. Activity is grouped locally by app and window title."
+    }
+}
+
+private struct VisibleTimeEntry: Identifiable {
+    let id: UUID
+    let title: String
+    let startSecond: Int
+    let endSecond: Int
+    let isRunning: Bool
+}
+
+struct ActivityColumnHeader: View {
+    @ObservedObject var monitor: AppActivityMonitor
+    var recordedEntryCount = 0
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Actual").font(.system(size: 15, weight: .semibold))
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(MetridayTheme.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 6)
+
+            if !monitor.accessibilityTrusted {
+                Button {
+                    monitor.requestAccessibilityAccess()
+                } label: {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .buttonStyle(.bordered)
+                .help("Allow Accessibility access to read window titles")
+                .accessibilityIdentifier("activity.accessibility")
+            }
+
+            Button {
+                monitor.toggleTracking()
+            } label: {
+                Label(
+                    monitor.isTracking ? "Pause" : "Track",
+                    systemImage: monitor.isTracking ? "pause.fill" : "play.fill"
+                )
+                .font(.system(size: 11, weight: .semibold))
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("activity.toggle")
+        }
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 55)
+    }
+
+    private var subtitle: String {
+        let recorded = recordedEntryCount > 0 ? " · \(recordedEntryCount) recorded" : ""
+        if !monitor.isTracking { return "Tracking paused\(recorded)" }
+        if monitor.isIdle { return "Live · Idle detected · \(elapsedLabel)" }
+        if monitor.currentWindowTitle.isEmpty {
+            return "Live · \(monitor.currentApplication) · \(elapsedLabel)\(recorded)"
+        }
+        return "Live · \(monitor.currentApplication) · \(elapsedLabel)\(recorded)"
+    }
+
+    private var elapsedLabel: String {
+        let seconds = max(0, monitor.currentDurationMinutes * 60)
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        return "\(max(1, minutes))m"
     }
 }

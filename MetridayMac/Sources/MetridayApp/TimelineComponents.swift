@@ -13,6 +13,14 @@ enum TimelineMetrics {
     static func height(start: Int, end: Int) -> CGFloat {
         max(32, CGFloat(end - start) / 60 * hourHeight)
     }
+
+    static func y(forSecond second: Int) -> CGFloat {
+        CGFloat(second - startMinute * 60) / 3600 * hourHeight
+    }
+
+    static func height(startSecond: Int, endSecond: Int) -> CGFloat {
+        max(0, CGFloat(endSecond - startSecond) / 3600 * hourHeight)
+    }
 }
 
 struct TimelineGrid: View {

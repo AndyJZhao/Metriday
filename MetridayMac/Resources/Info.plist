@@ -20,10 +20,35 @@
     <string>0.1.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>co.metriday.mac.commands</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>metriday</string>
+            </array>
+        </dict>
+    </array>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Metriday can redirect blocked Safari and Chrome tabs while a focus session is active.</string>
+    <string>Metriday can read Safari and Chrome tab URLs for local activity context and redirect blocked tabs while a focus session is active.</string>
+    <key>NSAppleScriptEnabled</key>
+    <true/>
+    <key>OSAScriptingDefinition</key>
+    <string>Metriday.sdef</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Metriday can show calendar events on the local activity timeline and record offline meeting time.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Metriday can read and create calendar events so planned tasks can be represented on your local calendar.</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>Metriday can show completed reminders on the local activity timeline and suggest their titles for time entries.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>Metriday can read completed reminders so you can add accurate local time entries for finished tasks.</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Metriday can include the frontmost window title in local activity history so planned and actual time can be compared.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSHumanReadableCopyright</key>

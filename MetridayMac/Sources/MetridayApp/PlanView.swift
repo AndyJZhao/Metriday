@@ -532,7 +532,7 @@ struct PlanCalendarPane: View {
         guard isDropTargeted else { return "⌘-drag: Time Block · ⌥-drag: Event" }
         switch appState.timelineDropIntent {
         case .timeBlock: return "Release to add a Time Block"
-        case .event: return "Release to choose Event (coming next)"
+        case .event: return "Release to add Event"
         case .choose: return "Release to choose Time Block or Event"
         }
     }
@@ -566,6 +566,7 @@ struct PlanCalendarPane: View {
                         .foregroundStyle(MetridayTheme.secondary)
                 }
                 .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: 34)
                 .contentShape(Rectangle())
             }
@@ -573,15 +574,27 @@ struct PlanCalendarPane: View {
 
             Divider()
 
-            HStack(spacing: 9) {
-                Image(systemName: "calendar.badge.plus")
-                Text("Add Event")
-                Spacer()
-                Text("Coming next")
+            Button {
+                if appState.calendarStore.isAuthorized {
+                    appState.confirmPendingEvent()
+                } else {
+                    appState.calendarStore.requestAccess()
+                }
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "calendar.badge.plus")
+                        .foregroundStyle(MetridayTheme.accent)
+                    Text(appState.calendarStore.isAuthorized ? "Add Event" : "Connect Calendar")
+                    Spacer()
+                    Text(appState.calendarStore.isAuthorized ? "⌥+Drop" : "Permission")
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
+                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 34)
+                .contentShape(Rectangle())
             }
-            .foregroundStyle(MetridayTheme.secondary.opacity(0.62))
-            .padding(.horizontal, 12)
-            .frame(height: 34)
+            .buttonStyle(.plain)
         }
         .font(.system(size: 12))
         .frame(width: 224)

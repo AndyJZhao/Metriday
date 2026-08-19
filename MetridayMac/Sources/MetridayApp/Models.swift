@@ -3,6 +3,7 @@ import Foundation
 enum AppSection: String, CaseIterable, Identifiable {
     case today = "Today"
     case plan = "Plan"
+    case activities = "Activities"
     case review = "Review"
     case rules = "Rules"
 
@@ -12,6 +13,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .today: "calendar"
         case .plan: "square.and.pencil"
+        case .activities: "waveform.path"
         case .review: "chart.bar.xaxis"
         case .rules: "shield"
         }
@@ -101,36 +103,109 @@ enum TimeFormat {
     }
 }
 
-struct ActivitySegment: Identifiable, Hashable {
+struct ActivitySegment: Identifiable, Hashable, Codable {
     let id: UUID
     var appName: String
     var bundleIdentifier: String
-    var startMinute: Int
-    var endMinute: Int
+    var deviceName: String
+    var windowTitle: String
+    var resource: String
+    var startSecond: Int
+    var endSecond: Int
     var relevance: ActivityRelevance
+    var projectID: UUID?
 
     init(
         id: UUID = UUID(),
         appName: String,
         bundleIdentifier: String = "",
+        deviceName: String = "This Mac",
+        windowTitle: String = "",
+        resource: String = "",
         startMinute: Int,
         endMinute: Int,
-        relevance: ActivityRelevance
+        startSecond: Int? = nil,
+        endSecond: Int? = nil,
+        relevance: ActivityRelevance,
+        projectID: UUID? = nil
     ) {
         self.id = id
         self.appName = appName
         self.bundleIdentifier = bundleIdentifier
-        self.startMinute = startMinute
-        self.endMinute = endMinute
+        self.deviceName = deviceName
+        self.windowTitle = windowTitle
+        self.resource = resource
+        self.startSecond = startSecond ?? startMinute * 60
+        self.endSecond = endSecond ?? endMinute * 60
         self.relevance = relevance
+        self.projectID = projectID
     }
 
-    var duration: Int { max(1, endMinute - startMinute) }
+    var startMinute: Int {
+        get { startSecond / 60 }
+        set { startSecond = newValue * 60 }
+    }
+
+    var endMinute: Int {
+        get { Int(ceil(Double(endSecond) / 60.0)) }
+        set { endSecond = newValue * 60 }
+    }
+
+    var durationSeconds: Int { max(1, endSecond - startSecond) }
+    var duration: Int { max(1, Int(ceil(Double(durationSeconds) / 60.0))) }
+
+    var displayTitle: String {
+        let title = windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.isEmpty, title.caseInsensitiveCompare(appName) != .orderedSame {
+            return "\(appName) · \(title)"
+        }
+        if let host = URL(string: resource)?.host, !host.isEmpty {
+            return "\(appName) · \(host)"
+        }
+        return appName
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, appName, bundleIdentifier, deviceName, windowTitle, resource, startMinute, endMinute, startSecond, endSecond, relevance, projectID
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        appName = try container.decode(String.self, forKey: .appName)
+        bundleIdentifier = try container.decode(String.self, forKey: .bundleIdentifier)
+        deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName) ?? "This Mac"
+        windowTitle = try container.decodeIfPresent(String.self, forKey: .windowTitle) ?? ""
+        resource = try container.decodeIfPresent(String.self, forKey: .resource) ?? ""
+        let legacyStart = try container.decodeIfPresent(Int.self, forKey: .startMinute) ?? 0
+        let legacyEnd = try container.decodeIfPresent(Int.self, forKey: .endMinute) ?? legacyStart + 1
+        startSecond = try container.decodeIfPresent(Int.self, forKey: .startSecond) ?? legacyStart * 60
+        endSecond = try container.decodeIfPresent(Int.self, forKey: .endSecond) ?? legacyEnd * 60
+        relevance = try container.decode(ActivityRelevance.self, forKey: .relevance)
+        projectID = try container.decodeIfPresent(UUID.self, forKey: .projectID)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(appName, forKey: .appName)
+        try container.encode(bundleIdentifier, forKey: .bundleIdentifier)
+        try container.encode(deviceName, forKey: .deviceName)
+        try container.encode(windowTitle, forKey: .windowTitle)
+        try container.encode(resource, forKey: .resource)
+        try container.encode(startMinute, forKey: .startMinute)
+        try container.encode(endMinute, forKey: .endMinute)
+        try container.encode(startSecond, forKey: .startSecond)
+        try container.encode(endSecond, forKey: .endSecond)
+        try container.encode(relevance, forKey: .relevance)
+        try container.encodeIfPresent(projectID, forKey: .projectID)
+    }
 }
 
-enum ActivityRelevance: String, Hashable {
+enum ActivityRelevance: String, Hashable, Codable {
     case related
     case distracted
+    case other
     case idle
 }
 

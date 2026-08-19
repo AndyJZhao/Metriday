@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+<dictionary title="Metriday Scripting Dictionary">
+    <suite name="Metriday Suite" code="MTRD" description="Local time tracking automation for Metriday.">
+        <command name="start timer" code="MTRDstrt" description="Start a local timer.">
+            <cocoa class="Metriday.MetridayStartTimerCommand" />
+            <parameter name="with title" code="pnam" type="text" optional="yes" description="Timer title."><cocoa key="title" /></parameter>
+            <parameter name="for project" code="proj" type="text" optional="yes" description="Project name."><cocoa key="project" /></parameter>
+            <parameter name="with notes" code="note" type="text" optional="yes" description="Optional notes."><cocoa key="notes" /></parameter>
+            <parameter name="with billing status" code="bill" type="text" optional="yes" description="Billing status."><cocoa key="billing status" /></parameter>
+        </command>
+        <command name="stop current timer" code="MTRDstop" description="Stop the current local timer.">
+            <cocoa class="Metriday.MetridayStopTimerCommand" />
+        </command>
+        <command name="pause tracking" code="MTRDpaus" description="Pause automatic activity tracking.">
+            <cocoa class="Metriday.MetridayPauseTrackingCommand" />
+        </command>
+        <command name="resume tracking" code="MTRDresu" description="Resume automatic activity tracking.">
+            <cocoa class="Metriday.MetridayResumeTrackingCommand" />
+        </command>
+        <command name="add time entry" code="MTRDadte" description="Create a local time entry.">
+            <cocoa class="Metriday.MetridayAddTimeEntryCommand" />
+            <parameter name="from" code="from" type="date" description="Start date." />
+            <parameter name="to" code="to__" type="date" description="End date." />
+            <parameter name="with title" code="pnam" type="text" optional="yes" description="Entry title."><cocoa key="title" /></parameter>
+            <parameter name="for project" code="proj" type="text" optional="yes" description="Project name."><cocoa key="project" /></parameter>
+            <parameter name="with notes" code="note" type="text" optional="yes" description="Optional notes."><cocoa key="notes" /></parameter>
+            <parameter name="with billing status" code="bill" type="text" optional="yes" description="Billing status."><cocoa key="billing status" /></parameter>
+        </command>
+        <command name="get time summary" code="MTRDsmry" description="Return the local activity and time-entry summary for a day.">
+            <cocoa class="Metriday.MetridayGetTimeSummaryCommand" />
+            <parameter name="for date" code="date" type="date" optional="yes" description="Day to summarize."><cocoa key="date" /></parameter>
+        </command>
+        <command name="list projects" code="MTRDproj" description="Return active local projects and billing settings.">
+            <cocoa class="Metriday.MetridayListProjectsCommand" />
+        </command>
+        <command name="export report" code="MTRDrprt" description="Export a local report and return its file path.">
+            <cocoa class="Metriday.MetridayExportReportCommand" />
+            <parameter name="from" code="from" type="date" optional="yes" description="First day." />
+            <parameter name="until" code="untl" type="date" optional="yes" description="Last day." />
+            <parameter name="as format" code="fmt " type="text" optional="yes" description="csv, xlsx, json, html, or pdf."><cocoa key="format" /></parameter>
+            <parameter name="to path" code="dest" type="text" optional="yes" description="Destination file path."><cocoa key="path" /></parameter>
+        </command>
+    </suite>
+</dictionary>

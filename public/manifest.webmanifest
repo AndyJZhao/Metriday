@@ -1,0 +1,19 @@
+{
+  "name": "Metriday 日衡",
+  "short_name": "Metriday",
+  "description": "Local-first planning and execution observability.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f8fa",
+  "theme_color": "#ffffff",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/icons/metriday.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

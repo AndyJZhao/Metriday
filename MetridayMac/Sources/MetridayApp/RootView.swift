@@ -14,20 +14,48 @@ struct RootView: View {
             Divider()
 
             VStack(spacing: 0) {
-                GlobalTopHeader(store: appState.markdownStore)
+                GlobalTopHeader(store: appState.markdownStore, monitor: appState.activityMonitor)
                     .zIndex(2)
                 Divider()
 
                 Group {
                     switch appState.section {
                     case .today:
-                        TodayView(store: appState.markdownStore)
+                        TodayView(
+                            store: appState.markdownStore,
+                            monitor: appState.activityMonitor,
+                            timeEntryStore: appState.timeEntryStore,
+                            screenTimeStore: appState.screenTimeStore
+                        )
                     case .plan:
                         PlanView()
+                    case .activities:
+                        ActivitiesView(
+                            monitor: appState.activityMonitor,
+                            projectStore: appState.projectStore,
+                            filterStore: appState.filterStore,
+                            preferences: appState.activitiesPreferences,
+                            timeEntryStore: appState.timeEntryStore,
+                            calendarStore: appState.calendarStore,
+                            reminderStore: appState.reminderStore,
+                            phoneCallStore: appState.phoneCallStore,
+                            screenTimeStore: appState.screenTimeStore,
+                            teamStore: appState.teamStore,
+                            selectedDate: appState.selectedDate
+                        )
                     case .review:
-                        ReviewView()
+                        ReviewView(
+                            monitor: appState.activityMonitor,
+                            screenTimeStore: appState.screenTimeStore,
+                            projectStore: appState.projectStore,
+                            timeEntryStore: appState.timeEntryStore,
+                            selectedDate: appState.selectedDate
+                        )
                     case .rules:
-                        RulesView(blocker: appState.blocker)
+                        RulesView(
+                            blocker: appState.blocker,
+                            projectStore: appState.projectStore
+                        )
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -39,11 +67,286 @@ struct RootView: View {
         }
         .background(MetridayTheme.canvas)
         .tint(MetridayTheme.accent)
+        .overlay {
+            ZStack {
+                IdlePromptPresenter(
+                    monitor: appState.activityMonitor,
+                    timeEntryStore: appState.timeEntryStore,
+                    projectStore: appState.projectStore
+                )
+                CallPromptPresenter(
+                    monitor: appState.activityMonitor,
+                    timeEntryStore: appState.timeEntryStore,
+                    projectStore: appState.projectStore
+                )
+            }
+        }
+    }
+}
+
+private struct IdlePromptPresenter: View {
+    @ObservedObject var monitor: AppActivityMonitor
+    @ObservedObject var timeEntryStore: TimeEntryStore
+    @ObservedObject var projectStore: ProjectStore
+
+    @State private var pendingInterval: IdleInterval?
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onReceive(monitor.$pendingIdleInterval) { interval in
+                pendingInterval = interval
+            }
+            .sheet(item: $pendingInterval) { interval in
+                IdleTimeEntrySheet(
+                    interval: interval,
+                    projects: projectStore.activeProjects
+                ) { title, projectID, notes, billingStatus in
+                    if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        _ = timeEntryStore.addEntry(
+                            title: title,
+                            projectID: projectID,
+                            notes: notes,
+                            start: interval.start,
+                            end: interval.end,
+                            billingStatus: billingStatus
+                        )
+                    }
+                    monitor.dismissPendingIdleInterval()
+                    pendingInterval = nil
+                } onSkip: {
+                    monitor.dismissPendingIdleInterval()
+                    pendingInterval = nil
+                }
+            }
+    }
+}
+
+private struct IdleTimeEntrySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let interval: IdleInterval
+    let projects: [TrackingProject]
+    let onSave: (String, UUID?, String, BillingStatus) -> Void
+    let onSkip: () -> Void
+
+    @State private var title = ""
+    @State private var projectID: UUID?
+    @State private var notes = ""
+    @State private var billingStatus: BillingStatus
+
+    init(
+        interval: IdleInterval,
+        projects: [TrackingProject],
+        onSave: @escaping (String, UUID?, String, BillingStatus) -> Void,
+        onSkip: @escaping () -> Void
+    ) {
+        self.interval = interval
+        self.projects = projects
+        self.onSave = onSave
+        self.onSkip = onSkip
+        _billingStatus = State(initialValue: projects.first?.defaultBillingStatus ?? .billable)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Label("What did you do while away?", systemImage: "moon.zzz")
+                .font(.system(size: 18, weight: .bold))
+            Text("Idle interval: \(formatTime(interval.start))–\(formatTime(interval.end)) · \(formatDuration(interval.durationSeconds))")
+                .font(.system(size: 11))
+                .foregroundStyle(MetridayTheme.secondary)
+
+            TextField("Time entry title", text: $title)
+                .textFieldStyle(.roundedBorder)
+
+            Picker("Project", selection: $projectID) {
+                Text("Unassigned").tag(nil as UUID?)
+                ForEach(projects) { project in
+                    Text(project.name).tag(project.id as UUID?)
+                }
+            }
+
+            Picker("Billing Status", selection: $billingStatus) {
+                ForEach(BillingStatus.allCases) { status in
+                    Text(status.label).tag(status)
+                }
+            }
+
+            TextField("Notes (optional)", text: $notes, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(3, reservesSpace: true)
+
+            HStack {
+                Button("Skip") {
+                    onSkip()
+                    dismiss()
+                }
+                Spacer()
+                Button("Save Time Entry") {
+                    onSave(title, projectID, notes, billingStatus)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 440)
+        .onChange(of: projectID) { _, newProjectID in
+            billingStatus = newProjectID
+                .flatMap { id in projects.first(where: { $0.id == id })?.defaultBillingStatus }
+                ?? .billable
+        }
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = max(1, Int((Double(seconds) / 60.0).rounded()))
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        return hours > 0 ? "\(hours)h \(remainder)m" : "\(remainder)m"
+    }
+}
+
+private struct CallPromptPresenter: View {
+    @ObservedObject var monitor: AppActivityMonitor
+    @ObservedObject var timeEntryStore: TimeEntryStore
+    @ObservedObject var projectStore: ProjectStore
+
+    @State private var pendingInterval: CallInterval?
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onReceive(monitor.$pendingCallInterval) { interval in
+                pendingInterval = interval
+            }
+            .sheet(item: $pendingInterval) { interval in
+                CallTimeEntrySheet(
+                    interval: interval,
+                    projects: projectStore.activeProjects
+                ) { title, projectID, notes, billingStatus in
+                    if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        _ = timeEntryStore.addEntry(
+                            title: title,
+                            projectID: projectID,
+                            notes: notes,
+                            start: interval.start,
+                            end: interval.end,
+                            billingStatus: billingStatus
+                        )
+                    }
+                    monitor.dismissPendingCallInterval()
+                    pendingInterval = nil
+                } onSkip: {
+                    monitor.dismissPendingCallInterval()
+                    pendingInterval = nil
+                }
+            }
+    }
+}
+
+private struct CallTimeEntrySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let interval: CallInterval
+    let projects: [TrackingProject]
+    let onSave: (String, UUID?, String, BillingStatus) -> Void
+    let onSkip: () -> Void
+
+    @State private var title: String
+    @State private var projectID: UUID?
+    @State private var notes = ""
+    @State private var billingStatus: BillingStatus
+
+    init(
+        interval: CallInterval,
+        projects: [TrackingProject],
+        onSave: @escaping (String, UUID?, String, BillingStatus) -> Void,
+        onSkip: @escaping () -> Void
+    ) {
+        self.interval = interval
+        self.projects = projects
+        self.onSave = onSave
+        self.onSkip = onSkip
+        let inferredTitle = interval.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        _title = State(initialValue: inferredTitle.isEmpty ? "\(interval.appName) call" : inferredTitle)
+        _billingStatus = State(initialValue: projects.first?.defaultBillingStatus ?? .billable)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Label("Record call time?", systemImage: "phone.badge.waveform")
+                .font(.system(size: 18, weight: .bold))
+            Text("\(interval.appName) · \(formatTime(interval.start))–\(formatTime(interval.end)) · \(formatDuration(interval.durationSeconds))")
+                .font(.system(size: 11))
+                .foregroundStyle(MetridayTheme.secondary)
+
+            TextField("Time entry title", text: $title)
+                .textFieldStyle(.roundedBorder)
+
+            Picker("Project", selection: $projectID) {
+                Text("Unassigned").tag(nil as UUID?)
+                ForEach(projects) { project in
+                    Text(project.name).tag(project.id as UUID?)
+                }
+            }
+
+            Picker("Billing Status", selection: $billingStatus) {
+                ForEach(BillingStatus.allCases) { status in
+                    Text(status.label).tag(status)
+                }
+            }
+
+            TextField("Notes (optional)", text: $notes, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(3, reservesSpace: true)
+
+            HStack {
+                Button("Skip") {
+                    onSkip()
+                    dismiss()
+                }
+                Spacer()
+                Button("Save Time Entry") {
+                    onSave(title, projectID, notes, billingStatus)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 460)
+        .onChange(of: projectID) { _, newProjectID in
+            billingStatus = newProjectID
+                .flatMap { id in projects.first(where: { $0.id == id })?.defaultBillingStatus }
+                ?? .billable
+        }
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = max(1, Int((Double(seconds) / 60.0).rounded()))
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        return hours > 0 ? "\(hours)h \(remainder)m" : "\(remainder)m"
     }
 }
 
 struct SidebarView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var showingSettings = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -75,11 +378,13 @@ struct SidebarView: View {
                                 Capsule().fill(MetridayTheme.accent).frame(width: 3, height: 22)
                             }
                         }
-                        .foregroundStyle(appState.section == section ? MetridayTheme.accent : MetridayTheme.graphite)
-                        .padding(.horizontal, 15)
-                        .frame(height: 52)
-                        .background(appState.section == section ? MetridayTheme.accentSoft : .clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                            .foregroundStyle(appState.section == section ? MetridayTheme.accent : MetridayTheme.graphite)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 15)
+                            .frame(height: 52)
+                            .background(appState.section == section ? MetridayTheme.accentSoft : .clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("sidebar.\(section.rawValue.lowercased())")
@@ -101,25 +406,29 @@ struct SidebarView: View {
                         Spacer()
                         Circle().fill(MetridayTheme.success).frame(width: 8, height: 8)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("sidebar.data")
 
                 Button {
-                    appState.section = .rules
+                    showingSettings = true
                 } label: {
                     HStack(spacing: 11) {
                         Image(systemName: "gearshape")
                         Text("Settings")
                         Spacer()
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("sidebar.settings")
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(MetridayTheme.success)
-                    Text("Markdown synced")
+                        .foregroundStyle(appState.syncStore.isEnabled ? MetridayTheme.success : MetridayTheme.secondary)
+                    Text(appState.syncStore.isEnabled ? "Data synced" : "Local data only")
                     Spacer()
                 }
                 .font(.system(size: 12))
@@ -130,12 +439,30 @@ struct SidebarView: View {
             .padding(20)
         }
         .background(MetridayTheme.sidebar)
+        .sheet(isPresented: $showingSettings) {
+            SettingsSheet(
+                preferences: appState.preferences,
+                monitor: appState.activityMonitor,
+                exclusionStore: appState.exclusionStore,
+                projectStore: appState.projectStore,
+                timeEntryStore: appState.timeEntryStore,
+                calendarStore: appState.calendarStore,
+                reminderStore: appState.reminderStore,
+                phoneCallStore: appState.phoneCallStore,
+                screenTimeStore: appState.screenTimeStore,
+                localAPIServer: appState.localAPIServer,
+                syncStore: appState.syncStore,
+                integrationStore: appState.integrationStore,
+                teamStore: appState.teamStore
+            )
+        }
     }
 }
 
 struct GlobalTopHeader: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var store: MarkdownStore
+    @ObservedObject var monitor: AppActivityMonitor
 
     var body: some View {
         HStack(spacing: 18) {

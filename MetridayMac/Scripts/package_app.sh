@@ -12,6 +12,7 @@ swift build -c release
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 cp ".build/release/Metriday" "$app_dir/Contents/MacOS/Metriday"
 cp "Resources/Info.plist" "$app_dir/Contents/Info.plist"
+cp "Resources/Metriday.sdef" "$app_dir/Contents/Resources/Metriday.sdef"
 codesign --force --deep --sign - "$app_dir"
 
 echo "$app_dir"

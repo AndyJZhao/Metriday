@@ -1,6 +1,11 @@
 import Combine
 import Foundation
 
+struct MarkdownPlanArchive: Codable {
+    let version: Int
+    let files: [String: String]
+}
+
 @MainActor
 final class MarkdownStore: ObservableObject {
     static let dayStart = 8 * 60
@@ -79,6 +84,73 @@ final class MarkdownStore: ObservableObject {
 
     func fileExists(for date: Date) -> Bool {
         FileManager.default.fileExists(atPath: Self.fileURL(for: date, rootDirectory: rootDirectory).path)
+    }
+
+    func markdown(for date: Date) -> String? {
+        try? String(
+            contentsOf: Self.fileURL(for: date, rootDirectory: rootDirectory),
+            encoding: .utf8
+        )
+    }
+
+    @discardableResult
+    func replaceMarkdown(_ raw: String, for date: Date) -> Bool {
+        let normalizedDate = Calendar.current.startOfDay(for: date)
+        guard normalizedDate == document.date else {
+            let url = Self.fileURL(for: normalizedDate, rootDirectory: rootDirectory)
+            do {
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                try raw.write(to: url, atomically: true, encoding: .utf8)
+                return true
+            } catch {
+                return false
+            }
+        }
+        updateRawMarkdown(raw)
+        return true
+    }
+
+    func exportArchiveData() throws -> Data {
+        let calendarDirectory = rootDirectory.appendingPathComponent("Calendar", isDirectory: true)
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: calendarDirectory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        var contents: [String: String] = [:]
+        for url in files where url.pathExtension.lowercased() == "md" {
+            guard let value = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            contents[url.lastPathComponent] = value
+        }
+        let archive = MarkdownPlanArchive(version: 1, files: contents)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(archive)
+    }
+
+    @discardableResult
+    func importArchiveData(_ data: Data) throws -> Int {
+        let archive = try JSONDecoder().decode(MarkdownPlanArchive.self, from: data)
+        let calendarDirectory = rootDirectory.appendingPathComponent("Calendar", isDirectory: true)
+        try FileManager.default.createDirectory(at: calendarDirectory, withIntermediateDirectories: true)
+        var imported = 0
+        for (filename, value) in archive.files {
+            guard filename.range(
+                of: #"^\d{4}-\d{2}-\d{2}\.md$"#,
+                options: .regularExpression
+            ) != nil else { continue }
+            try value.write(
+                to: calendarDirectory.appendingPathComponent(filename),
+                atomically: true,
+                encoding: .utf8
+            )
+            imported += 1
+        }
+        _ = load(date: document.date, createIfMissing: false)
+        return imported
     }
 
     @discardableResult

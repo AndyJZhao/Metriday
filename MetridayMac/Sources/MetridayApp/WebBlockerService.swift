@@ -60,6 +60,18 @@ final class WebBlockerService: ObservableObject {
         DomainRuleMatcher.normalizedDomain(rawValue)
     }
 
+    func importRules(_ importedRules: [WebRule]) {
+        var merged = rules
+        for imported in importedRules where !merged.contains(where: {
+            $0.domain == imported.domain && $0.isAllowed == imported.isAllowed
+        }) {
+            merged.append(imported)
+        }
+        rules = merged
+        persist()
+        status = "Imported \(importedRules.count) focus rules"
+    }
+
     private func startMonitoring() {
         guard timer == nil else { return }
         status = "Research Focus active · Safari and Chrome monitored"
