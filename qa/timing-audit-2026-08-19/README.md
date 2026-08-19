@@ -35,6 +35,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 29. Activities exclusions — verified create/delete of a temporary App exclusion through the Web companion and native persisted exclusion store.
 30. Activities category editing — verified create, edit, color/rule update, and delete of a temporary custom category from the Web companion.
 31. Activities filter editing — verified create, rule/name update, and delete of a temporary saved filter from the Web companion.
+32. Activity detail project fidelity — corrected the detail dialog to show the assigned project instead of always displaying `None`.
 
 ## Findings applied
 
@@ -65,3 +66,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Activities now separates reusable Filters from Exclusions: Filters narrow the visible evidence, while Exclusions remove matching App / website / item / device captures before they enter the local stream.
 - Custom Categories now support editing as well as creation/deletion; changing a category's role, color, or matching rule updates the native classification store used by the App / Category columns and timeline colors.
 - Saved Activity Filters now support editing as well as creation/deletion; changing a filter name or rule updates the native reusable filter store used by the toolbar and reports context.
+- Activity detail now reflects project assignment persisted by the drag target; unassigned segments still explicitly identify their source as app usage.

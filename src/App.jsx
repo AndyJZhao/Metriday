@@ -1721,6 +1721,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified" }) {
 function ActivityDetailDialog({ activity, api, dateKey, onClose }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const projectLabel = projectTitleFor(api.projects, activity.projectID);
   const category = activityCategory(activity);
   const Icon = activityIcon(activity);
   const app = activity.appName || activity.deviceName || "Unknown App";
@@ -1753,7 +1754,7 @@ function ActivityDetailDialog({ activity, api, dateKey, onClose }) {
     <section className="activity-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="activity-detail-title">
       <header className="activity-detail-heading"><div><span>Activity details</span><h2 id="activity-detail-title">{app}</h2></div><IconButton label="Close activity details" onClick={onClose}><X size={18} /></IconButton></header>
       <div className="activity-detail-app"><span className="activity-detail-icon"><Icon size={22} weight="duotone" /></span><div><strong>{context || app}</strong><small>{activity.deviceName || "This Mac"}</small></div><span className={`activity-category ${category.key}`} style={activityCategoryStyle(category)}><i />{category.label}</span></div>
-      <dl className="activity-detail-facts"><div><dt>Time</dt><dd>{preciseClock(startSecond)}–{preciseClock(endSecond)}</dd></div><div><dt>Duration</dt><dd>{preciseDuration(endSecond - startSecond)}</dd></div><div><dt>Project</dt><dd><i className="hover-project-dot" />None <small>From the app usage</small></dd></div>{activity.windowTitle ? <div><dt>Window</dt><dd>{activity.windowTitle}</dd></div> : null}{activity.resource ? <div><dt>Resource</dt><dd>{activity.resource}</dd></div> : null}</dl>
+      <dl className="activity-detail-facts"><div><dt>Time</dt><dd>{preciseClock(startSecond)}–{preciseClock(endSecond)}</dd></div><div><dt>Duration</dt><dd>{preciseDuration(endSecond - startSecond)}</dd></div><div><dt>Project</dt><dd><i className="hover-project-dot" />{projectLabel} {!activity.projectID ? <small>From the app usage</small> : null}</dd></div>{activity.windowTitle ? <div><dt>Window</dt><dd>{activity.windowTitle}</dd></div> : null}{activity.resource ? <div><dt>Resource</dt><dd>{activity.resource}</dd></div> : null}</dl>
       {message ? <p className="entry-message" role="status">{message}</p> : null}
       <footer className="activity-detail-actions"><button type="button" className="secondary-button" onClick={onClose}>Close</button><button type="button" className="primary-button" onClick={record} disabled={busy || !api.connected || endSecond <= startSecond}>{busy ? "Recording…" : "Record time"}</button></footer>
     </section>
