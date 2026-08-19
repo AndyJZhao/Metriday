@@ -486,6 +486,16 @@ function IconButton({ label, children, onClick, className = "" }) {
   return <button type="button" className={`icon-button ${className}`} aria-label={label} title={label} onClick={onClick}>{children}</button>;
 }
 
+function ActionMenu({ label, items, children }) {
+  const [open, setOpen] = useState(false);
+  return <div className="action-menu">
+    <button type="button" className="icon-button" aria-label={label} title={label} aria-expanded={open} onClick={() => setOpen((value) => !value)}>{children}</button>
+    {open ? <div className="action-menu-popover" role="menu" aria-label={label}>
+      {items.map((item) => <button key={item.label} type="button" role="menuitem" className="action-menu-item" onClick={() => { item.onSelect(); setOpen(false); }}>{item.label}</button>)}
+    </div> : null}
+  </div>;
+}
+
 function TodayHeader({ focusRunning, setFocusRunning, setPage, api, dateKey, setDateKey }) {
   const currentTitle = api.status?.currentTask?.title || "GeneZip rebuttal experiment";
   const currentApplication = api.status?.currentApplication && api.status.currentApplication !== "Waiting for activity" ? api.status.currentApplication : "Research Focus";
@@ -619,17 +629,22 @@ function MarkdownTaskLine({ task, line, active, onDragStart, onPointerDragStart,
 
 function MarkdownEditor({ tasks, setTasks, lastUpdatedId, planDate, onTaskDragStart, onPointerDragStart, onSelectTask, onSchedule, onComplete, onTitleCommit, addTask }) {
   const [newTitle, setNewTitle] = useState("");
+  const newTaskInputRef = useRef(null);
   const updateTask = (id, patch) => setTasks((items) => items.map((task) => task.id === id ? { ...task, ...patch } : task));
+  const copyTaskList = () => {
+    const markdown = tasks.map((task) => `- [${task.completed ? "x" : " "}] ${task.title}${task.start != null ? ` ${formatRange(task.start, task.end)}` : ""}`).join("\n");
+    navigator.clipboard?.writeText(markdown).catch(() => {});
+  };
   return (
     <section className="markdown-editor" aria-label="Markdown daily plan">
-      <div className="editor-toolbar"><div className="file-name"><FileText size={18} /> {planDate}.md <CaretRight size={13} /></div><div className="editor-actions"><span>Markdown</span><IconButton label="Document actions"><DotsThree size={22} /></IconButton></div></div>
+      <div className="editor-toolbar"><div className="file-name"><FileText size={18} /> {planDate}.md <CaretRight size={13} /></div><div className="editor-actions"><span>Markdown</span><ActionMenu label="Document actions" items={[{ label: "Focus new task", onSelect: () => newTaskInputRef.current?.focus() }, { label: "Copy task list", onSelect: copyTaskList }]}><DotsThree size={22} /></ActionMenu></div></div>
       <div className="editor-body">
         <div className="editor-line heading-line"><span className="line-number">1</span><span className="heading-mark">#</span><strong>{planDateLabel(planDate)}</strong></div>
         <div className="editor-line quote-line"><span className="line-number">2</span><span className="heading-mark">&gt;</span><em>Plan deep work. Ship calm results.</em></div>
         <div className="editor-line empty-line"><span className="line-number">3</span></div>
         <div className="editor-line section-line"><span className="line-number">4</span><span className="heading-mark">##</span><strong>Focus</strong></div>
         {tasks.map((task, index) => <MarkdownTaskLine key={task.id} task={task} line={5 + index} active={lastUpdatedId === task.id} onDragStart={onTaskDragStart} onPointerDragStart={onPointerDragStart} onSelectTask={onSelectTask} onComplete={onComplete} onTitleChange={(id, title) => updateTask(id, { title })} onTitleCommit={onTitleCommit} onSchedule={onSchedule} />)}
-        <div className="editor-line add-task-line"><span className="line-number">{5 + tasks.length}</span><span className="markdown-token">- [ ]</span><input value={newTitle} onChange={(event) => setNewTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && newTitle.trim()) { addTask(newTitle.trim()); setNewTitle(""); } }} placeholder="Add a Markdown task…" aria-label="Add a Markdown task" /></div>
+        <div className="editor-line add-task-line"><span className="line-number">{5 + tasks.length}</span><span className="markdown-token">- [ ]</span><input ref={newTaskInputRef} value={newTitle} onChange={(event) => setNewTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && newTitle.trim()) { addTask(newTitle.trim()); setNewTitle(""); } }} placeholder="Add a Markdown task…" aria-label="Add a Markdown task" /></div>
         <div className="editor-line empty-line"><span className="line-number">{6 + tasks.length}</span></div>
         <div className="editor-line section-line"><span className="line-number">{7 + tasks.length}</span><span className="heading-mark">##</span><strong>Notes</strong></div>
         <div className="editor-line note-line"><span className="line-number">{8 + tasks.length}</span><span>- Reviewer 2 asks about generalization.</span></div>
@@ -654,12 +669,17 @@ function CalendarPanel({ tasks, selectedTaskId, setSelectedTaskId, onDropTask, o
   const timelineRef = useRef(null);
   const [mode, setMode] = useState("day");
   const drop = (event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/task-id") || selectedTaskId; if (!id || !timelineRef.current) return; const rect = timelineRef.current.getBoundingClientRect(); onDropTask(id, event.clientY - rect.top); };
+  const calendarItems = [
+    { label: "Today", onSelect: () => onSelectDate(localDateKey()) },
+    { label: "Previous day", onSelect: () => onSelectDate(offsetDateKey(dateKey, -1)) },
+    { label: "Next day", onSelect: () => onSelectDate(offsetDateKey(dateKey, 1)) }
+  ];
   if (mode === "week") return (
-    <section className="calendar-panel week-panel" aria-label="Week calendar"><div className="calendar-toolbar"><div className="segmented-control"><button type="button" onClick={() => setMode("day")}>Day</button><button type="button" className="active">Week</button></div><IconButton label="Calendar options"><DotsThree size={21} /></IconButton></div><h2>{planDateLabel(offsetDateKey(dateKey, -3))}–{planDateLabel(offsetDateKey(dateKey, 3))}</h2><div className="week-grid">{Array.from({ length: 7 }, (_, index) => offsetDateKey(dateKey, index - 3)).map((day) => <button type="button" key={day} className={day === dateKey ? "today" : ""} onClick={() => { onSelectDate(day); setMode("day"); }}><span>{new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</span>{day === dateKey ? <strong>{tasks.filter((task) => task.start != null).length} blocks</strong> : <small>Open</small>}</button>)}</div><p className="week-hint">Select a day to open its draggable timeline.</p></section>
+    <section className="calendar-panel week-panel" aria-label="Week calendar"><div className="calendar-toolbar"><div className="segmented-control"><button type="button" onClick={() => setMode("day")}>Day</button><button type="button" className="active">Week</button></div><ActionMenu label="Calendar options" items={calendarItems}><DotsThree size={21} /></ActionMenu></div><h2>{planDateLabel(offsetDateKey(dateKey, -3))}–{planDateLabel(offsetDateKey(dateKey, 3))}</h2><div className="week-grid">{Array.from({ length: 7 }, (_, index) => offsetDateKey(dateKey, index - 3)).map((day) => <button type="button" key={day} className={day === dateKey ? "today" : ""} onClick={() => { onSelectDate(day); setMode("day"); }}><span>{new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</span>{day === dateKey ? <strong>{tasks.filter((task) => task.start != null).length} blocks</strong> : <small>Open</small>}</button>)}</div><p className="week-hint">Select a day to open its draggable timeline.</p></section>
   );
   return (
     <section className="calendar-panel" aria-label="Day calendar">
-      <div className="calendar-toolbar"><div className="segmented-control"><button type="button" className="active">Day</button><button type="button" onClick={() => setMode("week")}>Week</button></div><IconButton label="Calendar options"><DotsThree size={21} /></IconButton></div>
+      <div className="calendar-toolbar"><div className="segmented-control"><button type="button" className="active">Day</button><button type="button" onClick={() => setMode("week")}>Week</button></div><ActionMenu label="Calendar options" items={calendarItems}><DotsThree size={21} /></ActionMenu></div>
       <h2>{new Date(`${dateKey}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</h2><div className="all-day-row"><span>all-day</span></div>
       <div ref={timelineRef} className={`plan-calendar-canvas ${selectedTaskId ? "ready-to-schedule" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={drop} onClick={(event) => { if (!selectedTaskId || !timelineRef.current) return; const rect = timelineRef.current.getBoundingClientRect(); onDropTask(selectedTaskId, event.clientY - rect.top); }}>
         <HourLabels end={20} /><GridLines end={20} />
