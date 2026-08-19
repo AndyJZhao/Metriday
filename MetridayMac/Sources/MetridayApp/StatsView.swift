@@ -347,6 +347,13 @@ struct StatsView: View {
                             Text(point.name)
                                 .font(.system(size: 11, weight: .medium))
                                 .lineLimit(1)
+                            Text(point.categoryName)
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(point.color)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(point.color.opacity(0.10))
+                                .clipShape(Capsule())
                             Spacer()
                             Text(formatSeconds(point.seconds))
                                 .font(.system(size: 10, weight: .semibold))
@@ -529,16 +536,20 @@ struct StatsView: View {
     }
 
     private var applicationPoints: [StatsApplicationPoint] {
-        var totals: [String: (seconds: Int, color: Color)] = [:]
+        var totals: [String: (name: String, categoryName: String, seconds: Int, color: Color)] = [:]
         for segment in weekDates.flatMap(activitySegments(for:)) where segment.relevance != .idle {
-            let existing = totals[segment.displayTitle, default: (seconds: 0, color: categoryColor(for: category(for: segment)))]
-            totals[segment.displayTitle] = (
+            let definition = category(for: segment)
+            let key = "\(segment.displayTitle)::\(definition.name)::\(definition.role.rawValue)"
+            let existing = totals[key, default: (name: segment.displayTitle, categoryName: definition.name, seconds: 0, color: categoryColor(for: definition))]
+            totals[key] = (
+                name: existing.name,
+                categoryName: existing.categoryName,
                 seconds: existing.seconds + segment.durationSeconds,
                 color: existing.color
             )
         }
-        return totals.map { name, value in
-            StatsApplicationPoint(name: name, seconds: value.seconds, color: value.color)
+        return totals.map { _, value in
+            StatsApplicationPoint(name: value.name, categoryName: value.categoryName, seconds: value.seconds, color: value.color)
         }
         .sorted { $0.seconds > $1.seconds }
         .prefix(8)
@@ -651,8 +662,9 @@ private struct StatsCategoryPoint: Identifiable {
 }
 
 private struct StatsApplicationPoint: Identifiable {
-    var id: String { name }
+    var id: String { "\(name)::\(categoryName)" }
     let name: String
+    let categoryName: String
     let seconds: Int
     let color: Color
 }

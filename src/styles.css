@@ -417,6 +417,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-ranking { display: grid; gap: 12px; margin-top: 18px; }
 .stats-ranking-row { display: grid; grid-template-columns: minmax(100px, 0.8fr) minmax(100px, 1.4fr) auto; align-items: center; gap: 10px; color: #464b57; font-size: 11px; }
 .stats-ranking-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-ranking-name { display: flex; align-items: center; min-width: 0; gap: 7px; overflow: hidden; }
+.stats-ranking-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-ranking-name .activity-category { flex: 0 0 auto; min-height: 20px; padding: 0 6px; font-size: 9px; }
 .stats-ranking-row > i { display: block; height: 7px; overflow: hidden; border-radius: 99px; background: #eff0f3; }
 .stats-ranking-row > i b { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
 .stats-ranking-row > strong { color: #353a44; font-size: 11px; white-space: nowrap; }
