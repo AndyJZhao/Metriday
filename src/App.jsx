@@ -344,18 +344,46 @@ function activityIcon(activity) {
 function activityCategory(activity) {
   const categoryRole = String(activity?.categoryRole || "").toLowerCase();
   if (["focused", "distracting", "other", "idle"].includes(categoryRole)) {
-    return { key: categoryRole, label: activity.categoryName || categoryRole[0].toUpperCase() + categoryRole.slice(1) };
+    return { key: categoryRole, label: activity.categoryName || categoryRole[0].toUpperCase() + categoryRole.slice(1), color: activity.categoryColor || categoryRoleColor(categoryRole) };
   }
   switch (activity?.relevance) {
     case "related":
-      return { key: "focused", label: "Focused" };
+      return { key: "focused", label: "Focused", color: "blue" };
     case "distracted":
-      return { key: "distracting", label: "Distracting" };
+      return { key: "distracting", label: "Distracting", color: "red" };
     case "idle":
-      return { key: "idle", label: "Idle" };
+      return { key: "idle", label: "Idle", color: "graphite" };
     default:
-      return { key: "other", label: "Other" };
+      return { key: "other", label: "Other", color: "graphite" };
   }
+}
+
+function categoryRoleColor(role) {
+  return ["focused", "related", "current"].includes(role) ? "blue" : ["distracting", "distracted"].includes(role) ? "red" : "graphite";
+}
+
+function activityCategoryStyle(category) {
+  const palette = {
+    blue: { color: "#4e5ff2", background: "#eef1ff" },
+    red: { color: "#d24b4b", background: "#fff0f0" },
+    green: { color: "#399a55", background: "#f2faf4" },
+    orange: { color: "#d77b22", background: "#fff6ea" },
+    purple: { color: "#7b57b5", background: "#f5f0ff" },
+    graphite: { color: "#6f7480", background: "#f0f1f4" },
+  };
+  return palette[category?.color] || palette.graphite;
+}
+
+function activityBlockStyle(color) {
+  const palette = {
+    blue: { borderColor: "#cfd8ff", background: "#f1f4ff" },
+    red: { borderColor: "#f0caca", background: "#fff5f5" },
+    green: { borderColor: "#cbe7d2", background: "#f2faf4" },
+    orange: { borderColor: "#f2d8b4", background: "#fff8ee" },
+    purple: { borderColor: "#dfd1f3", background: "#f8f3ff" },
+    graphite: { borderColor: "#e2e3e7", background: "#f7f7f8" },
+  };
+  return palette[color] || palette.graphite;
 }
 
 function activityContext(activity) {
@@ -390,6 +418,7 @@ function liveActivityBlocks(activities) {
         startSecond: rawStartSecond,
         endSecond: rawEndSecond,
         kind: category.key,
+        categoryColor: category.color,
         label: category.key === "idle" ? "Idle" : activityLabel(activity),
         icon: category.key === "idle" ? null : activityIcon(activity),
       };
@@ -412,10 +441,12 @@ function liveActivityBlocks(activities) {
         startSecond: activity.startSecond,
         endSecond: activity.endSecond,
         kind: activity.kind,
+        categoryColor: activity.categoryColor,
         label: activity.kind === "idle" ? "Idle" : activity.label,
         detail: activity.kind === "idle" ? "No significant activity" : formatRange(activity.start, activity.end),
         kinds: new Set([activity.kind]),
         categorySeconds: new Map([[activity.kind, Math.max(1, activity.endSecond - activity.startSecond)]]),
+        categoryColors: new Map([[activity.kind, activity.categoryColor]]),
         rowMap: new Map([[`${activity.kind}|${activity.label}`, {
           icon: activity.icon,
           label: activity.label,
@@ -436,7 +467,9 @@ function liveActivityBlocks(activities) {
       activity.kind,
       (previous.categorySeconds.get(activity.kind) || 0) + Math.max(1, activity.endSecond - activity.startSecond)
     );
+    previous.categoryColors.set(activity.kind, activity.categoryColor);
     previous.kind = primaryKind(previous.categorySeconds);
+    previous.categoryColor = previous.categoryColors.get(previous.kind) || previous.categoryColor;
     const rowKey = `${activity.kind}|${activity.label}`;
     const row = previous.rowMap.get(rowKey);
     if (row) {
@@ -461,6 +494,7 @@ function liveActivityBlocks(activities) {
     startSecond: block.startSecond,
     endSecond: block.endSecond,
     kind: block.kind,
+    categoryColor: block.categoryColor,
     label: block.label,
     detail: block.kind === "idle" ? block.detail : formatRange(block.start, block.end),
     rows: block.kinds.size === 1 && block.kinds.has("idle") ? null : [...block.rowMap.values()]
@@ -696,7 +730,7 @@ function ActualTrack({ activities, connected, onRecord }) {
   return (
     <section className="today-track actual-track" aria-label="Actual activity timeline">
       <div className="track-heading"><strong>Actual</strong><span>{connected ? "Live from Metriday" : "What actually happened"}</span></div>
-      <div className="track-canvas"><GridLines />{blocks.map((block) => <div key={block.id} className={`actual-block ${block.kind} ${hoveredBlockId === block.id ? "hovered" : ""}`} style={actualBlockStyle(block)} title={`${block.label} · ${block.detail}`} onMouseEnter={() => setHoveredBlockId(block.id)} onMouseLeave={() => setHoveredBlockId(null)}><ActualRows block={block} />{hoveredBlockId === block.id ? <ActualHoverCard block={block} onRecord={connected ? onRecord : null} /> : null}</div>)}</div>
+      <div className="track-canvas"><GridLines />{blocks.map((block) => <div key={block.id} className={`actual-block ${block.kind} ${hoveredBlockId === block.id ? "hovered" : ""}`} style={{ ...actualBlockStyle(block), ...activityBlockStyle(block.categoryColor || categoryRoleColor(block.kind)) }} title={`${block.label} · ${block.detail}`} onMouseEnter={() => setHoveredBlockId(block.id)} onMouseLeave={() => setHoveredBlockId(null)}><ActualRows block={block} />{hoveredBlockId === block.id ? <ActualHoverCard block={block} onRecord={connected ? onRecord : null} /> : null}</div>)}</div>
     </section>
   );
 }
@@ -1208,7 +1242,7 @@ function ActivityTable({ activities, onSelect }) {
           <span className="activity-table-icon"><Icon size={19} weight="duotone" /></span>
           <span className="activity-app-copy"><strong>{app}</strong>{context ? <small>{context}</small> : null}</span>
         </div>
-        <span className={`activity-category ${category.key}`}><i />{category.label}</span>
+        <span className={`activity-category ${category.key}`} style={activityCategoryStyle(category)}><i />{category.label}</span>
         <span>{formatRange(start, end)}</span>
         <small>{formatDurationSeconds(duration)} · {activity.deviceName || "This Mac"}</small>
       </button>;
@@ -1250,7 +1284,7 @@ function ActivityDetailDialog({ activity, api, dateKey, onClose }) {
   return <div className="activity-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="activity-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="activity-detail-title">
       <header className="activity-detail-heading"><div><span>Activity details</span><h2 id="activity-detail-title">{app}</h2></div><IconButton label="Close activity details" onClick={onClose}><X size={18} /></IconButton></header>
-      <div className="activity-detail-app"><span className="activity-detail-icon"><Icon size={22} weight="duotone" /></span><div><strong>{context || app}</strong><small>{activity.deviceName || "This Mac"}</small></div><span className={`activity-category ${category.key}`}><i />{category.label}</span></div>
+      <div className="activity-detail-app"><span className="activity-detail-icon"><Icon size={22} weight="duotone" /></span><div><strong>{context || app}</strong><small>{activity.deviceName || "This Mac"}</small></div><span className={`activity-category ${category.key}`} style={activityCategoryStyle(category)}><i />{category.label}</span></div>
       <dl className="activity-detail-facts"><div><dt>Time</dt><dd>{preciseClock(startSecond)}–{preciseClock(endSecond)}</dd></div><div><dt>Duration</dt><dd>{preciseDuration(endSecond - startSecond)}</dd></div><div><dt>Project</dt><dd><i className="hover-project-dot" />None <small>From the app usage</small></dd></div>{activity.windowTitle ? <div><dt>Window</dt><dd>{activity.windowTitle}</dd></div> : null}{activity.resource ? <div><dt>Resource</dt><dd>{activity.resource}</dd></div> : null}</dl>
       {message ? <p className="entry-message" role="status">{message}</p> : null}
       <footer className="activity-detail-actions"><button type="button" className="secondary-button" onClick={onClose}>Close</button><button type="button" className="primary-button" onClick={record} disabled={busy || !api.connected || endSecond <= startSecond}>{busy ? "Recording…" : "Record time"}</button></footer>
