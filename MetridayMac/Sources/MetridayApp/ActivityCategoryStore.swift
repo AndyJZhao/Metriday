@@ -189,7 +189,7 @@ final class ActivityCategoryStore: ObservableObject {
         }
         categories[index].isArchived = true
         persist()
-        statusMessage = "Category archived · (definition.name)"
+        statusMessage = "Category archived · \(definition.name)"
     }
 
     func exportArchiveData() throws -> Data {
@@ -228,7 +228,7 @@ final class ActivityCategoryStore: ObservableObject {
             try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try (try exportArchiveData()).write(to: fileURL, options: .atomic)
         } catch {
-            statusMessage = "Could not save categories · (error.localizedDescription)"
+            statusMessage = "Could not save categories · \(error.localizedDescription)"
         }
     }
 
