@@ -414,6 +414,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-bar-column strong { color: #454a55; font-size: 10px; }
 .stats-bar-track { display: flex; align-items: end; width: min(38px, 100%); height: 145px; border-radius: 6px 6px 2px 2px; background: #f1f2f5; }
 .stats-bar-track i { display: block; width: 100%; min-height: 3px; border-radius: 6px 6px 2px 2px; background: var(--accent); }
+.stats-score-bars .stats-bar-track { background: #f1f7f2; }
+.stats-hour-bars { display: flex; align-items: end; gap: 4px; min-height: 215px; padding-top: 20px; }
+.stats-hour-column { display: grid; flex: 1; align-items: end; justify-items: center; gap: 5px; min-width: 0; color: var(--muted); font-size: 9px; }
+.stats-hour-track { display: flex; align-items: end; width: 100%; height: 145px; border-radius: 4px 4px 1px 1px; background: #f1f2f5; }
+.stats-hour-track i { display: block; width: 100%; min-height: 3px; border-radius: 4px 4px 1px 1px; background: var(--accent); }
+.stats-score-bars .stats-hour-track { background: #f1f7f2; }
+.stats-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .stats-ranking { display: grid; gap: 12px; margin-top: 18px; }
 .stats-ranking-row { display: grid; grid-template-columns: minmax(100px, 0.8fr) minmax(100px, 1.4fr) auto; align-items: center; gap: 10px; color: #464b57; font-size: 11px; }
 .stats-ranking-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
