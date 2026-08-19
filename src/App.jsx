@@ -656,25 +656,43 @@ function ActualRows({ block }) {
   ); })}</div>;
 }
 
-function ActualHoverCard({ block }) {
+function ActualHoverCard({ block, onRecord }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
   const categoryLabel = block.kind === "focused" ? "Focused" : block.kind === "distracting" ? "Distracting" : block.kind === "idle" ? "Idle" : "Other";
   const appLabel = block.rows?.[0]?.label || block.label;
+  const startSecond = Number.isFinite(block.startSecond) ? block.startSecond : block.start * 60;
+  const endSecond = Number.isFinite(block.endSecond) ? block.endSecond : block.end * 60;
+  const record = async () => {
+    if (!onRecord || busy) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await onRecord({ ...block, startSecond, endSecond });
+      setMessage("Recorded");
+    } catch (error) {
+      setMessage(error.message || "Could not record");
+    } finally {
+      setBusy(false);
+    }
+  };
   return <div className="actual-hover-card" role="tooltip">
-    <strong className="actual-hover-time">{preciseClock(block.startSecond)}</strong>
-    <span className="actual-hover-duration">({preciseDuration(block.endSecond - block.startSecond)})</span>
+    <strong className="actual-hover-time">{preciseClock(startSecond)}</strong>
+    <span className="actual-hover-duration">({preciseDuration(endSecond - startSecond)})</span>
     <div className="actual-hover-meta"><span>App:</span><b>{appLabel}</b></div>
     <div className="actual-hover-meta"><span>Category:</span><i className={`hover-category-dot ${block.kind}`} /><b>{categoryLabel}</b></div>
     <div className="actual-hover-meta"><span>Project:</span><i className="hover-project-dot" /><b>None</b><small>From the app usage</small></div>
+    {onRecord ? <div className="actual-hover-actions"><button type="button" className="actual-record-button" onClick={record} disabled={busy}>{message || (busy ? "Recording…" : "Record time")}</button></div> : null}
   </div>;
 }
 
-function ActualTrack({ activities, connected }) {
+function ActualTrack({ activities, connected, onRecord }) {
   const [hoveredBlockId, setHoveredBlockId] = useState(null);
   const blocks = connected && activities.length > 0 ? liveActivityBlocks(activities) : actualBlocks;
   return (
     <section className="today-track actual-track" aria-label="Actual activity timeline">
       <div className="track-heading"><strong>Actual</strong><span>{connected ? "Live from Metriday" : "What actually happened"}</span></div>
-      <div className="track-canvas"><GridLines />{blocks.map((block) => <div key={block.id} className={`actual-block ${block.kind}`} style={actualBlockStyle(block)} title={`${block.label} · ${block.detail}`} onMouseEnter={() => setHoveredBlockId(block.id)} onMouseLeave={() => setHoveredBlockId(null)}><ActualRows block={block} />{hoveredBlockId === block.id ? <ActualHoverCard block={block} /> : null}</div>)}</div>
+      <div className="track-canvas"><GridLines />{blocks.map((block) => <div key={block.id} className={`actual-block ${block.kind} ${hoveredBlockId === block.id ? "hovered" : ""}`} style={actualBlockStyle(block)} title={`${block.label} · ${block.detail}`} onMouseEnter={() => setHoveredBlockId(block.id)} onMouseLeave={() => setHoveredBlockId(null)}><ActualRows block={block} />{hoveredBlockId === block.id ? <ActualHoverCard block={block} onRecord={connected ? onRecord : null} /> : null}</div>)}</div>
     </section>
   );
 }
@@ -682,13 +700,24 @@ function ActualTrack({ activities, connected }) {
 function TodayPage({ setPage, api, dateKey, setDateKey }) {
   const [focusRunning, setFocusRunning] = useState(Boolean(api.status?.timer));
   useEffect(() => setFocusRunning(Boolean(api.status?.timer)), [api.status?.timer?.id]);
+  const recordActivity = async (block) => {
+    const start = localEntryDateSeconds(dateKey, block.startSecond);
+    const end = localEntryDateSeconds(dateKey, block.endSecond);
+    if (!start || !end || end <= start) throw new Error("Activity range is not available");
+    await api.addTimeEntry({
+      title: block.rows?.[0]?.label || block.label || "App activity",
+      start,
+      end,
+      billingStatus: "billable",
+    });
+  };
   const now = currentMinuteAndLabel();
   const showNow = dateKey === localDateKey();
   const nowStyle = showNow ? { top: `${56 + ((now.minute - DAY_START) / 60) * HOUR_HEIGHT}px` } : { display: "none" };
   return (
     <main className="page today-page">
       <TodayHeader focusRunning={focusRunning} setFocusRunning={setFocusRunning} setPage={setPage} api={api} dateKey={dateKey} setDateKey={setDateKey} />
-      <div className="today-comparison"><div className="timeline-label-column"><HourLabels /></div><PlannedTrack tasks={api.plan?.tasks} connected={api.connected} /><ActualTrack activities={api.activities} connected={api.connected} /><div className="now-marker" style={nowStyle} aria-label={`Current time ${now.label}`}><span /></div></div>
+      <div className="today-comparison"><div className="timeline-label-column"><HourLabels /></div><PlannedTrack tasks={api.plan?.tasks} connected={api.connected} /><ActualTrack activities={api.activities} connected={api.connected} onRecord={recordActivity} /><div className="now-marker" style={nowStyle} aria-label={`Current time ${now.label}`}><span /></div></div>
       <TodayInsightBar api={api} setPage={setPage} />
       {api.connected ? <WebActivityInsights insights={api.insights} dateKey={dateKey} /> : null}
     </main>
@@ -893,6 +922,13 @@ function entryRange(entry) {
 function localEntryDate(dateKey, time) {
   const date = new Date(`${dateKey}T${time}:00`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function localEntryDateSeconds(dateKey, seconds) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setSeconds(Math.round(Number(seconds || 0)));
+  return date.toISOString();
 }
 
 function billingLabel(value) {

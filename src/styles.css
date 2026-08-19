@@ -93,7 +93,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .actual-block.related, .actual-block.focused { border-color: #cfd8ff; background: #f1f4ff; }
 .actual-block.distracting { border-color: #f0caca; background: #fff5f5; }
 .actual-block.current { border: 2px solid #5369ef; background: #fff; }
-.actual-hover-card { position: absolute; z-index: 40; right: 8px; bottom: calc(100% + 10px); width: min(320px, calc(100vw - 280px)); padding: 14px 16px; border: 1px solid #c4c6ca; border-radius: 12px; background: rgba(255, 255, 255, 0.98); box-shadow: 0 8px 24px rgba(24, 27, 35, 0.18); color: #3d4048; pointer-events: none; }
+.actual-block.hovered { z-index: 50; }
+.actual-hover-card { position: absolute; z-index: 40; right: 8px; bottom: calc(100% + 10px); width: min(320px, calc(100vw - 280px)); padding: 14px 16px; border: 1px solid #c4c6ca; border-radius: 12px; background: rgba(255, 255, 255, 0.98); box-shadow: 0 8px 24px rgba(24, 27, 35, 0.18); color: #3d4048; pointer-events: auto; }
 .actual-hover-card::after { position: absolute; right: 24px; bottom: -7px; width: 12px; height: 12px; border-right: 1px solid #c4c6ca; border-bottom: 1px solid #c4c6ca; background: #fff; content: ""; transform: rotate(45deg); }
 .actual-hover-time { display: inline-block; margin-right: 6px; color: #44474f; font-size: 17px; }
 .actual-hover-duration { color: #70747d; font-size: 12px; }
@@ -107,6 +108,10 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .hover-category-dot.distracting { background: var(--danger); }
 .hover-category-dot.idle { background: #a6abb5; }
 .hover-project-dot { background: #c7c9ce; }
+.actual-hover-actions { display: flex; justify-content: flex-end; margin-top: 11px; padding-top: 10px; border-top: 1px solid #eceef1; }
+.actual-record-button { min-height: 28px; padding: 0 11px; border: 1px solid #d9dce7; border-radius: 7px; background: #fff; color: var(--accent); font-size: 11px; font-weight: 650; cursor: pointer; }
+.actual-record-button:hover { background: var(--accent-soft); }
+.actual-record-button:disabled { cursor: wait; opacity: 0.65; }
 .actual-simple { display: grid; grid-template-columns: 55px minmax(0, 1fr); align-items: start; height: 100%; padding: 9px 12px; }
 .actual-simple > strong { font-size: 12px; }
 .actual-simple > span { display: flex; flex-direction: column; }
