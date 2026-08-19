@@ -636,7 +636,7 @@ function IconButton({ label, children, onClick, className = "" }) {
 }
 
 function DatePickerControl({ dateKey, onChange, label = "Choose date" }) {
-  return <label className="date-picker-control" title={label} aria-label={label}><CalendarBlank size={20} /><input type="date" value={dateKey} onChange={(event) => { if (event.target.value) onChange(event.target.value); }} aria-label={label} /></label>;
+  return <label className="date-picker-control" title={label}><CalendarBlank size={20} /><input type="date" value={dateKey} onChange={(event) => { if (event.target.value) onChange(event.target.value); }} aria-label={label} /></label>;
 }
 
 function ActionMenu({ label, items, children }) {
