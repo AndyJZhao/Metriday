@@ -15,6 +15,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 9. `09-plan-month-calendar.png` — Plan after replacing the Day / Week branch with a compact, actionable month calendar above the selected-day timeline.
 10. `10-plan-continuous-timeline.png` — Plan after extending the right rail into a three-day continuous timeline with the selected day as the writable drop target.
 11. `11-date-controls.png` — Activities after making the header calendar icon an actionable date picker; App uses a light-gray icon tile while Category remains the semantic color column.
+12. `12-category-colors-live.png` — Activities after restarting the packaged native build; the live API now carries category name, role, and color metadata, with Distracting rows rendered red.
 
 ## Findings applied
 
@@ -26,3 +27,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Plan's right rail now keeps adjacent days visible in one continuous timeline; only the selected day accepts Markdown scheduling writes.
 - Today, Plan, Activities, and Review expose the same native date-picker affordance in their headers, while preserving Today and previous/next shortcuts.
 - Activities keeps App identity in the light-gray icon tile and lets the item/app/website Category own its color: Focused uses deep blue and Distracting uses red.
+- The packaged native API now exposes `categoryName`, `categoryRole`, and `categoryColor` on every activity segment, so the web companion receives the same category decisions as the macOS surface.
