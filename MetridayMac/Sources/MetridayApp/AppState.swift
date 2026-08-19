@@ -1912,6 +1912,7 @@ final class AppState: ObservableObject {
 
     private func planAPIResponse(for date: Date) -> [String: Any] {
         let normalized = Calendar.current.startOfDay(for: date)
+        markdownStore.ensurePlanFile(for: normalized)
         let raw = markdownStore.markdown(for: normalized)
             ?? MarkdownCodec.serialize(MarkdownCodec.blank(for: normalized))
         let taskIDs = Dictionary(

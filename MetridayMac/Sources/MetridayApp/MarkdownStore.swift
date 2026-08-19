@@ -86,6 +86,26 @@ final class MarkdownStore: ObservableObject {
         FileManager.default.fileExists(atPath: Self.fileURL(for: date, rootDirectory: rootDirectory).path)
     }
 
+    /// Ensures a selected date has its own blank Markdown document without
+    /// changing the currently loaded editor document.
+    @discardableResult
+    func ensurePlanFile(for date: Date) -> Bool {
+        let normalizedDate = Calendar.current.startOfDay(for: date)
+        let destination = Self.fileURL(for: normalizedDate, rootDirectory: rootDirectory)
+        guard !FileManager.default.fileExists(atPath: destination.path) else { return false }
+        do {
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let blank = MarkdownCodec.serialize(MarkdownCodec.blank(for: normalizedDate))
+            try blank.write(to: destination, atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     func markdown(for date: Date) -> String? {
         try? String(
             contentsOf: Self.fileURL(for: date, rootDirectory: rootDirectory),
