@@ -505,31 +505,49 @@ struct GlobalTopHeader: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
 
-                HStack(spacing: 12) {
-                    Button {
-                        appState.section = .plan
-                    } label: {
-                        Image(systemName: "calendar")
-                    }
-                    .buttonStyle(.plain)
-                    .help("Open Plan")
+                ZStack(alignment: .leading) {
+                    Color.clear
+                        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .onTapGesture { appState.goToToday() }
+                        .accessibilityHidden(true)
 
-                    Button("Today") { appState.goToToday() }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("header.today")
+                    HStack(spacing: 12) {
+                        Button {
+                            appState.section = .plan
+                        } label: {
+                            Image(systemName: "calendar")
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open Plan")
 
-                    Button { appState.moveSelectedDate(byDays: -1) } label: {
-                        Image(systemName: "chevron.left")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("header.previous-day")
+                        Button("Today") { appState.goToToday() }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("header.today")
 
-                    Button { appState.moveSelectedDate(byDays: 1) } label: {
-                        Image(systemName: "chevron.right")
+                        Button { appState.moveSelectedDate(byDays: -1) } label: {
+                            Image(systemName: "chevron.left")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("header.previous-day")
+
+                        Button { appState.moveSelectedDate(byDays: 1) } label: {
+                            Image(systemName: "chevron.right")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("header.next-day")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("header.next-day")
+                    .padding(.horizontal, 10)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 34)
+                .background(MetridayTheme.canvas)
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(MetridayTheme.line.opacity(0.7), lineWidth: 1)
+                )
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Date navigation; click empty space for Today")
                 .foregroundStyle(MetridayTheme.secondary)
             }
             .frame(width: 250, alignment: .leading)
