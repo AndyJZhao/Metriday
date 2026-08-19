@@ -107,9 +107,14 @@ struct ActivityRow: View {
                 .foregroundStyle(categoryColor)
                 .frame(width: 40, alignment: .leading)
             if let symbol {
-                Image(systemName: symbol).font(.system(size: 15)).frame(width: 18)
+                Image(systemName: symbol)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(MetridayTheme.graphite)
+                    .frame(width: 23, height: 23)
+                    .background(MetridayTheme.sidebar)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             } else {
-                Color.clear.frame(width: 18)
+                Color.clear.frame(width: 23, height: 23)
             }
             Text(title).font(.system(size: 12, weight: .medium))
             Spacer()

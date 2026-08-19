@@ -2468,6 +2468,22 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
  const trackRef = useRef(null);
  const [selection, setSelection] = useState(null);
  const [message, setMessage] = useState("");
+ const activityClickTimer = useRef(null);
+ useEffect(() => () => { if (activityClickTimer.current) window.clearTimeout(activityClickTimer.current); }, []);
+ const openActivityDetails = (activity) => {
+   if (activityClickTimer.current) window.clearTimeout(activityClickTimer.current);
+   activityClickTimer.current = window.setTimeout(() => {
+     onSelect?.(activity);
+     activityClickTimer.current = null;
+   }, 220);
+ };
+ const createActivityTimeEntry = (event, activity) => {
+   event.preventDefault();
+   event.stopPropagation();
+   if (activityClickTimer.current) window.clearTimeout(activityClickTimer.current);
+   activityClickTimer.current = null;
+   onCreateTimeEntry?.(activity);
+ };
   const controlledOrientation = typeof onToggleOrientation === "function";
   const [localOrientation, setLocalOrientation] = useState(() => api.activityPreferences?.timeline_orientation === "vertical" ? "vertical" : "horizontal");
   const orientation = controlledOrientation ? requestedOrientation : localOrientation;
@@ -2547,11 +2563,13 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
     }
   };
   const rangeStyle = (startSecond, endSecond, color) => vertical ? { top: `${(startSecond / totalSeconds) * 100}%`, height: `${Math.max((endSecond - startSecond) / totalSeconds * 100, 0.4)}%`, borderColor: color } : { left: `${(startSecond / totalSeconds) * 100}%`, width: `${Math.max((endSecond - startSecond) / totalSeconds * 100, 0.4)}%`, borderColor: color };
-  return <section className="web-activity-timeline" aria-label="Activities timeline"><div className="web-activity-timeline-heading"><div><h2>Timeline</h2><p>Click for details · double-click to create a time entry · drag across a gap to select time.</p><div className="web-activity-timeline-legend" aria-label="Timeline color legend"><span><i className="focused" />Focused</span><span><i className="distracting" />Distracting</span><span><i className="other" />Other</span><span><i className="idle" />Idle</span></div></div><div className="web-activity-timeline-actions"><button type="button" className="timeline-orientation-toggle" onClick={toggleOrientation} aria-label={"Switch to " + (vertical ? "horizontal" : "vertical") + " timeline"} title={"Switch to " + (vertical ? "horizontal" : "vertical") + " timeline"}><ArrowsClockwise size={14} />{vertical ? "Vertical" : "Horizontal"}</button>{selection ? <><span>{formatRange(selection.start, selection.end)}</span><button type="button" onClick={recordSelection} disabled={!api.connected}>Record time</button><button type="button" className="timeline-clear" onClick={() => setSelection(null)}>Clear</button></> : <span>00:00–24:00</span>}{message ? <small role="status">{message}</small> : null}</div></div><div className={"web-activity-timeline-track " + (vertical ? "vertical" : "horizontal")} ref={trackRef} onPointerDown={startSelection}>{timelineHours.map((hour) => <span className="web-activity-timeline-label" key={hour} style={vertical ? { top: `${(hour / 24) * 100}%` } : { left: `${(hour / 24) * 100}%` }}>{String(hour).padStart(2, "0")}:00</span>)}<div className="web-activity-timeline-grid" aria-hidden="true">{timelineHours.map((hour) => <i key={hour} style={vertical ? { top: `${(hour / 24) * 100}%` } : { left: `${(hour / 24) * 100}%` }} />)}</div>{activities.map((activity) => { const startSecond = Math.max(0, Number(activity.startSecond || 0)); const endSecond = Math.min(totalSeconds, Number(activity.endSecond || 0)); if (endSecond <= startSecond) return null; const category = activityCategory(activity); const categoryStyle = activityCategoryStyle(category); const startPercent = (startSecond / totalSeconds) * 100; const durationPercent = Math.max((endSecond - startSecond) / totalSeconds * 100, 0.18); const blockStyle = vertical ? { top: `${startPercent}%`, height: `${durationPercent}%`, borderColor: categoryStyle.color } : { left: `${startPercent}%`, width: `${durationPercent}%`, borderColor: categoryStyle.color }; return <button type="button" key={activity.id} className={"web-activity-timeline-block " + category.key} style={blockStyle} title={activityLabel(activity) + " · " + category.label + " · " + preciseClock(startSecond) + "–" + preciseClock(endSecond)} onPointerDown={(event) => event.stopPropagation()} onClick={() => onSelect(activity)} onDoubleClick={(event) => { event.preventDefault(); event.stopPropagation(); onCreateTimeEntry?.(activity); }}><span style={{ color: categoryStyle.color }} /></button>; })}{timeEntries.map(({ entry, range }) => <button type="button" key={"entry-" + entryID(entry)} className="web-activity-timeline-overlay time-entry" style={rangeStyle(range.startSecond, range.endSecond, "#d77b22")} aria-label={"Edit time entry " + (entry.title || "Untitled") + " " + entryRange(entry)} title={"Edit time entry · " + (entry.title || "Untitled") + " · " + entryRange(entry)} onPointerDown={(event) => event.stopPropagation()} onClick={() => onEditTimeEntry ? onEditTimeEntry(entry) : setMessage("Time entry · " + (entry.title || "Untitled"))}><span /></button>)}{calendarEvents.map(({ event, startSecond, endSecond }) => <button type="button" key={"calendar-" + (event.id || event.title)} className="web-activity-timeline-overlay calendar-event" style={rangeStyle(startSecond, endSecond, "#4e5ff2")} aria-label={"Record calendar event " + (event.title || "Untitled event")} title={"Calendar · " + (event.title || "Untitled event")} onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()} onClick={() => recordCalendarEvent(event)}><span /></button>)}{selection ? <div className="web-activity-timeline-selection" style={vertical ? { top: `${(selection.start / (24 * 60)) * 100}%`, height: `${((selection.end - selection.start) / (24 * 60)) * 100}%` } : { left: `${(selection.start / (24 * 60)) * 100}%`, width: `${((selection.end - selection.start) / (24 * 60)) * 100}%` }} aria-label={"Selected " + formatRange(selection.start, selection.end)} /> : null}</div></section>;
+  return <section className="web-activity-timeline" aria-label="Activities timeline"><div className="web-activity-timeline-heading"><div><h2>Timeline</h2><p>Click for details · double-click to create a time entry · drag across a gap to select time.</p><div className="web-activity-timeline-legend" aria-label="Timeline color legend"><span><i className="focused" />Focused</span><span><i className="distracting" />Distracting</span><span><i className="other" />Other</span><span><i className="idle" />Idle</span></div></div><div className="web-activity-timeline-actions"><button type="button" className="timeline-orientation-toggle" onClick={toggleOrientation} aria-label={"Switch to " + (vertical ? "horizontal" : "vertical") + " timeline"} title={"Switch to " + (vertical ? "horizontal" : "vertical") + " timeline"}><ArrowsClockwise size={14} />{vertical ? "Vertical" : "Horizontal"}</button>{selection ? <><span>{formatRange(selection.start, selection.end)}</span><button type="button" onClick={recordSelection} disabled={!api.connected}>Record time</button><button type="button" className="timeline-clear" onClick={() => setSelection(null)}>Clear</button></> : <span>00:00–24:00</span>}{message ? <small role="status">{message}</small> : null}</div></div><div className={"web-activity-timeline-track " + (vertical ? "vertical" : "horizontal")} ref={trackRef} onPointerDown={startSelection}>{timelineHours.map((hour) => <span className="web-activity-timeline-label" key={hour} style={vertical ? { top: `${(hour / 24) * 100}%` } : { left: `${(hour / 24) * 100}%` }}>{String(hour).padStart(2, "0")}:00</span>)}<div className="web-activity-timeline-grid" aria-hidden="true">{timelineHours.map((hour) => <i key={hour} style={vertical ? { top: `${(hour / 24) * 100}%` } : { left: `${(hour / 24) * 100}%` }} />)}</div>{activities.map((activity) => { const startSecond = Math.max(0, Number(activity.startSecond || 0)); const endSecond = Math.min(totalSeconds, Number(activity.endSecond || 0)); if (endSecond <= startSecond) return null; const category = activityCategory(activity); const categoryStyle = activityCategoryStyle(category); const startPercent = (startSecond / totalSeconds) * 100; const durationPercent = Math.max((endSecond - startSecond) / totalSeconds * 100, 0.18); const blockStyle = vertical ? { top: `${startPercent}%`, height: `${durationPercent}%`, borderColor: categoryStyle.color } : { left: `${startPercent}%`, width: `${durationPercent}%`, borderColor: categoryStyle.color }; return <button type="button" key={activity.id} className={"web-activity-timeline-block " + category.key} style={blockStyle} title={activityLabel(activity) + " · " + category.label + " · " + preciseClock(startSecond) + "–" + preciseClock(endSecond)} onPointerDown={(event) => event.stopPropagation()} onClick={() => openActivityDetails(activity)} onDoubleClick={(event) => createActivityTimeEntry(event, activity)}><span style={{ color: categoryStyle.color }} /></button>; })}{timeEntries.map(({ entry, range }) => <button type="button" key={"entry-" + entryID(entry)} className="web-activity-timeline-overlay time-entry" style={rangeStyle(range.startSecond, range.endSecond, "#d77b22")} aria-label={"Edit time entry " + (entry.title || "Untitled") + " " + entryRange(entry)} title={"Edit time entry · " + (entry.title || "Untitled") + " · " + entryRange(entry)} onPointerDown={(event) => event.stopPropagation()} onClick={() => onEditTimeEntry ? onEditTimeEntry(entry) : setMessage("Time entry · " + (entry.title || "Untitled"))}><span /></button>)}{calendarEvents.map(({ event, startSecond, endSecond }) => <button type="button" key={"calendar-" + (event.id || event.title)} className="web-activity-timeline-overlay calendar-event" style={rangeStyle(startSecond, endSecond, "#4e5ff2")} aria-label={"Record calendar event " + (event.title || "Untitled event")} title={"Calendar · " + (event.title || "Untitled event")} onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()} onClick={() => recordCalendarEvent(event)}><span /></button>)}{selection ? <div className="web-activity-timeline-selection" style={vertical ? { top: `${(selection.start / (24 * 60)) * 100}%`, height: `${((selection.end - selection.start) / (24 * 60)) * 100}%` } : { left: `${(selection.start / (24 * 60)) * 100}%`, width: `${((selection.end - selection.start) / (24 * 60)) * 100}%` }} aria-label={"Selected " + formatRange(selection.start, selection.end)} /> : null}</div></section>;
 }
 
 function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode = "none", projects = [], displayPreferences = null, dateKey = "", api = null, onCreateTimeEntry }) {
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
+  const rowClickTimer = useRef(null);
+  useEffect(() => () => { if (rowClickTimer.current) window.clearTimeout(rowClickTimer.current); }, []);
   const rows = [...activities].sort((left, right) => String(left.date || dateKey).localeCompare(String(right.date || dateKey)) || Number(left.startSecond || 0) - Number(right.startSecond || 0));
   const activityRow = (activity) => {
     const category = activityCategory(activity);
@@ -2589,17 +2607,25 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     };
     const openDetails = (event) => {
       if (event.target.closest(".activity-row-action")) return;
-      onSelect(activity);
+      if (rowClickTimer.current) window.clearTimeout(rowClickTimer.current);
+      rowClickTimer.current = window.setTimeout(() => {
+        onSelect(activity);
+        rowClickTimer.current = null;
+      }, 220);
     };
     const openTimeEntry = (event) => {
       if (event.target.closest(".activity-row-action")) return;
       event.preventDefault();
+      if (rowClickTimer.current) window.clearTimeout(rowClickTimer.current);
+      rowClickTimer.current = null;
       onCreateTimeEntry?.(activity);
     };
     const handleKeyDown = (event) => {
       if (event.target.closest(".activity-row-action")) return;
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
+        if (rowClickTimer.current) window.clearTimeout(rowClickTimer.current);
+        rowClickTimer.current = null;
         onSelect(activity);
       }
     };
