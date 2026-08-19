@@ -367,7 +367,7 @@ function categoryRoleColor(role) {
 
 function activityCategoryStyle(category) {
   const palette = {
-    blue: { color: "#4e5ff2", background: "#eef1ff" },
+    blue: { color: "#384ae0", background: "#eef0ff" },
     red: { color: "#d24b4b", background: "#fff0f0" },
     green: { color: "#399a55", background: "#f2faf4" },
     orange: { color: "#d77b22", background: "#fff6ea" },
