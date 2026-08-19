@@ -1208,6 +1208,7 @@ struct ActivitiesView: View {
                                 }
                             }
                             .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                             .help("Edit time entry")
                             .accessibilityIdentifier("time-entry.\(entry.id.uuidString)")
