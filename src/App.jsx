@@ -6,11 +6,32 @@ import {
   LockSimple, NotePencil, Pause, Play, Plus, ShieldCheck, Sparkle, TerminalWindow,
   Timer, Trash, TrendUp, UsersThree, Waveform, X, SlidersHorizontal,
 } from "@phosphor-icons/react";
-import { SiArxiv, SiVscodium, SiYoutube } from "@icons-pack/react-simple-icons";
+import {
+  SiArc, SiArxiv, SiBilibili, SiBrave, SiChatbot, SiChromewebstore, SiDiscord,
+  SiFigma, SiFirefox, SiGmail, SiGooglechrome, SiIterm2, SiLinear, SiNotion,
+  SiSafari, SiSteam, SiVscodium, SiWechat, SiXcode, SiYoutube,
+} from "@icons-pack/react-simple-icons";
 
 const VSCodeLogo = ({ weight: _weight, ...props }) => <SiVscodium {...props} color="#1683d8" />;
 const ArxivLogo = ({ weight: _weight, ...props }) => <SiArxiv {...props} color="#b31b1b" />;
 const YouTubeLogo = ({ weight: _weight, ...props }) => <SiYoutube {...props} color="#ff0033" />;
+const ChatGPTLogo = ({ weight: _weight, ...props }) => <SiChatbot {...props} color="#10a37f" />;
+const ChromeLogo = ({ weight: _weight, ...props }) => <SiGooglechrome {...props} color="#4285f4" />;
+const SafariLogo = ({ weight: _weight, ...props }) => <SiSafari {...props} color="#0a84ff" />;
+const BraveLogo = ({ weight: _weight, ...props }) => <SiBrave {...props} color="#fb542b" />;
+const FirefoxLogo = ({ weight: _weight, ...props }) => <SiFirefox {...props} color="#ff7139" />;
+const ArcLogo = ({ weight: _weight, ...props }) => <SiArc {...props} color="#6d5dfc" />;
+const LinearLogo = ({ weight: _weight, ...props }) => <SiLinear {...props} color="#5e6ad2" />;
+const WeChatLogo = ({ weight: _weight, ...props }) => <SiWechat {...props} color="#07c160" />;
+const BilibiliLogo = ({ weight: _weight, ...props }) => <SiBilibili {...props} color="#00aeec" />;
+const SteamLogo = ({ weight: _weight, ...props }) => <SiSteam {...props} color="#1b2838" />;
+const NotionLogo = ({ weight: _weight, ...props }) => <SiNotion {...props} color="#111111" />;
+const FigmaLogo = ({ weight: _weight, ...props }) => <SiFigma {...props} color="#f24e1e" />;
+const XcodeLogo = ({ weight: _weight, ...props }) => <SiXcode {...props} color="#147efb" />;
+const ItermLogo = ({ weight: _weight, ...props }) => <SiIterm2 {...props} color="#2d2d2d" />;
+const GmailLogo = ({ weight: _weight, ...props }) => <SiGmail {...props} color="#ea4335" />;
+const DiscordLogo = ({ weight: _weight, ...props }) => <SiDiscord {...props} color="#5865f2" />;
+const ChromeWebStoreLogo = ({ weight: _weight, ...props }) => <SiChromewebstore {...props} color="#4285f4" />;
 
 const DAY_START = 8 * 60;
 const DAY_END = 20 * 60;
@@ -590,11 +611,30 @@ function activityLabel(activity) {
 function activityIcon(activity) {
   const bundle = String(activity.bundleIdentifier || "").toLowerCase();
   const app = String(activity.appName || "").toLowerCase();
-  if (bundle.includes("vscode") || app.includes("code")) return VSCodeLogo;
-  if (bundle.includes("terminal") || app.includes("terminal")) return TerminalWindow;
-  if (bundle.includes("safari") || bundle.includes("chrome") || bundle.includes("firefox") || app.includes("browser")) return GlobeSimple;
+  const resource = String(activity.resource || "").toLowerCase();
+  const haystack = `${app} ${bundle} ${resource}`;
+  if (bundle.includes("vscode") || app.includes("visual studio code") || app === "code" || app.includes("vscodium")) return VSCodeLogo;
+  if (bundle.includes("xcode") || app === "xcode") return XcodeLogo;
+  if (bundle.includes("iterm") || app.includes("iterm")) return ItermLogo;
+  if (bundle.includes("terminal") || app === "terminal") return TerminalWindow;
+  if (bundle.includes("safari") || app.includes("safari")) return SafariLogo;
+  if (bundle.includes("chrome") || app.includes("google chrome") || app === "chrome") return ChromeLogo;
+  if (bundle.includes("brave") || app.includes("brave")) return BraveLogo;
+  if (bundle.includes("firefox") || app.includes("firefox")) return FirefoxLogo;
+  if (bundle.includes("arc") || app === "arc") return ArcLogo;
+  if (haystack.includes("linear.app") || app === "linear") return LinearLogo;
+  if (app.includes("wechat") || app.includes("weixin")) return WeChatLogo;
+  if (app.includes("bilibili") || resource.includes("bilibili.com")) return BilibiliLogo;
+  if (app.includes("steam")) return SteamLogo;
+  if (app.includes("notion")) return NotionLogo;
+  if (app.includes("figma")) return FigmaLogo;
+  if (app.includes("chatgpt") || app.includes("openai")) return ChatGPTLogo;
+  if (app.includes("gmail") || resource.includes("mail.google.com")) return GmailLogo;
+  if (app.includes("discord")) return DiscordLogo;
+  if (app.includes("chrome web store")) return ChromeWebStoreLogo;
   if (app.includes("youtube")) return YouTubeLogo;
   if (app.includes("arxiv")) return ArxivLogo;
+  if (resource.startsWith("http://") || resource.startsWith("https://") || app.includes("browser")) return Browsers;
   return Browsers;
 }
 

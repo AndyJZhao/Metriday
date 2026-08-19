@@ -111,6 +111,7 @@ struct TodayView: View {
                             title: segment.displayTitle,
                             range: TimeFormat.range(start: segment.startMinute, end: segment.endMinute),
                             symbol: symbol(for: segment),
+                            bundleIdentifier: segment.bundleIdentifier,
                             relevance: segment.relevance,
                             categoryColor: categoryColor(for: category(for: segment))
                         )

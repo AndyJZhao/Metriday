@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum TimelineMetrics {
@@ -97,6 +98,7 @@ struct ActivityRow: View {
     let title: String
     let range: String
     let symbol: String?
+    let bundleIdentifier: String?
     let relevance: ActivityRelevance
     let categoryColor: Color
 
@@ -106,16 +108,7 @@ struct ActivityRow: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(categoryColor)
                 .frame(width: 40, alignment: .leading)
-            if let symbol {
-                Image(systemName: symbol)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(MetridayTheme.graphite)
-                    .frame(width: 23, height: 23)
-                    .background(MetridayTheme.sidebar)
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-            } else {
-                Color.clear.frame(width: 23, height: 23)
-            }
+            AppIdentityIcon(symbol: symbol, bundleIdentifier: bundleIdentifier)
             Text(title).font(.system(size: 12, weight: .medium))
             Spacer()
             Text(range).font(.system(size: 10)).foregroundStyle(MetridayTheme.secondary)
@@ -123,5 +116,39 @@ struct ActivityRow: View {
         .padding(.horizontal, 10)
         .frame(height: 30)
         .background(categoryColor.opacity(relevance == .distracted ? 0.055 : 0.035))
+    }
+}
+
+private struct AppIdentityIcon: View {
+    let symbol: String?
+    let bundleIdentifier: String?
+
+    private var appImage: NSImage? {
+        guard let bundleIdentifier,
+              !bundleIdentifier.isEmpty,
+              bundleIdentifier != "com.metriday.idle",
+              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+        else { return nil }
+        return NSWorkspace.shared.icon(forFile: url.path)
+    }
+
+    var body: some View {
+        Group {
+            if let appImage {
+                Image(nsImage: appImage)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(3)
+            } else if let symbol {
+                Image(systemName: symbol)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(MetridayTheme.graphite)
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: 23, height: 23)
+        .background(MetridayTheme.sidebar)
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
     }
 }
