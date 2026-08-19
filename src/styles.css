@@ -188,6 +188,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .file-name, .editor-actions { display: flex; align-items: center; gap: 8px; color: #5f6470; font-size: 13px; }
 .editor-actions > span { color: #969aa4; font-size: 12px; }
 .editor-body { padding: 23px 16px 34px 9px; overflow: auto; font-family: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace; scrollbar-width: thin; }
+.markdown-source-wrap { position: relative; min-height: 0; padding: 0; overflow: hidden; }
+.markdown-source-editor { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; padding: 18px 18px 34px 92px; border: 0; outline: 0; resize: none; overflow: auto; background: #fff; color: #282a31; font: 14px/46px "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace; white-space: pre; tab-size: 2; scrollbar-width: thin; }
+.markdown-source-editor:focus { background: #fdfdff; }
+.markdown-source-overlays { position: absolute; top: 18px; right: 0; left: 0; min-height: 100%; pointer-events: none; font-family: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace; }
+.markdown-source-line-number { display: block; width: 57px; height: 46px; color: #a0a4ae; font-size: 12px; line-height: 46px; text-align: right; user-select: none; }
+.markdown-source-task-actions { position: absolute; left: 67px; display: flex; align-items: center; gap: 2px; height: 46px; pointer-events: auto; }
+.markdown-source-task-actions .drag-handle { opacity: 1; }
 .editor-line { display: flex; align-items: center; min-height: 46px; padding: 0 12px 0 0; border-radius: 7px; color: #282a31; font-size: 14px; white-space: nowrap; }
 .line-number { flex: 0 0 45px; margin-right: 20px; color: #a0a4ae; font-size: 12px; text-align: right; user-select: none; }
 .heading-line { min-height: 52px; font-size: 16px; }

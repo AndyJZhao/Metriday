@@ -764,6 +764,33 @@ function markdownWithTasks(raw, tasks) {
   return updated.join("\n");
 }
 
+function tasksFromMarkdown(raw, previousTasks = []) {
+  const pattern = /^\s*(?:[-*+]|[0-9]+[.)])\s+\[([ xX])\]\s+(?:(\d{1,2}:\d{2}\s*[–—-]\s*\d{1,2}:\d{2})\s+)?(.+)$/;
+  const lines = String(raw || "").split("\n");
+  let taskIndex = 0;
+  return lines.flatMap((line) => {
+    const match = line.match(pattern);
+    if (!match) return [];
+    const range = match[2]?.match(/^(\d{1,2}):(\d{2})\s*[–—-]\s*(\d{1,2}):(\d{2})$/);
+    const start = range ? Number(range[1]) * 60 + Number(range[2]) : null;
+    const end = range ? Number(range[3]) * 60 + Number(range[4]) : null;
+    const body = match[3].trim();
+    const tags = body.split(/\s+/).filter((item) => item.startsWith("#")).map((item) => item.slice(1)).filter(Boolean);
+    const title = body.split(/\s+/).filter((item) => !item.startsWith("#")).join(" ") || "Untitled task";
+    const previous = previousTasks[taskIndex];
+    taskIndex += 1;
+    return [{
+      id: previous?.id || "markdown-task-" + Date.now() + "-" + taskIndex,
+      title,
+      tags,
+      start: Number.isFinite(start) && Number.isFinite(end) && end > start ? start : null,
+      end: Number.isFinite(start) && Number.isFinite(end) && end > start ? end : null,
+      completed: match[1].toLowerCase() === "x",
+      tone: title.toLowerCase().includes("genezip") ? "accent" : "soft",
+    }];
+  });
+}
+
 function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) {
   const [draft, setDraft] = useState(apiBase);
   const [preferences, setPreferences] = useState({
@@ -1148,30 +1175,22 @@ function MarkdownTaskLine({ task, line, active, onDragStart, onPointerDragStart,
   );
 }
 
-function MarkdownEditor({ tasks, setTasks, lastUpdatedId, planDate, onTaskDragStart, onPointerDragStart, onSelectTask, onSchedule, onComplete, onTitleCommit, addTask }) {
-  const [newTitle, setNewTitle] = useState("");
-  const newTaskInputRef = useRef(null);
-  const updateTask = (id, patch) => setTasks((items) => items.map((task) => task.id === id ? { ...task, ...patch } : task));
-  const copyTaskList = () => {
-    const markdown = tasks.map((task) => `- [${task.completed ? "x" : " "}] ${task.title}${task.start != null ? ` ${formatRange(task.start, task.end)}` : ""}`).join("\n");
-    navigator.clipboard?.writeText(markdown).catch(() => {});
-  };
+function MarkdownEditor({ tasks, markdown, planDate, onMarkdownChange, onMarkdownCommit, onTaskDragStart, onPointerDragStart, onSelectTask, onComplete }) {
+  const [scrollTop, setScrollTop] = useState(0);
+  const lines = String(markdown || "").split("\n");
+  const taskLineIndices = lines.map((line, index) => ({ line, index })).filter(({ line }) => /^\s*(?:[-*+]|[0-9]+[.)])\s+\[[ xX]\]\s+/.test(line));
+  const copyMarkdown = () => navigator.clipboard?.writeText(String(markdown || "")).catch(() => {});
   return (
     <section className="markdown-editor" aria-label="Markdown daily plan">
-      <div className="editor-toolbar"><div className="file-name"><FileText size={18} /> {planDate}.md <CaretRight size={13} /></div><div className="editor-actions"><span>Markdown</span><ActionMenu label="Document actions" items={[{ label: "Focus new task", onSelect: () => newTaskInputRef.current?.focus() }, { label: "Copy task list", onSelect: copyTaskList }]}><DotsThree size={22} /></ActionMenu></div></div>
-      <div className="editor-body">
-        <div className="editor-line heading-line"><span className="line-number">1</span><span className="heading-mark">#</span><strong>{planDateLabel(planDate)}</strong></div>
-        <div className="editor-line quote-line"><span className="line-number">2</span><span className="heading-mark">&gt;</span><em>Plan deep work. Ship calm results.</em></div>
-        <div className="editor-line empty-line"><span className="line-number">3</span></div>
-        <div className="editor-line section-line"><span className="line-number">4</span><span className="heading-mark">##</span><strong>Focus</strong></div>
-        {tasks.map((task, index) => <MarkdownTaskLine key={task.id} task={task} line={5 + index} active={lastUpdatedId === task.id} onDragStart={onTaskDragStart} onPointerDragStart={onPointerDragStart} onSelectTask={onSelectTask} onComplete={onComplete} onTitleChange={(id, title) => updateTask(id, { title })} onTitleCommit={onTitleCommit} onSchedule={onSchedule} />)}
-        <div className="editor-line add-task-line"><span className="line-number">{5 + tasks.length}</span><span className="markdown-token">- [ ]</span><input ref={newTaskInputRef} value={newTitle} onChange={(event) => setNewTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && newTitle.trim()) { addTask(newTitle.trim()); setNewTitle(""); } }} placeholder="Add a Markdown task…" aria-label="Add a Markdown task" /></div>
-        <div className="editor-line empty-line"><span className="line-number">{6 + tasks.length}</span></div>
-        <div className="editor-line section-line"><span className="line-number">{7 + tasks.length}</span><span className="heading-mark">##</span><strong>Notes</strong></div>
-        <div className="editor-line note-line"><span className="line-number">{8 + tasks.length}</span><span>- Reviewer 2 asks about generalization.</span></div>
-        <div className="editor-line note-line"><span className="line-number">{9 + tasks.length}</span><span>- Compare GeneZip vs. strong baselines.</span></div>
+      <div className="editor-toolbar"><div className="file-name"><FileText size={18} /> {planDate}.md <span>{markdown ? "Markdown document" : "Blank Markdown document"}</span></div><div className="editor-actions"><span>Markdown</span><ActionMenu label="Document actions" items={[{ label: "Copy Markdown", onSelect: copyMarkdown }]}><DotsThree size={22} /></ActionMenu></div></div>
+      <div className="editor-body markdown-source-wrap">
+        <textarea className="markdown-source-editor" aria-label="Markdown editor" value={markdown || ""} spellCheck={false} onChange={(event) => onMarkdownChange(event.target.value)} onBlur={() => onMarkdownCommit(markdown || "")} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} />
+        <div className="markdown-source-overlays" style={{ transform: "translateY(" + (-scrollTop) + "px)" }} aria-hidden="false">
+          {lines.map((_, index) => <span className="markdown-source-line-number" key={index}>{index + 1}</span>)}
+          {taskLineIndices.map(({ index }, taskIndex) => { const task = tasks[taskIndex]; if (!task) return null; return <div className="markdown-source-task-actions" style={{ top: (index * 46) + 18 }} key={task.id}><button type="button" className="drag-handle" draggable onDragStart={(event) => onTaskDragStart(event, task.id)} onPointerDown={(event) => onPointerDragStart(event, task.id)} onClick={() => onSelectTask(task.id)} aria-label={`Drag ${task.title} to calendar`}><DotsSixVertical size={16} /></button><button type="button" className="markdown-check" onClick={() => onComplete(task.id)} aria-label={`Mark ${task.title} ${task.completed ? "incomplete" : "complete"}`}>{task.completed ? <Check size={13} weight="bold" /> : null}</button></div>; })}
+        </div>
       </div>
-      <footer className="editor-footer"><span>{tasks.length + 7} lines</span><span>UTF-8</span><span>Local file</span><CheckCircle size={18} weight="fill" /></footer>
+      <footer className="editor-footer"><span>{lines.length} lines</span><span>UTF-8</span><span>Local file</span><CheckCircle size={18} weight="fill" /></footer>
     </section>
   );
 }
@@ -1224,14 +1243,16 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [lastUpdatedId, setLastUpdatedId] = useState(null);
   const [toast, setToast] = useState("");
+  const [markdown, setMarkdown] = useState(() => markdownWithTasks("", tasks));
   const [neighborPlans, setNeighborPlans] = useState({});
   const [pendingSchedule, setPendingSchedule] = useState(null);
   const planDate = dateKey;
   useEffect(() => {
     if (!api.connected || !api.plan?.tasks) return;
+    setMarkdown(String(api.plan.markdown || ""));
     setTasks(api.plan.tasks.map(planTaskFromAPI));
     setSelectedTaskId(null);
-  }, [api.connected, api.plan?.date, setTasks]);
+  }, [api.connected, api.plan?.date, api.plan?.markdown, setTasks]);
   useEffect(() => {
     if (!api.connected || typeof api.fetchPlan !== "function") {
       setNeighborPlans({});
@@ -1252,10 +1273,26 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
     return () => { cancelled = true; };
   }, [api.connected, api.fetchPlan, dateKey]);
   const persistTasks = (nextTasks, message) => {
+    const nextMarkdown = markdownWithTasks(markdown || api.plan?.markdown || "", nextTasks);
+    setMarkdown(nextMarkdown);
     setTasks(nextTasks);
     setToast(message);
     if (!api.connected || !api.plan?.markdown || api.plan.date !== dateKey) return;
-    api.savePlan(markdownWithTasks(api.plan.markdown, nextTasks))
+    api.savePlan(nextMarkdown)
+      .then(() => setToast("Markdown synced to Metriday"))
+      .catch(() => setToast("Local change kept; sync failed"));
+  };
+  const updateMarkdown = (nextMarkdown) => {
+    setMarkdown(nextMarkdown);
+    setTasks(tasksFromMarkdown(nextMarkdown, tasks));
+  };
+  const commitMarkdown = (nextMarkdown) => {
+    const parsedTasks = tasksFromMarkdown(nextMarkdown, tasks);
+    setMarkdown(nextMarkdown);
+    setTasks(parsedTasks);
+    setToast("Markdown saved");
+    if (!api.connected || api.plan?.date !== dateKey) return;
+    api.savePlan(nextMarkdown)
       .then(() => setToast("Markdown synced to Metriday"))
       .catch(() => setToast("Local change kept; sync failed"));
   };
@@ -1288,7 +1325,7 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
   const addTask = (title) => { const nextTasks = [...tasks, { id: "task-" + Date.now(), title, tags: [], start: null, end: null, completed: false, tone: "soft" }]; persistTasks(nextTasks, "Markdown task added"); };
   return (
     <main className="page plan-page"><header className="plan-header"><h1>Plan <span>·</span> {planDateLabel(planDate)}</h1><div className="date-controls"><DatePickerControl dateKey={planDate} onChange={setDateKey} label="Choose Plan date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div></header>
-      <div className="plan-workspace"><MarkdownEditor tasks={tasks} setTasks={setTasks} lastUpdatedId={lastUpdatedId} planDate={planDate} onTaskDragStart={taskDragStart} onPointerDragStart={pointerMoveStart} onSelectTask={setSelectedTaskId} onSchedule={scheduleTask} onComplete={completeTask} onTitleCommit={titleCommit} addTask={addTask} /><CalendarPanel tasks={tasks} neighborPlans={neighborPlans} selectedTaskId={selectedTaskId} setSelectedTaskId={setSelectedTaskId} onDropTask={dropTask} onMoveStart={pointerMoveStart} onComplete={completeTask} onUnschedule={unscheduleTask} onResizeStart={resizeStart} dateKey={planDate} onSelectDate={setDateKey} connected={api.connected} /></div>
+      <div className="plan-workspace"><MarkdownEditor tasks={tasks} markdown={markdown} planDate={planDate} onMarkdownChange={updateMarkdown} onMarkdownCommit={commitMarkdown} onTaskDragStart={taskDragStart} onPointerDragStart={pointerMoveStart} onSelectTask={setSelectedTaskId} onComplete={completeTask} /><CalendarPanel tasks={tasks} neighborPlans={neighborPlans} selectedTaskId={selectedTaskId} setSelectedTaskId={setSelectedTaskId} onDropTask={dropTask} onMoveStart={pointerMoveStart} onComplete={completeTask} onUnschedule={unscheduleTask} onResizeStart={resizeStart} dateKey={planDate} onSelectDate={setDateKey} connected={api.connected} /></div>
       {pendingSchedule ? <div className="schedule-choice-backdrop" role="presentation" onClick={() => setPendingSchedule(null)}><section className="schedule-choice-dialog" role="dialog" aria-modal="true" aria-labelledby="schedule-choice-title" onClick={(event) => event.stopPropagation()}><div><span>Schedule task</span><h2 id="schedule-choice-title">{pendingSchedule.title}</h2><p>{formatRange(pendingSchedule.start, pendingSchedule.end)} · Choose how this drop should be recorded.</p></div><div className="schedule-choice-actions"><button type="button" className="secondary-button" onClick={() => confirmSchedule("event")} disabled>Event <small>Later</small></button><button type="button" className="primary-button" onClick={() => confirmSchedule("time-block")}>Time Block</button></div><button type="button" className="schedule-choice-cancel" onClick={() => setPendingSchedule(null)}>Cancel</button></section></div> : null}
       {toast ? <div className="toast" role="status"><CheckCircle size={20} weight="fill" /><span>{toast}</span><IconButton label="Dismiss" onClick={() => setToast("")}><X size={15} /></IconButton></div> : null}
     </main>

@@ -53,6 +53,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 47. Plan month navigation — verified all 42 month cells remain actionable, Next / Previous month no longer snap back to the selected date, December 31 selection switches the editor to `2026-12-31.md`, and a missing day renders a blank editable task list.
 48. Plan connected empty state — verified a connected missing-day plan has no preview Morning routine / Team sync / Lunch blocks, no stale “14:00–16:00 added” toast, zero Markdown task rows, and no horizontal overflow.
 49. Plan Time Block resizing — verified separate top/start and bottom/end resize hit targets, 15-minute snapping, a 30-minute minimum duration, and independent Markdown persistence.
+50. Plan Markdown editor — verified the connected Plan surface uses one continuous editable Markdown document, preserves arbitrary lines and normal Return editing, and overlays task drag/check controls without replacing the source with per-line title fields.
 
 ## Findings applied
 
@@ -103,3 +104,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Plan month navigation now keeps the visible month independent from the selected date until a day is chosen, so every calendar cell can be reached and selected.
 - Connected Plan renders only the selected date’s Markdown tasks; static sample blocks and preview update messages are limited to offline preview mode.
 - Plan calendar Time Blocks now expose separate full-width start and end resize handles; moving the top edge rewrites the start time, moving the bottom edge rewrites the end time, and both keep the task selectable and Markdown-first.
+- Plan now keeps a single continuous Markdown textarea as the source of truth; task handles and circular checkboxes are overlays keyed to parsed task lines, while free-form Markdown remains directly editable and saveable.
