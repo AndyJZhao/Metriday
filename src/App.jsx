@@ -315,13 +315,41 @@ function activityIcon(activity) {
   return Browsers;
 }
 
+function activityCategory(activity) {
+  switch (activity?.relevance) {
+    case "related":
+      return { key: "focused", label: "Focused" };
+    case "distracted":
+      return { key: "distracting", label: "Distracting" };
+    case "idle":
+      return { key: "idle", label: "Idle" };
+    default:
+      return { key: "other", label: "Other" };
+  }
+}
+
+function activityContext(activity) {
+  const title = String(activity?.windowTitle || "").trim();
+  const resource = String(activity?.resource || "").trim();
+  const app = String(activity?.appName || "").trim();
+  if (title && title.toLowerCase() !== app.toLowerCase()) return title;
+  if (resource) {
+    try {
+      return new URL(resource).host || resource;
+    } catch {
+      return resource;
+    }
+  }
+  return "";
+}
+
 function liveActivityBlocks(activities) {
   return activities
     .map((activity) => {
       const start = Math.max(DAY_START, Math.floor(Number(activity.startSecond || 0) / 60));
       const end = Math.min(DAY_END, Math.ceil(Number(activity.endSecond || 0) / 60));
       if (end <= start) return null;
-      const kind = activity.relevance === "distracted" ? "distracted" : activity.relevance === "related" ? "related" : activity.relevance === "idle" ? "idle" : "other";
+      const kind = activityCategory(activity).key;
       return {
         id: activity.id || `${start}-${end}-${activity.appName}`,
         start,
@@ -988,9 +1016,33 @@ function WebReportPanel({ api, dateKey }) {
   return <section className="web-report-panel"><div className="chart-heading"><div><h2>Reports & exports</h2><p>Timing-style reports from local activities, time entries, projects, and billing status.</p></div><div className="report-actions"><button type="button" onClick={exportCSV} disabled={!report.rows.length}>Export CSV</button><button type="button" onClick={exportJSON} disabled={!report.rows.length}>Export JSON</button><button type="button" onClick={exportHTML} disabled={!report.rows.length}>Export HTML</button></div></div><div className="report-presets"><button type="button" onClick={() => setPreset("today")}>Today</button><button type="button" className="active" onClick={() => setPreset("week")}>Last 7 days</button><button type="button" onClick={() => setPreset("month")}>This month</button><label>From<input type="date" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} /></label><label>To<input type="date" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} /></label></div><div className="report-filters"><label><input type="checkbox" checked={includeActivities} onChange={(event) => setIncludeActivities(event.target.checked)} />Include app activity</label><label>Billing<select value={billingFilter} onChange={(event) => setBillingFilter(event.target.value)}><option value="all">All statuses</option><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select></label><label>Rounding<select value={rounding} onChange={(event) => setRounding(event.target.value)}><option value="none">Exact</option><option value="up">Round up</option><option value="down">Round down</option><option value="nearest">Nearest</option></select></label><label>Interval<select value={roundingInterval} onChange={(event) => setRoundingInterval(Number(event.target.value))}><option value={1}>1 min</option><option value={5}>5 min</option><option value={6}>6 min</option><option value={10}>10 min</option><option value={12}>12 min</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label></div>{message ? <p className="entry-message" role="status">{message}</p> : null}<div className="report-metrics"><div><span>Total</span><strong>{formatDurationSeconds(report.totalSeconds)}</strong></div><div><span>Billable</span><strong>{formatDurationSeconds(report.billableSeconds)}</strong></div><div><span>Amount</span><strong>{report.amount.toFixed(2)} {report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD"}</strong></div><div><span>Rows</span><strong>{loading ? "…" : report.rows.length}</strong></div></div>{report.rows.length > 0 ? <div className="report-table"><div className="report-table-head"><span>Title</span><span>Project</span><span>Timespan</span><span>Duration</span><span>Billing</span></div>{report.rows.slice(0, 40).map((row, index) => <div className="report-table-row" key={`${row.kind}-${row.start.toISOString()}-${index}`}><strong>{row.title}</strong><span>{row.project}</span><span>{row.start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} {entryClock(row.start)}–{entryClock(row.end)}</span><span>{formatDurationSeconds(row.seconds)}</span><small>{row.billing}</small></div>)}</div> : <div className="entries-empty"><ChartBar size={24} /><span>{loading ? "Loading report data…" : api.connected ? "No rows match this report." : "Connect the native app to generate a report."}</span></div>}</section>;
 }
 
+function ActivityTable({ activities }) {
+  return <div className="activity-table">
+    <div className="activity-table-head" aria-hidden="true"><span>App</span><span>Category</span><span>Time</span><span>Device</span></div>
+    {activities.map((activity) => {
+      const category = activityCategory(activity);
+      const Icon = activityIcon(activity);
+      const app = activity.appName || activity.deviceName || "Unknown App";
+      const context = activityContext(activity);
+      const start = Math.floor(Number(activity.startSecond || 0) / 60);
+      const end = Math.ceil(Number(activity.endSecond || 0) / 60);
+      const duration = Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
+      return <div className="activity-table-row" key={activity.id}>
+        <div className="activity-app-cell">
+          <span className="activity-table-icon"><Icon size={19} weight="duotone" /></span>
+          <span className="activity-app-copy"><strong>{app}</strong>{context ? <small>{context}</small> : null}</span>
+        </div>
+        <span className={`activity-category ${category.key}`}><i />{category.label}</span>
+        <span>{formatRange(start, end)}</span>
+        <small>{formatDurationSeconds(duration)} · {activity.deviceName || "This Mac"}</small>
+      </div>;
+    })}
+  </div>;
+}
+
 function ActivitiesPage({ api, dateKey }) {
   const activities = [...api.activities].sort((left, right) => Number(left.startSecond || 0) - Number(right.startSecond || 0));
-  return <main className="page supporting-page"><header className="supporting-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></header><ProjectPanel api={api} /><TimeEntriesPanel api={api} dateKey={dateKey} /><section className="activities-list"><div className="activities-list-heading"><div><h2>Today’s activity</h2><p>{api.connected ? `${activities.length} locally recorded segments` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || "The hosted view keeps working with preview data until the loopback API is available."}</span></div> : <div className="activity-table">{activities.map((activity) => <div className="activity-table-row" key={activity.id}><span className={`activity-kind ${activity.relevance || "other"}`} /><span className="activity-table-icon">{(() => { const Icon = activityIcon(activity); return <Icon size={19} weight="duotone" />; })()}</span><strong>{activityLabel(activity)}</strong><span>{formatRange(Math.floor(Number(activity.startSecond || 0) / 60), Math.ceil(Number(activity.endSecond || 0) / 60))}</span><small>{formatDurationSeconds(Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)))} · {activity.deviceName || "This Mac"}</small></div>)}</div>}</section></main>;
+  return <main className="page supporting-page"><header className="supporting-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></header><ProjectPanel api={api} /><TimeEntriesPanel api={api} dateKey={dateKey} /><section className="activities-list"><div className="activities-list-heading"><div><h2>Today’s activity</h2><p>{api.connected ? `${activities.length} locally recorded segments` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || "The hosted view keeps working with preview data until the loopback API is available."}</span></div> : <ActivityTable activities={activities} />}</section></main>;
 }
 
 function RulesPage() {
