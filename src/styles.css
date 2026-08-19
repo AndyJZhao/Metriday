@@ -575,6 +575,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-source-actions { display: flex; align-items: center; gap: 8px; }
 .web-source-list { margin-top: 16px; border-top: 1px solid var(--border); }
 .web-source-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) 100px 32px; align-items: center; gap: 10px; min-height: 50px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
+.web-source-row[role="button"] { cursor: pointer; }
+.web-source-row[role="button"]:hover { background: #fafbff; }
 .web-source-row > div { display: flex; flex-direction: column; min-width: 0; gap: 3px; }
 .web-source-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
 .web-source-row small { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
