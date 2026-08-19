@@ -43,6 +43,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 37. Persistent Web shell — verified one shared date / current-block / Focus / Research Focus header across Today, Plan, Activities, Stats, Reports, Teams, Review, and Rules; Today no longer duplicates its page-local header.
 38. Activities Entry-O-Matic — verified the native-shaped conversion dialog, project scope, minimum-duration and maximum-gap controls, overlap replacement toggle, preview recalculation, billing/notes fields, and create action against the selected App / Category evidence.
 39. Activities project workspace — verified the native-shaped Projects / Unassigned / Filters sidebar, project and saved-filter selection, filtered timeline/list counts, and no horizontal overflow at the desktop viewport.
+40. Activities entry workflow — verified native-shaped New Time Entry and Start Timer sheets, project/billing/notes fields, timer estimate choices, recent-entry surface, validation, and cancel paths without creating QA data.
 
 ## Findings applied
 
@@ -83,3 +84,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - The global Focus control now matches native semantics: it toggles the Research Focus blocklist, shows Resume/Pause focus, is disabled without a scheduled current block, and never starts a timer implicitly.
 - Activities now exposes Entry-O-Matic conversion: visible non-idle App / Category segments are merged by configurable gap, existing time can be subtracted or replaced, and the preview maps directly to native time-entry creation payloads.
 - Activities now keeps project and saved-filter navigation beside the timeline, with full-width rows that filter the same App / Category evidence and preserve the project assignment drop workflow.
+- Activities now exposes native-shaped New Time Entry and Start Timer sheets from the primary toolbar; direct timer starts are replaced by explicit title, project, billing, notes, and estimate configuration.

@@ -602,6 +602,14 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .entry-omatic-check { display: flex !important; grid-template-columns: none; align-items: center; gap: 7px !important; font-weight: 500 !important; }
 .entry-omatic-check input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
 .entry-omatic-help { color: var(--muted); font-size: 10px; }
+.time-entry-recent { display: grid; gap: 6px; }
+.time-entry-recent > strong { color: var(--muted); font-size: 11px; }
+.time-entry-recent button { display: flex; align-items: center; width: 100%; gap: 8px; min-height: 34px; padding: 5px 8px; border: 0; border-radius: 6px; background: #f6f7f9; color: #4a4f5a; cursor: pointer; text-align: left; }
+.time-entry-recent button:hover { background: var(--accent-soft); color: var(--accent); }
+.time-entry-recent button > span { display: grid; min-width: 0; gap: 2px; }
+.time-entry-recent button b, .time-entry-recent button small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.time-entry-recent button b { color: inherit; font-size: 11px; }
+.time-entry-recent button small { color: var(--muted); font-size: 10px; }
 .entry-omatic-preview { display: grid; gap: 8px; margin-top: 18px; padding: 13px; border: 1px solid #dfe2ff; border-radius: 9px; background: var(--accent-soft); color: #4f567d; }
 .entry-omatic-preview > div { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
 .entry-omatic-preview strong { display: inline-flex; align-items: center; gap: 6px; color: #343b76; font-size: 12px; }
