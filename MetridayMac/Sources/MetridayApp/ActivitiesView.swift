@@ -77,6 +77,7 @@ struct ActivitiesView: View {
     @ObservedObject var monitor: AppActivityMonitor
     @ObservedObject var projectStore: ProjectStore
     @ObservedObject var filterStore: ActivityFilterStore
+    @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var preferences: ActivitiesPreferencesStore
     @ObservedObject var timeEntryStore: TimeEntryStore
     @ObservedObject var calendarStore: CalendarEventStore
@@ -149,7 +150,7 @@ struct ActivitiesView: View {
                             selectedDate: selectedDate,
                             project: { projectStore.project($0) },
                             orientation: timelineOrientation,
-                            activityColor: { category(for: $0).color },
+                            activityColor: { categoryColor(for: category(for: $0)) },
                             onToggleOrientation: {
                                 timelineOrientation = timelineOrientation == .horizontal ? .vertical : .horizontal
                             },
@@ -282,7 +283,11 @@ struct ActivitiesView: View {
             }
         }
         .sheet(isPresented: $showingActivitySettings) {
-            ActivityDisplaySettingsSheet(preferences: preferences)
+            ActivityDisplaySettingsSheet(
+                preferences: preferences,
+                categoryStore: categoryStore,
+                filterStore: filterStore
+            )
         }
         .sheet(item: $editingEntry) { entry in
             TimeEntryEditorSheet(entry: entry, projects: projectStore.activeProjects) { updatedEntry in
@@ -1367,9 +1372,9 @@ struct ActivitiesView: View {
                                 Text(appGroup.name)
                                     .font(.system(size: 11, weight: .semibold))
                                     .lineLimit(1)
-                                Text(category(for: appGroup.segments[0]).label)
+                                Text(category(for: appGroup.segments[0]).name)
                                     .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(category(for: appGroup.segments[0]).color)
+                                    .foregroundStyle(categoryColor(for: category(for: appGroup.segments[0])))
                                 Spacer()
                                 Text(formatMinutes(appGroup.seconds))
                                     .font(.system(size: 10, weight: .semibold))
@@ -1553,16 +1558,16 @@ struct ActivitiesView: View {
 
             HStack(spacing: 6) {
                 Circle()
-                    .fill(category.color)
+                    .fill(categoryColor(for: category))
                     .frame(width: 7, height: 7)
-                Text(category.label)
+                Text(category.name)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(category.color)
+                    .foregroundStyle(categoryColor(for: category))
                     .lineLimit(1)
             }
             .padding(.horizontal, 8)
             .frame(width: 112, height: 24, alignment: .leading)
-            .background(category.color.opacity(0.10))
+            .background(categoryColor(for: category).opacity(0.10))
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
             Spacer(minLength: 10)
@@ -1623,8 +1628,29 @@ struct ActivitiesView: View {
         .help("Double-click or right-click to create a time entry")
     }
 
-    private func category(for segment: ActivitySegment) -> ActivityCategoryKind {
-        ActivityCategoryKind(relevance: segment.relevance)
+    private func category(for segment: ActivitySegment) -> ActivityCategoryDefinition {
+        categoryStore.category(
+            for: segment,
+            filterStore: filterStore,
+            date: selectedDate
+        )
+    }
+
+    private func categoryColor(for category: ActivityCategoryDefinition) -> Color {
+        switch category.color {
+        case .blue:
+            return MetridayTheme.accentDeep
+        case .green:
+            return MetridayTheme.success
+        case .orange:
+            return MetridayTheme.warning
+        case .purple:
+            return .purple
+        case .red:
+            return MetridayTheme.danger
+        case .graphite:
+            return MetridayTheme.secondary
+        }
     }
 
     private func appName(for segment: ActivitySegment) -> String {
@@ -2740,6 +2766,9 @@ private struct ActivityFilterEditorSheet: View {
 private struct ActivityDisplaySettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var preferences: ActivitiesPreferencesStore
+    @ObservedObject var categoryStore: ActivityCategoryStore
+    @ObservedObject var filterStore: ActivityFilterStore
+    @State private var showingCategories = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -2771,6 +2800,24 @@ private struct ActivityDisplaySettingsSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            Divider()
+
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Categories")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("App, website, and item colors come from their matched category.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
+                Spacer()
+                Button("Manage Categories") {
+                    showingCategories = true
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("activities.manage-categories")
+            }
+
             HStack {
                 Spacer()
                 Button("Done") { dismiss() }
@@ -2779,6 +2826,274 @@ private struct ActivityDisplaySettingsSheet: View {
         }
         .padding(24)
         .frame(width: 430)
+        .sheet(isPresented: $showingCategories) {
+            ActivityCategoriesSheet(
+                categoryStore: categoryStore,
+                filterStore: filterStore
+            )
+        }
+    }
+}
+
+private struct ActivityCategoriesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var categoryStore: ActivityCategoryStore
+    @ObservedObject var filterStore: ActivityFilterStore
+    @State private var showingEditor = false
+    @State private var editingCategory: ActivityCategoryDefinition?
+    @State private var creatingCategory = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Activity Categories")
+                        .font(.system(size: 18, weight: .bold))
+                    Text("The first matching App, Website, or Item rule owns the color in Activities.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
+                Spacer()
+                Button {
+                    creatingCategory = true
+                    editingCategory = nil
+                    showingEditor = true
+                } label: {
+                    Label("New Category", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("activities.categories.new")
+            }
+
+            ScrollView {
+                VStack(spacing: 8) {
+                    ForEach(categoryStore.activeCategories) { category in
+                        categoryRow(category)
+                    }
+                }
+            }
+
+            HStack {
+                Text(categoryStore.statusMessage)
+                    .font(.system(size: 10))
+                    .foregroundStyle(MetridayTheme.secondary)
+                Spacer()
+                Button("Done") { dismiss() }
+                    .buttonStyle(.bordered)
+            }
+        }
+        .padding(24)
+        .frame(width: 520, height: 470)
+        .sheet(isPresented: $showingEditor) {
+            ActivityCategoryEditorSheet(category: creatingCategory ? nil : editingCategory) { definition in
+                if creatingCategory {
+                    _ = categoryStore.createCategory(
+                        name: definition.name,
+                        role: definition.role,
+                        color: definition.color,
+                        matchMode: definition.matchMode,
+                        rules: definition.rules
+                    )
+                } else {
+                    categoryStore.save(definition)
+                }
+                showingEditor = false
+            }
+        }
+    }
+
+    private func categoryRow(_ category: ActivityCategoryDefinition) -> some View {
+        let detail = category.isSystem
+            ? "Built-in fallback · \(category.role.label)"
+            : "\(category.rules.count) rule\(category.rules.count == 1 ? "" : "s") · \(category.role.label)"
+        return HStack(spacing: 10) {
+            Circle()
+                .fill(categoryColor(for: category))
+                .frame(width: 10, height: 10)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(category.name)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(detail)
+                    .font(.system(size: 10))
+                    .foregroundStyle(MetridayTheme.secondary)
+            }
+            Spacer()
+            if category.isSystem {
+                Text("Built-in")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(MetridayTheme.secondary)
+            } else {
+                Button("Edit") {
+                    creatingCategory = false
+                    editingCategory = category
+                    showingEditor = true
+                }
+                .buttonStyle(.borderless)
+                Button(role: .destructive) {
+                    categoryStore.archive(category)
+                } label: {
+                    Image(systemName: "archivebox")
+                }
+                .buttonStyle(.borderless)
+                .help("Archive category")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(MetridayTheme.canvas)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func categoryColor(for category: ActivityCategoryDefinition) -> Color {
+        switch category.color {
+        case .blue: return MetridayTheme.accentDeep
+        case .green: return MetridayTheme.success
+        case .orange: return MetridayTheme.warning
+        case .purple: return .purple
+        case .red: return MetridayTheme.danger
+        case .graphite: return MetridayTheme.secondary
+        }
+    }
+}
+
+private struct ActivityCategoryEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let onSave: (ActivityCategoryDefinition) -> Void
+    @State private var draft: ActivityCategoryDefinition
+    @State private var newField: ActivityFilterField = .application
+    @State private var newComparison: ProjectRuleComparison = .contains
+    @State private var newPattern = ""
+    @State private var newCaseSensitive = false
+
+    init(
+        category: ActivityCategoryDefinition?,
+        onSave: @escaping (ActivityCategoryDefinition) -> Void
+    ) {
+        self.onSave = onSave
+        _draft = State(initialValue: category ?? ActivityCategoryDefinition(name: "New Category", role: .focused, color: .blue))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Text("Category Editor")
+                .font(.system(size: 18, weight: .bold))
+
+            TextField("Category name", text: $draft.name)
+                .textFieldStyle(.roundedBorder)
+
+            HStack(spacing: 10) {
+                Picker("Role", selection: $draft.role) {
+                    ForEach(ActivityCategoryRole.allCases) { role in
+                        Text(role.label).tag(role)
+                    }
+                }
+                Picker("Color", selection: $draft.color) {
+                    ForEach(ProjectColor.allCases, id: \.self) { color in
+                        Text(color.rawValue.capitalized).tag(color)
+                    }
+                }
+            }
+
+            Picker("Match", selection: $draft.matchMode) {
+                ForEach(ActivityFilterMatchMode.allCases) { mode in
+                    Text(mode.label).tag(mode)
+                }
+            }
+
+            Text("Rules are evaluated before the built-in Focused, Distracting, Other, and Idle fallbacks. Use Application, Domain, URL, Window title, or Keyword to classify a source.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(draft.rules.enumerated()), id: \.element.id) { index, rule in
+                        if draft.rules.indices.contains(index) {
+                            let binding = Binding<ActivityFilterRule>(
+                                get: { draft.rules[index] },
+                                set: { draft.rules[index] = $0 }
+                            )
+                            HStack(spacing: 7) {
+                                Picker("Field", selection: binding.field) {
+                                    ForEach(ActivityFilterField.allCases) { field in
+                                        Text(field.label).tag(field)
+                                    }
+                                }
+                                Picker("Relation", selection: binding.comparison) {
+                                    ForEach(ProjectRuleComparison.allCases) { comparison in
+                                        Text(comparison.label).tag(comparison)
+                                    }
+                                }
+                                TextField("Value", text: binding.pattern)
+                                    .textFieldStyle(.roundedBorder)
+                                Button(role: .destructive) {
+                                    draft.rules.remove(at: index)
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(minHeight: 90, maxHeight: 140)
+
+            HStack(spacing: 7) {
+                Picker("Field", selection: $newField) {
+                    ForEach(ActivityFilterField.allCases) { field in
+                        Text(field.label).tag(field)
+                    }
+                }
+                Picker("Relation", selection: $newComparison) {
+                    ForEach(ProjectRuleComparison.allCases) { comparison in
+                        Text(comparison.label).tag(comparison)
+                    }
+                }
+                TextField("Value", text: $newPattern)
+                    .textFieldStyle(.roundedBorder)
+                Button {
+                    addRule()
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.bordered)
+                .disabled(newPattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            HStack {
+                Button("Cancel") { dismiss() }
+                Spacer()
+                Button("Save Category") {
+                    onSave(draft)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || draft.rules.isEmpty
+                )
+            }
+        }
+        .padding(24)
+        .frame(width: 650, height: 520)
+    }
+
+    private func addRule() {
+        let pattern = newPattern.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pattern.isEmpty else { return }
+        draft.rules.append(
+            ActivityFilterRule(
+                field: newField,
+                pattern: pattern,
+                isCaseSensitive: newCaseSensitive,
+                comparison: newComparison
+            )
+        )
+        newPattern = ""
+        newCaseSensitive = false
     }
 }
 

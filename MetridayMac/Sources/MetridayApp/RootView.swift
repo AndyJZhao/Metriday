@@ -34,6 +34,7 @@ struct RootView: View {
                             monitor: appState.activityMonitor,
                             projectStore: appState.projectStore,
                             filterStore: appState.filterStore,
+                            categoryStore: appState.categoryStore,
                             preferences: appState.activitiesPreferences,
                             timeEntryStore: appState.timeEntryStore,
                             calendarStore: appState.calendarStore,

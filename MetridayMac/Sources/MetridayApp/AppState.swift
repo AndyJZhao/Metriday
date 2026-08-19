@@ -20,6 +20,7 @@ final class AppState: ObservableObject {
     let markdownStore: MarkdownStore
     let projectStore: ProjectStore
     let filterStore: ActivityFilterStore
+    let categoryStore: ActivityCategoryStore
     let activitiesPreferences: ActivitiesPreferencesStore
     let timeEntryStore: TimeEntryStore
     let preferences: PreferencesStore
@@ -42,6 +43,7 @@ final class AppState: ObservableObject {
         self.markdownStore = MarkdownStore(date: initialDate)
         self.projectStore = ProjectStore()
         self.filterStore = ActivityFilterStore()
+        self.categoryStore = ActivityCategoryStore()
         self.activitiesPreferences = ActivitiesPreferencesStore()
         self.timeEntryStore = TimeEntryStore()
         self.preferences = PreferencesStore()
