@@ -1150,7 +1150,7 @@ function PlannedTrack({ tasks, connected, onSelect }) {
  const blocks = planTimelineBlocks(tasks, connected);
  return (
    <section className="today-track planned-track" aria-label="Planned timeline">
-     <div className="track-heading"><strong>Plan</strong><span>What I planned</span></div>
+     <div className="track-heading"><div><strong>Plan</strong><span>What I planned</span></div></div>
      <div className="track-canvas"><GridLines />{blocks.map(({ id, title, start, end, icon: Icon, current }) => (
         <button key={id} type="button" className={`planned-block ${current ? "current" : ""}`} style={blockStyle(start, end)} onClick={() => onSelect?.(id)} aria-label={`Open planned task ${title}`}><Icon size={18} weight="duotone" /><span><strong>{title}</strong><small>{formatRange(start, end)}</small></span></button>
      ))}{connected && blocks.length === 0 ? <div className="planned-empty">No scheduled tasks in this Markdown plan.</div> : null}</div>
@@ -1197,13 +1197,15 @@ function ActualHoverCard({ block, onRecord }) {
   </div>;
 }
 
-function ActualTrack({ activities, connected, onRecord, onSelect, projects = [] }) {
+function ActualTrack({ activities, connected, onRecord, onSelect, projects = [], api }) {
   const [hoveredBlockId, setHoveredBlockId] = useState(null);
   const blocks = connected && activities.length > 0 ? liveActivityBlocks(activities, projects) : actualBlocks;
   const selectActivity = (block) => activities.find((activity) => String(activity.id) === String(block.id)) || null;
+ const tracking = Boolean(api?.status?.tracking);
+ const accessibilityTrusted = Boolean(api?.sourcePreferences?.permissions?.accessibility_trusted);
  return (
    <section className="today-track actual-track" aria-label="Actual activity timeline">
-     <div className="track-heading"><strong>Actual</strong><span>{connected ? "Live from Metriday" : "What actually happened"}</span></div>
+     <div className="track-heading"><div><strong>Actual</strong><span>{connected ? tracking ? "Live from Metriday" : "Tracking paused" : "What actually happened"}</span></div>{connected ? <div className="track-actions">{!accessibilityTrusted ? <button type="button" className="track-action" onClick={() => api?.requestSourceAccess?.("accessibility")} aria-label="Request Accessibility access" title="Allow Accessibility access to read window titles"><LockSimple size={12} /></button> : null}<button type="button" className="track-action" onClick={() => api?.toggleTracking?.().catch(() => {})} aria-label={tracking ? "Pause activity tracking" : "Resume activity tracking"}>{tracking ? <Pause size={13} weight="fill" /> : <Play size={13} weight="fill" />}{tracking ? "Pause" : "Track"}</button></div> : null}</div>
       <div className="track-canvas"><GridLines />{blocks.map((block) => { const activity = selectActivity(block); return <div key={block.id} className={`actual-block ${block.kind} ${hoveredBlockId === block.id ? "hovered" : ""}`} style={{ ...actualBlockStyle(block), ...activityBlockStyle(block.categoryColor || categoryRoleColor(block.kind)) }} title={`${block.label} · ${block.detail}`} role={activity ? "button" : undefined} aria-label={activity ? `Open activity ${block.label} ${block.detail}` : undefined} tabIndex={activity ? 0 : undefined} onMouseEnter={() => setHoveredBlockId(block.id)} onMouseLeave={() => setHoveredBlockId(null)} onClick={(event) => { if (event.target.closest("button")) return; if (activity) onSelect?.(activity); }} onKeyDown={(event) => { if (activity && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onSelect?.(activity); } }}><ActualRows block={block} />{hoveredBlockId === block.id ? <ActualHoverCard block={block} onRecord={connected ? onRecord : null} /> : null}</div>; })}</div>
    </section>
  );
@@ -1228,7 +1230,7 @@ function TodayPage({ setPage, api, dateKey, setDateKey }) {
   const nowStyle = showNow ? { top: `${56 + ((now.minute - DAY_START) / 60) * HOUR_HEIGHT}px` } : { display: "none" };
   return (
     <main className="page today-page">
-      <div className="today-comparison"><div className="timeline-label-column"><HourLabels /></div><PlannedTrack tasks={api.plan?.tasks} connected={api.connected} onSelect={() => setPage("plan")} /><ActualTrack activities={api.activities} connected={api.connected} onRecord={recordActivity} onSelect={setSelectedActivity} projects={api.projects} /><div className="now-marker" style={nowStyle} aria-label={`Current time ${now.label}`}><span /></div></div>
+      <div className="today-comparison"><div className="timeline-label-column"><HourLabels /></div><PlannedTrack tasks={api.plan?.tasks} connected={api.connected} onSelect={() => setPage("plan")} /><ActualTrack activities={api.activities} connected={api.connected} onRecord={recordActivity} onSelect={setSelectedActivity} projects={api.projects} api={api} /><div className="now-marker" style={nowStyle} aria-label={`Current time ${now.label}`}><span /></div></div>
       <TodayInsightBar api={api} setPage={setPage} />
       {api.connected ? <WebActivityInsights insights={api.insights} dateKey={dateKey} /> : null}{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} displayPreferences={api.activityPreferences} onClose={() => setSelectedActivity(null)} /> : null}
     </main>

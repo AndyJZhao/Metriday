@@ -103,9 +103,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .hour-labels span { position: absolute; right: 12px; transform: translateY(-7px); color: #757b88; font-size: 12px; }
 .today-track { min-width: 0; }
 .planned-track { border-right: 1px solid var(--border); }
-.track-heading { position: sticky; top: 0; z-index: 12; display: flex; flex-direction: column; height: 56px; padding: 10px 16px 8px; border-bottom: 1px solid #eef0f3; background: rgba(255, 255, 255, 0.96); }
+.track-heading { position: sticky; top: 0; z-index: 12; display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 56px; padding: 10px 16px 8px; border-bottom: 1px solid #eef0f3; background: rgba(255, 255, 255, 0.96); }
+.track-heading > div:first-child { display: flex; min-width: 0; flex-direction: column; }
 .track-heading strong { font-size: 17px; }
 .track-heading span { color: var(--muted); font-size: 12px; }
+.track-actions { display: flex; align-items: center; gap: 6px; }
+.track-action { display: inline-flex; align-items: center; gap: 4px; min-height: 26px; padding: 0 7px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #4a4f5a; cursor: pointer; font-size: 10px; font-weight: 650; }
+.track-action:hover { border-color: var(--accent); color: var(--accent); }
 .track-canvas { position: relative; height: calc(11 * var(--hour-height)); margin: 0 14px; }
 .grid-lines { position: absolute; inset: 0; pointer-events: none; }
 .grid-lines i { position: absolute; right: 0; left: 0; height: 1px; border-top: 1px dashed #e8e9ed; }
