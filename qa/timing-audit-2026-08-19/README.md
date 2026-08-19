@@ -63,6 +63,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 57. Today accessibility labels — verified `swift build` and native smoke tests after fixing the Plan / Actual / recorded-time labels to interpolate their task, activity, and time-range values; the Web Actual block now exposes the same readable button label.
 58. Calendar overlay entry parity — verified the Web New Time Entry sheet still opens and dismisses with Escape after adding its prefill path; Calendar timeline clicks now open a time-entry form with the event title and range instead of writing immediately.
 59. Source record-entry parity — verified the Web Activities build and Sites tests after routing Calendar Events, Completed Reminders, and Phone Calls Record actions through the same prefilled New Time Entry flow used by native Activities.
+60. Activity source affordances — verified the source-panel implementations keep App / Category evidence read-only while exposing explicit Record actions for Calendar, Reminders, and Phone Calls; no source action writes without opening the shared editor first.
 
 ## Findings applied
 
