@@ -69,6 +69,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 63. Markdown Return continuation — verified in the live Plan editor that Return continues task, bullet, and numbered-list prefixes; an empty list item exits the list, and the original daily Markdown was restored exactly after the test.
 64. Rules workflow parity — verified Web Rules exposes current Focus scope, separate blocked/allowed domain forms, blocking explanation, and Today/All History project-rule reapply actions; after packaging and relaunching native Metriday, the Today action completed through the new local API endpoint and its success status remained visible.
 65. Native Today Activity detail — verified `swift build`, packaged-app launch, and native smoke tests after changing an Actual segment's full hit target from a generic Activities navigation into a detail sheet with App, Category, Project, Window/Website context, and an explicit Record Time Entry action.
+66. Web Time Entry row hit target — verified a temporary local entry opens the inline editor from the entire row and the row's exact accessible button target; Enter/Escape behavior was exercised, and the temporary entry was deleted after verification.
 
 ## Findings applied
 
@@ -135,3 +136,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Rules now mirrors the native project-rule maintenance workflow: allowed domains can be added directly, the current scheduled scope and native blocking model are visible, and reapplying rules is an explicit Today or All History action backed by the local API.
 - Web global and Rules current-block labels now accept the native API's camelCase `startMinute` / `endMinute` fields, so a scheduled block keeps its time range instead of falling back to “No scheduled time.”
 - Native Today Actual segments now open their owning Activity detail directly, preserving category/project/context evidence and requiring an explicit Record Time Entry action before writing manual time.
+- Web Time Entries now make the complete row a keyboard-accessible edit target, while nested Edit/Delete controls keep independent actions and inline editors dismiss on Escape.

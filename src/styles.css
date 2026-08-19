@@ -656,6 +656,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .entry-message { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
 .entry-table { margin-top: 20px; border-top: 1px solid var(--border); }
 .entry-table-row { display: grid; grid-template-columns: 22px minmax(150px, 1fr) 120px 120px 145px 70px; align-items: center; gap: 10px; min-height: 49px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
+.entry-table-row.interactive { cursor: pointer; }
+.entry-table-row.interactive:hover { background: #fafbff; }
+.entry-table-row.interactive:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
 .entry-table-row > svg { color: var(--accent); }
 .entry-table-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
 .entry-table-row small { color: var(--muted); }
