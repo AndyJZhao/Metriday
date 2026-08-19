@@ -76,6 +76,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 70. Native Timeline click parity — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after making horizontal and vertical App activity blocks open the shared detail sheet on single click while retaining double-click Time Entry creation; Project rows now also use an exclusive single-select / double-edit gesture.
 71. Native saved-filter click disambiguation — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after replacing the saved-filter row's competing Button and double-tap handlers with one exclusive recognizer: single click selects the filter and double click opens its editor.
 72. Native Time Entry row hit target — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after constraining the primary Time Entry edit button to fill the complete row area left of the independent Edit/Delete controls.
+73. Native Activity detail duration formatting — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after correcting the Activity detail sheet's duration formatter to render numeric hours/minutes instead of placeholder text.
 
 ## Findings applied
 
@@ -149,3 +150,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Native Timeline activity blocks now use the same exclusive click semantics as activity rows: single click opens App / Category detail, double click creates a Time Entry, and Project rows no longer compete between selection and edit callbacks.
 - Saved Activity Filter rows now keep single-click selection and double-click editing mutually exclusive, so the same click cannot both change the activity scope and open the editor.
 - Native Activities Time Entry rows now give the primary edit action the full remaining row hit target, matching Web row behavior while keeping destructive and secondary controls separate.
+- Native Activity details now render the actual rounded duration (`h` / `m`) in the detail sheet, keeping the App / Category evidence readable and truthful.

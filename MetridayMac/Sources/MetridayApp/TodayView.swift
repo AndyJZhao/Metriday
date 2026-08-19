@@ -496,7 +496,7 @@ struct ActivityDetailSheet: View {
         let minutes = Int((Double(seconds) / 60.0).rounded())
         if minutes < 1 { return "<1m" }
         let hours = minutes / 60
-        return hours > 0 ? "(hours)h (minutes % 60)m" : "(minutes)m"
+        return hours > 0 ? "\(hours)h \(minutes % 60)m" : "\(minutes)m"
     }
 
     private func recordTimeEntry() {
