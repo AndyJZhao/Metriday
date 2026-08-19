@@ -174,6 +174,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Web Activities Projects sidebar now exposes a native-style New Project plus action; it scrolls to and focuses the shared project creation form so project creation is available from the same primary location.
 - Web source recording now preserves native metadata semantics: Calendar notes/location, Reminder list/notes with a 30-minute pre-completion range, and Phone Call title/service-provider notes; Timeline Calendar overlays use the same source-recording path.
 - Web Calendar, Reminders, Phone Calls, and Screen Time panels now expose inline Connect actions when their native permission/database is unavailable, matching the native panel workflow while retaining Refresh for connected sources.
+- Web Stats now exposes the native Time per Project Hour / Day unit selector and formats project values from the selected unit.
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
 78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
@@ -198,3 +199,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 97. Web Activities New Project entry point — verified Web build, Sites tests, and diff checks after adding the sidebar plus action, project panel anchor, and automatic focus on the existing creation form.
 98. Web source recording metadata parity — verified Web build, Sites tests, and diff checks after aligning Calendar, Reminder, Phone Call, Timeline Calendar, and Activity-detail time-entry payloads with native title, notes, and time-range semantics.
 99. Web source inline access actions — verified Web build, Sites tests, and diff checks after adding native source access requests to the Calendar, Reminders, Phone Calls, and Screen Time panel headers.
+100. Web Stats project unit parity — verified Web build, Sites tests, and diff checks after adding the native Hour / Day project time selector and unit-aware values.
