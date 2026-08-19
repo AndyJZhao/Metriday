@@ -157,6 +157,7 @@ function useMetridayAPI(dateKey, apiBase) {
     exclusions: [],
     activityPreferences: null,
     teams: [],
+    sourcePreferences: null,
     weekly: [],
     insights: [],
   });
@@ -201,6 +202,7 @@ function useMetridayAPI(dateKey, apiBase) {
         request("/v1/exclusions"),
         request("/v1/activity-preferences"),
         request("/v1/teams"),
+        request("/v1/source-preferences"),
       ]);
       const value = (index, fallback) => results[index].status === "fulfilled" ? results[index].value : fallback;
       setSnapshot({
@@ -229,6 +231,7 @@ function useMetridayAPI(dateKey, apiBase) {
         exclusions: value(17, { data: [] })?.data || [],
         activityPreferences: value(18, null),
         teams: value(19, { data: [] })?.data || [],
+        sourcePreferences: value(20, null),
       });
       setRefreshVersion((value) => value + 1);
     } catch (error) {
@@ -296,6 +299,14 @@ function useMetridayAPI(dateKey, apiBase) {
     },
     updateActivityPreferences: async (preferences) => {
       await request("/v1/activity-preferences", { method: "PATCH", body: JSON.stringify(preferences) });
+      await refresh();
+    },
+    updateSourcePreferences: async (preferences) => {
+      await request("/v1/source-preferences", { method: "PATCH", body: JSON.stringify(preferences) });
+      await refresh();
+    },
+    requestSourceAccess: async (source) => {
+      await request("/v1/source-preferences/access", { method: "POST", body: JSON.stringify({ source }) });
       await refresh();
     },
     syncNow: () => mutate("/v1/sync/now"),
@@ -370,6 +381,10 @@ function useMetridayAPI(dateKey, apiBase) {
     },
     hidePhoneCallAddress: async (address, hidden = true) => {
       await request("/v1/phone-calls/hide", { method: "POST", body: JSON.stringify({ address, hidden }) });
+      await refresh();
+    },
+    showAllPhoneCallAddresses: async () => {
+      await request("/v1/phone-calls/hide-all", { method: "POST" });
       await refresh();
     },
     createActivityFilter: async (filter) => {
@@ -922,6 +937,32 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
     setMessage("已恢复默认连接地址。");
   };
 
+  const sourcePreferences = api?.sourcePreferences || {};
+  const calendarSource = sourcePreferences.calendar || {};
+  const reminderSource = sourcePreferences.reminders || {};
+  const phoneSource = sourcePreferences.phone_calls || {};
+  const screenTimeSource = sourcePreferences.screen_time || {};
+  const updateSource = (payload) => {
+    if (!connected || !api?.updateSourcePreferences) return;
+    api.updateSourcePreferences(payload).catch((error) => setMessage(error.message || "Could not save source filters."));
+  };
+  const toggleSourceTitle = (available, included, key, title, checked) => {
+    const allTitles = new Set(available || []);
+    const selected = new Set(included || []);
+    if (selected.size === 0) allTitles.forEach((item) => selected.add(item));
+    if (checked) selected.add(title);
+    else selected.delete(title);
+    updateSource({ [key]: selected.size === allTitles.size ? [] : [...selected] });
+  };
+  const requestSourceAccess = (source) => {
+    if (!connected || !api?.requestSourceAccess) return;
+    api.requestSourceAccess(source).catch((error) => setMessage(error.message || "Could not request source access."));
+  };
+  const showAllPhoneAddresses = () => {
+    if (!connected || !api?.showAllPhoneCallAddresses) return;
+    api.showAllPhoneCallAddresses().catch((error) => setMessage(error.message || "Could not show phone calls."));
+  };
+
   return <div className="settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div className="settings-dialog-heading"><div><span>Preferences</span><h2 id="settings-title">Metriday Settings</h2></div><IconButton label="Close settings" onClick={onClose}><X size={18} /></IconButton></div>
     <p className="settings-description">Tracking, working hours, privacy, and the local Web companion connection are kept on this Mac.</p>
@@ -949,6 +990,10 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
         <div className="settings-integration-list">{api.integrations?.map((integration) => <div className="settings-integration-row" key={integration.provider}><div><strong>{integration.title || integration.provider}</strong><small>{integration.connected ? integration.workspace || "Connected" : integration.status || "Not connected"}</small></div><button type="button" className="quiet-pill" onClick={() => api.syncIntegration(integration.provider).then(() => setMessage(`${integration.title || integration.provider} sync started.`)).catch((error) => setMessage(error.message || "Integration sync failed."))} disabled={!connected || saving || api.sync?.isWorking}>{integration.connected ? "Sync" : "Connect"}</button></div>)}</div>
       </div>
       <div className="settings-section settings-source-status"><div className="settings-section-heading"><strong>Data sources</strong></div><span><i className={api.calendarEvents?.authorized ? "connected" : ""} />Calendar · {api.calendarEvents?.status || "Not connected"}</span><span><i className={api.reminders?.authorized ? "connected" : ""} />Reminders · {api.reminders?.status || "Not connected"}</span><span><i className={api.screenTime?.database_available ? "connected" : ""} />Screen Time · {api.screenTime?.status || "Not connected"}</span></div>
+      <div className="settings-section settings-source-filters"><div className="settings-section-heading"><strong>Calendar filters</strong><span className={`settings-state-dot ${calendarSource.authorized ? "connected" : ""}`} /></div>{calendarSource.authorized ? <><label className="settings-toggle-row"><span><input type="checkbox" checked={!calendarSource.included_titles?.length} onChange={(event) => updateSource({ calendar_included_titles: event.target.checked ? [] : (calendarSource.available_titles || []) })} />All calendars</span><small>{calendarSource.available_titles?.length || 0} available</small></label>{calendarSource.available_titles?.map((title) => <label className="settings-source-filter-row" key={title}><span><input type="checkbox" checked={!calendarSource.included_titles?.length || calendarSource.included_titles.includes(title)} onChange={(event) => toggleSourceTitle(calendarSource.available_titles, calendarSource.included_titles, "calendar_included_titles", title, event.target.checked)} />{title}</span></label>)}<small className="settings-help-text">Only selected calendars appear on the Activities timeline; all-day events stay hidden.</small></> : <div className="settings-source-connect"><span>{calendarSource.status || "Calendar access not connected"}</span><button type="button" className="secondary-button" onClick={() => requestSourceAccess("calendar")} disabled={!connected}>Request access</button></div>}</div>
+      <div className="settings-section settings-source-filters"><div className="settings-section-heading"><strong>Reminders filters</strong><span className={`settings-state-dot ${reminderSource.authorized ? "connected" : ""}`} /></div>{reminderSource.authorized ? <><label className="settings-toggle-row"><span><input type="checkbox" checked={!reminderSource.included_list_titles?.length} onChange={(event) => updateSource({ reminder_included_list_titles: event.target.checked ? [] : (reminderSource.available_list_titles || []) })} />All reminder lists</span><small>{reminderSource.available_list_titles?.length || 0} available</small></label><label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(reminderSource.hide_recurring)} onChange={(event) => updateSource({ reminder_hide_recurring: event.target.checked })} />Hide recurring reminders</span></label>{reminderSource.available_list_titles?.map((title) => <label className="settings-source-filter-row" key={title}><span><input type="checkbox" checked={!reminderSource.included_list_titles?.length || reminderSource.included_list_titles.includes(title)} onChange={(event) => toggleSourceTitle(reminderSource.available_list_titles, reminderSource.included_list_titles, "reminder_included_list_titles", title, event.target.checked)} />{title}</span></label>)}<small className="settings-help-text">Completed reminders follow these list and recurring-item filters.</small></> : <div className="settings-source-connect"><span>{reminderSource.status || "Reminders access not connected"}</span><button type="button" className="secondary-button" onClick={() => requestSourceAccess("reminders")} disabled={!connected}>Request access</button></div>}</div>
+      <div className="settings-section settings-source-filters"><div className="settings-section-heading"><strong>Phone Calls filters</strong><span className={`settings-state-dot ${phoneSource.database_available ? "connected" : ""}`} /></div>{phoneSource.database_available ? phoneSource.hidden_addresses?.length ? <><div className="settings-source-filter-heading"><span>Hidden numbers</span><button type="button" className="secondary-button" onClick={showAllPhoneAddresses}>Show all</button></div><div className="settings-source-list">{phoneSource.hidden_addresses.map((address) => <div key={address}><span>{address}</span><button type="button" className="quiet-pill" onClick={() => api.hidePhoneCallAddress(address, false).catch((error) => setMessage(error.message || "Could not show phone calls."))}>Show</button></div>)}</div><small className="settings-help-text">Hidden calls stay in macOS CallHistory but are excluded from the Metriday timeline.</small></> : <small className="settings-help-text">Calls are shown by default. Hide a number from the Phone Calls panel in Activities.</small> : <div className="settings-source-connect"><span>{phoneSource.status || "Phone Calls access not connected"}</span><button type="button" className="secondary-button" onClick={() => requestSourceAccess("phone-calls")} disabled={!connected}>Open Settings</button></div>}</div>
+      <div className="settings-section settings-source-filters"><div className="settings-section-heading"><strong>Screen Time</strong><span className={`settings-state-dot ${screenTimeSource.database_available ? "connected" : ""}`} /></div><div className="settings-source-connect"><span>{screenTimeSource.status || "Screen Time not connected"}</span>{!screenTimeSource.database_available ? <button type="button" className="secondary-button" onClick={() => requestSourceAccess("screen-time")} disabled={!connected}>Open Settings</button> : null}</div></div>
       {message ? <p className="entry-message" role="status">{message}</p> : null}
       <div className="settings-actions"><button type="button" className="secondary-button" onClick={reset}>Use this Mac</button><button type="submit" className="primary-button" disabled={saving}>{saving ? "Saving…" : "Save settings"}</button></div>
     </form>

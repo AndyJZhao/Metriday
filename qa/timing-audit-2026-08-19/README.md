@@ -163,6 +163,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Web Category matching now exposes native `Full website URL`, `Start time`, and `Day of week` fields plus `is like` / `is not`; domain, keyword, and time-derived values use the same candidate semantics as native matching.
 - Web Saved Filters now matches native filter editing: multiple rules, Any / All mode, filter color, case-sensitive matching, and the full native field/comparison set are persisted through the shared API.
 - Stats application rankings now split each source by Category, so the category-owned color remains correct when one App, website, or item has both Focused and Distracting activity.
+- Web Settings now exposes native source preferences: Calendar selections, Reminder lists and recurring-item filtering, Phone Calls hidden numbers, and Screen Time access state. App identity remains source metadata while Category remains the only color owner for captured activity. :codex-annotation{index="1"}
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
 78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
@@ -176,3 +177,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 86. Native source-row hit targets — verified that Calendar Events, Completed Reminders, and Phone Calls keep the left information banner clickable while Record/Edit/Delete controls remain independent instead of firing the row action together.
 87. Web source-row hit targets — verified that Calendar Events, Completed Reminders, and Phone Calls expose full row/keyboard Record targets while nested Record and Hide controls remain independent.
 88. Web Review parity — verified that Review now mirrors native summary cards, seven-day focus-quality evidence, application/hour/project breakdowns, weekly time entries, Report Builder navigation, and local CSV export.
+89. Web Settings source preferences — verified native/Web build and Sites tests, packaged native smoke tests, and live `/v1/source-preferences` GET/PATCH plus Phone Calls hide-all routes after adding shared Calendar, Reminders, Phone Calls, and Screen Time source settings.

@@ -877,6 +877,14 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .settings-data-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .settings-data-actions button { min-height: 30px; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #4a4f5a; cursor: pointer; font-size: 10px; }
 .settings-source-status > span { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+.settings-source-filters { gap: 8px; }
+.settings-source-filter-row { display: flex; align-items: center; gap: 7px; padding-left: 16px; color: #454a55; font-size: 11px; }
+.settings-source-filter-row input, .settings-source-filters input { accent-color: var(--accent); }
+.settings-source-connect { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 11px; }
+.settings-source-connect .secondary-button, .settings-source-filter-heading .secondary-button { min-height: 28px; padding: 0 9px; font-size: 10px; }
+.settings-source-filter-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #454a55; font-size: 11px; }
+.settings-source-list { display: grid; gap: 6px; }
+.settings-source-list > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; border: 1px solid #eceef2; border-radius: 7px; color: #454a55; font-size: 11px; }
 .settings-form button:disabled, .settings-form input:disabled, .settings-form select:disabled { cursor: not-allowed; opacity: 0.55; }
 .settings-install-note { display: flex; gap: 10px; margin-top: 23px; padding-top: 17px; border-top: 1px solid #eceef2; color: var(--accent); }
 .settings-install-note > div { display: flex; flex-direction: column; gap: 4px; }

@@ -135,6 +135,14 @@ final class ReminderStore: ObservableObject {
         loadCompleted(for: selectedDate)
     }
 
+    func setIncludedListTitles(_ titles: [String]) {
+        let available = Set(availableListTitles)
+        let selected = Set(titles).intersection(available)
+        includedListTitles = selected == available ? [] : selected
+        persistPreferences()
+        loadCompleted(for: selectedDate)
+    }
+
     private func persistPreferences() {
         do {
             try FileManager.default.createDirectory(

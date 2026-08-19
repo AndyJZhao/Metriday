@@ -309,6 +309,45 @@ final class AppState: ObservableObject {
             return .jsonObject(activityPreferencesAPI())
         }
 
+        if request.method == "GET", path == "/v1/source-preferences" {
+            return .jsonObject(sourcePreferencesAPI())
+        }
+
+        if (request.method == "PATCH" || request.method == "PUT"), path == "/v1/source-preferences" {
+            guard let body = apiBody(request) else {
+                return .error("Source preferences body is invalid", statusCode: 400)
+            }
+            if let titles = apiStringArray(body["calendar_included_titles"]) {
+                calendarStore.setIncludedCalendarTitles(titles)
+            }
+            if let titles = apiStringArray(body["reminder_included_list_titles"]) {
+                reminderStore.setIncludedListTitles(titles)
+            }
+            if let value = body["reminder_hide_recurring"] as? Bool {
+                reminderStore.hideRecurringReminders = value
+            }
+            return .jsonObject(sourcePreferencesAPI())
+        }
+
+        if request.method == "POST", path == "/v1/source-preferences/access" {
+            guard let body = apiBody(request), let source = body["source"] as? String else {
+                return .error("Source access request needs a source", statusCode: 400)
+            }
+            switch source {
+            case "calendar":
+                calendarStore.requestAccess()
+            case "reminders":
+                reminderStore.requestAccess()
+            case "phone-calls":
+                phoneCallStore.openAccessSettings()
+            case "screen-time":
+                screenTimeStore.openAccessSettings()
+            default:
+                return .error("Unknown source", statusCode: 400)
+            }
+            return .jsonObject(sourcePreferencesAPI())
+        }
+
         if request.method == "GET", path == "/v1/project-rules" {
             return .jsonObject([
                 "data": projectStore.rules.map(apiProjectRule),
@@ -1180,6 +1219,13 @@ final class AppState: ObservableObject {
             ])
         }
 
+        if request.method == "POST", path == "/v1/phone-calls/hide-all" {
+            phoneCallStore.showAllAddresses()
+            return .jsonObject([
+                "hidden_addresses": Array(phoneCallStore.hiddenAddresses).sorted()
+            ])
+        }
+
         if request.method == "GET", path == "/v1/insights" {
             let date = apiDate(from: request.query["date"]) ?? selectedDate
             let segments = effectiveActivitySegments(for: date)
@@ -1455,8 +1501,12 @@ final class AppState: ObservableObject {
                     "PUT /v1/plans?date=YYYY-MM-DD",
                     "GET /v1/activities?date=YYYY-MM-DD",
                     "PATCH /v1/activities/{id}?date=YYYY-MM-DD",
+                    "GET /v1/source-preferences",
+                    "PATCH /v1/source-preferences",
+                    "POST /v1/source-preferences/access",
                     "GET /v1/phone-calls?date=YYYY-MM-DD",
                     "POST /v1/phone-calls/hide",
+                    "POST /v1/phone-calls/hide-all",
                     "GET /v1/calendar-events?date=YYYY-MM-DD",
                     "GET /v1/reminders?date=YYYY-MM-DD",
                     "GET /v1/screen-time?date=YYYY-MM-DD",
@@ -2121,12 +2171,48 @@ final class AppState: ObservableObject {
         ]
     }
 
+    private func sourcePreferencesAPI() -> [String: Any] {
+        [
+            "calendar": [
+                "authorized": calendarStore.isAuthorized,
+                "status": calendarStore.statusMessage,
+                "available_titles": calendarStore.availableCalendarTitles,
+                "included_titles": Array(calendarStore.includedCalendarTitles).sorted()
+            ],
+            "reminders": [
+                "authorized": reminderStore.isAuthorized,
+                "status": reminderStore.statusMessage,
+                "available_list_titles": reminderStore.availableListTitles,
+                "included_list_titles": Array(reminderStore.includedListTitles).sorted(),
+                "hide_recurring": reminderStore.hideRecurringReminders
+            ],
+            "phone_calls": [
+                "database_available": phoneCallStore.databaseAvailable,
+                "status": phoneCallStore.statusMessage,
+                "hidden_addresses": Array(phoneCallStore.hiddenAddresses).sorted()
+            ],
+            "screen_time": [
+                "database_available": screenTimeStore.databaseAvailable,
+                "status": screenTimeStore.statusMessage
+            ]
+        ]
+    }
+
     private func apiBoolean(_ rawValue: String?, default defaultValue: Bool) -> Bool {
         guard let rawValue else { return defaultValue }
         switch rawValue.lowercased() {
         case "1", "true", "yes", "on": return true
         case "0", "false", "no", "off": return false
         default: return defaultValue
+        }
+    }
+
+    private func apiStringArray(_ rawValue: Any?) -> [String]? {
+        guard let values = rawValue as? [Any] else { return nil }
+        return values.compactMap { value in
+            guard let string = value as? String else { return nil }
+            let normalized = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return normalized.isEmpty ? nil : normalized
         }
     }
 

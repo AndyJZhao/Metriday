@@ -153,6 +153,14 @@ final class CalendarEventStore: ObservableObject {
         loadEvents(for: selectedDate)
     }
 
+    func setIncludedCalendarTitles(_ titles: [String]) {
+        let available = Set(availableCalendarTitles)
+        let selected = Set(titles).intersection(available)
+        includedCalendarTitles = selected == available ? [] : selected
+        persistPreferences()
+        loadEvents(for: selectedDate)
+    }
+
     @discardableResult
     func createEvent(
         title rawTitle: String,
