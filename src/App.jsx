@@ -1737,20 +1737,37 @@ function WebReportPanel({ api, dateKey }) {
   </section>;
 }
 
-function WebActivityTimeline({ activities, dateKey, api, onSelect }) {
-  const trackRef = useRef(null);
-  const [selection, setSelection] = useState(null);
-  const [message, setMessage] = useState("");
-  const totalSeconds = 24 * 60 * 60;
-  const minuteAt = (clientX, rect) => Math.max(0, Math.min(24 * 60, Math.round(((clientX - rect.left) / rect.width) * 24 * 60 / 15) * 15));
+function WebActivityTimeline({ activities, dateKey, api, onSelect, orientation: requestedOrientation = "horizontal", onToggleOrientation }) {
+ const trackRef = useRef(null);
+ const [selection, setSelection] = useState(null);
+ const [message, setMessage] = useState("");
+  const controlledOrientation = typeof onToggleOrientation === "function";
+  const [localOrientation, setLocalOrientation] = useState(() => api.activityPreferences?.timeline_orientation === "vertical" ? "vertical" : "horizontal");
+  const orientation = controlledOrientation ? requestedOrientation : localOrientation;
+  useEffect(() => {
+    if (!controlledOrientation) setLocalOrientation(api.activityPreferences?.timeline_orientation === "vertical" ? "vertical" : "horizontal");
+  }, [api.activityPreferences, controlledOrientation]);
+  const toggleOrientation = onToggleOrientation || (() => {
+    const next = orientation === "horizontal" ? "vertical" : "horizontal";
+    setLocalOrientation(next);
+    void api.updateActivityPreferences?.({ timeline_orientation: next });
+  });
+ const totalSeconds = 24 * 60 * 60;
+  const minuteAt = (clientPosition, rect) => {
+    const offset = orientation === "vertical" ? clientPosition - rect.top : clientPosition - rect.left;
+    const length = orientation === "vertical" ? rect.height : rect.width;
+    return Math.max(0, Math.min(24 * 60, Math.round((offset / length) * 24 * 60 / 15) * 15));
+  };
   const startSelection = (event) => {
     if (event.button !== 0 || !trackRef.current) return;
     const rect = trackRef.current.getBoundingClientRect();
-    const start = minuteAt(event.clientX, rect);
+    const position = orientation === "vertical" ? event.clientY : event.clientX;
+    const start = minuteAt(position, rect);
     let latest = { start, end: Math.min(start + 15, 24 * 60) };
     setSelection(latest);
     const move = (moveEvent) => {
-      const end = minuteAt(moveEvent.clientX, rect);
+      const movePosition = orientation === "vertical" ? moveEvent.clientY : moveEvent.clientX;
+      const end = minuteAt(movePosition, rect);
       latest = { start: Math.min(start, end), end: Math.max(start, end) || Math.min(start + 15, 24 * 60) };
       if (latest.end === latest.start) latest.end = Math.min(latest.start + 15, 24 * 60);
       setSelection(latest);
@@ -1772,12 +1789,14 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect }) {
     try {
       await api.addTimeEntry({ title: "Activity time", start, end, billingStatus: "billable" });
       setSelection(null);
-      setMessage(`Recorded ${formatRange(selection.start, selection.end)}`);
+      setMessage("Recorded " + formatRange(selection.start, selection.end));
     } catch (error) {
       setMessage(error.message || "Could not record the selected range.");
     }
   };
-  return <section className="web-activity-timeline" aria-label="Activities timeline"><div className="web-activity-timeline-heading"><div><h2>Timeline</h2><p>Hover for exact activity; drag across a gap to select time for a manual entry.</p></div><div className="web-activity-timeline-actions">{selection ? <><span>{formatRange(selection.start, selection.end)}</span><button type="button" onClick={recordSelection} disabled={!api.connected}>Record time</button><button type="button" className="timeline-clear" onClick={() => setSelection(null)}>Clear</button></> : <span>00:00–24:00</span>}{message ? <small role="status">{message}</small> : null}</div></div><div className="web-activity-timeline-track" ref={trackRef} onPointerDown={startSelection}>{[0, 6, 12, 18, 24].map((hour) => <span className="web-activity-timeline-label" key={hour} style={{ left: `${(hour / 24) * 100}%` }}>{String(hour).padStart(2, "0")}:00</span>)}<div className="web-activity-timeline-grid" aria-hidden="true">{[0, 6, 12, 18, 24].map((hour) => <i key={hour} style={{ left: `${(hour / 24) * 100}%` }} />)}</div>{activities.map((activity) => { const startSecond = Math.max(0, Number(activity.startSecond || 0)); const endSecond = Math.min(totalSeconds, Number(activity.endSecond || 0)); if (endSecond <= startSecond) return null; const category = activityCategory(activity); const categoryStyle = activityCategoryStyle(category); return <button type="button" key={activity.id} className={`web-activity-timeline-block ${category.key}`} style={{ left: `${(startSecond / totalSeconds) * 100}%`, width: `${Math.max((endSecond - startSecond) / totalSeconds * 100, 0.18)}%`, borderColor: categoryStyle.color }} title={`${activityLabel(activity)} · ${category.label} · ${preciseClock(startSecond)}–${preciseClock(endSecond)}`} onPointerDown={(event) => event.stopPropagation()} onClick={() => onSelect(activity)}><span style={{ color: categoryStyle.color }} /></button>; })}{selection ? <div className="web-activity-timeline-selection" style={{ left: `${(selection.start / (24 * 60)) * 100}%`, width: `${((selection.end - selection.start) / (24 * 60)) * 100}%` }} aria-label={`Selected ${formatRange(selection.start, selection.end)}`} /> : null}</div></section>;
+ const vertical = orientation === "vertical";
+ const timelineHours = [0, 6, 12, 18, 24];
+  return <section className="web-activity-timeline" aria-label="Activities timeline"><div className="web-activity-timeline-heading"><div><h2>Timeline</h2><p>Hover for exact activity; drag across a gap to select time for a manual entry.</p></div><div className="web-activity-timeline-actions"><button type="button" className="timeline-orientation-toggle" onClick={toggleOrientation} aria-label={"Switch to " + (vertical ? "horizontal" : "vertical") + " timeline"} title={"Switch to " + (vertical ? "horizontal" : "vertical") + " timeline"}><ArrowsClockwise size={14} />{vertical ? "Vertical" : "Horizontal"}</button>{selection ? <><span>{formatRange(selection.start, selection.end)}</span><button type="button" onClick={recordSelection} disabled={!api.connected}>Record time</button><button type="button" className="timeline-clear" onClick={() => setSelection(null)}>Clear</button></> : <span>00:00–24:00</span>}{message ? <small role="status">{message}</small> : null}</div></div><div className={"web-activity-timeline-track " + (vertical ? "vertical" : "horizontal")} ref={trackRef} onPointerDown={startSelection}>{timelineHours.map((hour) => <span className="web-activity-timeline-label" key={hour} style={vertical ? { top: `${(hour / 24) * 100}%` } : { left: `${(hour / 24) * 100}%` }}>{String(hour).padStart(2, "0")}:00</span>)}<div className="web-activity-timeline-grid" aria-hidden="true">{timelineHours.map((hour) => <i key={hour} style={vertical ? { top: `${(hour / 24) * 100}%` } : { left: `${(hour / 24) * 100}%` }} />)}</div>{activities.map((activity) => { const startSecond = Math.max(0, Number(activity.startSecond || 0)); const endSecond = Math.min(totalSeconds, Number(activity.endSecond || 0)); if (endSecond <= startSecond) return null; const category = activityCategory(activity); const categoryStyle = activityCategoryStyle(category); const startPercent = (startSecond / totalSeconds) * 100; const durationPercent = Math.max((endSecond - startSecond) / totalSeconds * 100, 0.18); const blockStyle = vertical ? { top: `${startPercent}%`, height: `${durationPercent}%`, borderColor: categoryStyle.color } : { left: `${startPercent}%`, width: `${durationPercent}%`, borderColor: categoryStyle.color }; return <button type="button" key={activity.id} className={"web-activity-timeline-block " + category.key} style={blockStyle} title={activityLabel(activity) + " · " + category.label + " · " + preciseClock(startSecond) + "–" + preciseClock(endSecond)} onPointerDown={(event) => event.stopPropagation()} onClick={() => onSelect(activity)}><span style={{ color: categoryStyle.color }} /></button>; })}{selection ? <div className="web-activity-timeline-selection" style={vertical ? { top: `${(selection.start / (24 * 60)) * 100}%`, height: `${((selection.end - selection.start) / (24 * 60)) * 100}%` } : { left: `${(selection.start / (24 * 60)) * 100}%`, width: `${((selection.end - selection.start) / (24 * 60)) * 100}%` }} aria-label={"Selected " + formatRange(selection.start, selection.end)} /> : null}</div></section>;
 }
 
 function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode = "none", projects = [], displayPreferences = null, dateKey = "" }) {

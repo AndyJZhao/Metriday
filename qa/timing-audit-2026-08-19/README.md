@@ -45,6 +45,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 39. Activities project workspace — verified the native-shaped Projects / Unassigned / Filters sidebar, project and saved-filter selection, filtered timeline/list counts, and no horizontal overflow at the desktop viewport.
 40. Activities entry workflow — verified native-shaped New Time Entry and Start Timer sheets, project/billing/notes fields, timer estimate choices, recent-entry surface, validation, and cancel paths without creating QA data.
 41. Activities toolbar popovers — verified native-shaped Devices and Filters popovers, device visibility state, Focused / Distracting / Other / Idle selection, saved-filter entries, automatic close after selection, and continued filtering of the same activity evidence.
+42. Activities timeline orientation — verified native-backed horizontal / vertical switching, Y-axis time selection in vertical mode, persisted `timeline_orientation`, reload restoration, category-colored blocks, and no horizontal overflow.
 
 ## Findings applied
 
@@ -87,3 +88,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Activities now keeps project and saved-filter navigation beside the timeline, with full-width rows that filter the same App / Category evidence and preserve the project assignment drop workflow.
 - Activities now exposes native-shaped New Time Entry and Start Timer sheets from the primary toolbar; direct timer starts are replaced by explicit title, project, billing, notes, and estimate configuration.
 - Activities now groups device and filter selection into native-style popovers; Display remains focused on presentation settings while Devices and Filters own their respective scope choices.
+ Activities now mirrors the native timeline orientation control; horizontal mode remains the default, vertical mode uses the same 24-hour evidence and selection workflow, and the preference is shared with the macOS app.
