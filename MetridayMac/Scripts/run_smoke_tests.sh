@@ -24,6 +24,7 @@ swiftc \
   "$project_dir/Sources/MetridayApp/ActivityTracking.swift" \
   "$project_dir/Sources/MetridayApp/AppActivityMonitor.swift" \
   "$project_dir/Sources/MetridayApp/ActivityFilterStore.swift" \
+  "$project_dir/Sources/MetridayApp/ActivityCategoryStore.swift" \
   "$project_dir/Sources/MetridayApp/ActivitiesPreferencesStore.swift" \
   "$project_dir/Sources/MetridayApp/WebBlockerService.swift" \
   "$project_dir/Sources/MetridayApp/SyncStore.swift" \

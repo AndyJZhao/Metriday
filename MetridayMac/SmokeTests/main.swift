@@ -221,6 +221,36 @@ try? FileManager.default.removeItem(at: activityRoot)
 
 Task { @MainActor in
     let tempRoot = FileManager.default.temporaryDirectory.appendingPathComponent("MetridaySmoke-\(UUID().uuidString)")
+    let categoryFilterStore = ActivityFilterStore(rootDirectory: tempRoot.appendingPathComponent("CategoryFilters", isDirectory: true))
+    let categoryStore = ActivityCategoryStore(rootDirectory: tempRoot.appendingPathComponent("Categories", isDirectory: true))
+    _ = categoryStore.createCategory(
+        name: "Focused coding",
+        role: .focused,
+        color: .blue,
+        matchMode: .any,
+        rules: [ActivityFilterRule(field: .application, pattern: "Visual Studio Code")]
+    )
+    _ = categoryStore.createCategory(
+        name: "Distracting video",
+        role: .distracting,
+        color: .red,
+        matchMode: .any,
+        rules: [ActivityFilterRule(field: .domain, pattern: "youtube.com")]
+    )
+    let focusedCategory = categoryStore.category(for: trackedActivities[0], filterStore: categoryFilterStore, date: date)
+    let youtubeActivity = ActivitySegment(
+        appName: "Google Chrome",
+        bundleIdentifier: "com.google.Chrome",
+        windowTitle: "YouTube",
+        resource: "https://youtube.com/watch?v=1",
+        startMinute: 600,
+        endMinute: 612,
+        relevance: .distracted
+    )
+    let distractingCategory = categoryStore.category(for: youtubeActivity, filterStore: categoryFilterStore, date: date)
+    expect(focusedCategory.role == .focused && focusedCategory.color == .blue, "Focused application rules should resolve to the deep-blue category")
+    expect(distractingCategory.role == .distracting && distractingCategory.color == .red, "Distracting domain rules should resolve to the red category")
+
     let teamRoot = tempRoot.appendingPathComponent("Teams", isDirectory: true)
     let teamStore = TeamStore(rootDirectory: teamRoot)
     guard let teamID = teamStore.createTeam(name: "Smoke Team") else {
