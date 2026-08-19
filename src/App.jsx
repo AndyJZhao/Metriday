@@ -1181,7 +1181,7 @@ function CalendarBlock({ task, selected, onSelect, onMoveStart, onComplete, onUn
     <div className={`calendar-task-block ${task.tone} ${selected ? "selected" : ""} ${task.completed ? "completed" : ""}`} style={blockStyle(task.start, task.end)} onClick={(event) => { event.stopPropagation(); onSelect(task.id); }} tabIndex={0} onKeyDown={(event) => { if (event.key === "Delete" || event.key === "Backspace") onUnschedule(task.id); }}>
       <div className="block-content" onPointerDown={(event) => onMoveStart(event, task.id)}><strong>{task.title}</strong><span>{formatRange(task.start, task.end)}</span></div>
       {selected ? <div className="block-actions"><IconButton label={task.completed ? "Mark incomplete" : "Mark complete"} onClick={() => onComplete(task.id)}>{task.completed ? <ArrowsClockwise size={15} /> : <Check size={15} />}</IconButton><IconButton label="Remove time" onClick={() => onUnschedule(task.id)}><Trash size={15} /></IconButton></div> : null}
-      <button type="button" className="resize-handle" aria-label={`Resize ${task.title}`} onPointerDown={(event) => onResizeStart(event, task.id)} />
+      <button type="button" className="resize-start-handle" aria-label={`Resize start of ${task.title}`} onPointerDown={(event) => onResizeStart(event, task.id, "start")} /><button type="button" className="resize-handle" aria-label={`Resize end of ${task.title}`} onPointerDown={(event) => onResizeStart(event, task.id, "end")} />
     </div>
   );
 }
@@ -1278,11 +1278,11 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
   const completeTask = (id) => { const nextTasks = tasks.map((task) => task.id === id ? { ...task, completed: !task.completed } : task); persistTasks(nextTasks, "Markdown task state updated"); };
   const titleCommit = () => persistTasks(tasks, "Markdown saved");
   const unscheduleTask = (id) => { const nextTasks = tasks.map((task) => task.id === id ? { ...task, start: null, end: null } : task); persistTasks(nextTasks, "Markdown updated · time removed, task preserved"); setLastUpdatedId(id); setSelectedTaskId(null); };
-  const resizeStart = (event, id) => {
-    event.preventDefault(); event.stopPropagation(); const task = tasks.find((item) => item.id === id); if (!task) return; const startY = event.clientY; const initialEnd = task.end;
-    let finalEnd = initialEnd;
-    const move = (moveEvent) => { const delta = Math.round(((moveEvent.clientY - startY) / HOUR_HEIGHT) * 4) * 15; finalEnd = Math.max(task.start + 30, Math.min(DAY_END, initialEnd + delta)); setTasks((items) => items.map((item) => item.id === id ? { ...item, end: finalEnd } : item)); };
-    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); const nextTasks = tasks.map((item) => item.id === id ? { ...item, end: finalEnd } : item); persistTasks(nextTasks, "Markdown updated · calendar duration changed"); setLastUpdatedId(id); };
+  const resizeStart = (event, id, edge = "end") => {
+    event.preventDefault(); event.stopPropagation(); const task = tasks.find((item) => item.id === id); if (!task || task.start == null || task.end == null) return; const startY = event.clientY; const initialValue = edge === "start" ? task.start : task.end;
+    let finalValue = initialValue;
+    const move = (moveEvent) => { const delta = Math.round(((moveEvent.clientY - startY) / HOUR_HEIGHT) * 4) * 15; finalValue = edge === "start" ? Math.max(DAY_START, Math.min(task.end - 30, task.start + delta)) : Math.max(task.start + 30, Math.min(DAY_END, task.end + delta)); setTasks((items) => items.map((item) => item.id === id ? { ...item, ...(edge === "start" ? { start: finalValue } : { end: finalValue }) } : item)); };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); const nextTasks = tasks.map((item) => item.id === id ? { ...item, ...(edge === "start" ? { start: finalValue } : { end: finalValue }) } : item); persistTasks(nextTasks, `Markdown updated · calendar ${edge === "start" ? "start" : "duration"} changed`); setLastUpdatedId(id); };
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
   };
   const addTask = (title) => { const nextTasks = [...tasks, { id: "task-" + Date.now(), title, tags: [], start: null, end: null, completed: false, tone: "soft" }]; persistTasks(nextTasks, "Markdown task added"); };
