@@ -12,6 +12,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 6. `06-today-current-state.png` — Today after reconciling the current-block banner with the native API; no scheduled block is no longer replaced by preview content.
 7. `07-review-category-pulse.png` — Review after adding a RescueTime-style category breakdown sourced from the same activity evidence.
 8. `08-review-evidence-grid.png` — Review after placing Planned vs. Actual beside Category pulse so category colors remain visible in the first viewport.
+9. `09-plan-month-calendar.png` — Plan after replacing the Day / Week branch with a compact, actionable month calendar above the selected-day timeline.
 
 ## Findings applied
 
@@ -19,3 +20,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Activity rows remain full-width keyboard-accessible buttons without default browser bevels or dark borders.
 - Today only shows a scheduled current block when the native API provides one; otherwise it presents an explicit empty state and a generic Start timer action.
 - Review keeps planned/actual evidence and Focused/Distracting/Other category colors in the same first-viewport evidence grid.
+- Plan exposes 42 actionable month cells and keeps the selected date's draggable timeline directly below the calendar.

@@ -862,20 +862,31 @@ function CalendarBlock({ task, selected, onSelect, onMoveStart, onComplete, onUn
 
 function CalendarPanel({ tasks, selectedTaskId, setSelectedTaskId, onDropTask, onMoveStart, onComplete, onUnschedule, onResizeStart, dateKey, onSelectDate }) {
   const timelineRef = useRef(null);
-  const [mode, setMode] = useState("day");
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date(`${dateKey}T12:00:00`));
+  useEffect(() => {
+    const selectedMonth = new Date(`${dateKey}T12:00:00`);
+    if (!Number.isNaN(selectedMonth.getTime()) && (selectedMonth.getMonth() !== visibleMonth.getMonth() || selectedMonth.getFullYear() !== visibleMonth.getFullYear())) {
+      setVisibleMonth(selectedMonth);
+    }
+  }, [dateKey, visibleMonth]);
   const drop = (event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/task-id") || selectedTaskId; if (!id || !timelineRef.current) return; const rect = timelineRef.current.getBoundingClientRect(); onDropTask(id, event.clientY - rect.top); };
   const calendarItems = [
     { label: "Today", onSelect: () => onSelectDate(localDateKey()) },
     { label: "Previous day", onSelect: () => onSelectDate(offsetDateKey(dateKey, -1)) },
     { label: "Next day", onSelect: () => onSelectDate(offsetDateKey(dateKey, 1)) }
   ];
-  if (mode === "week") return (
-    <section className="calendar-panel week-panel" aria-label="Week calendar"><div className="calendar-toolbar"><div className="segmented-control"><button type="button" onClick={() => setMode("day")}>Day</button><button type="button" className="active">Week</button></div><ActionMenu label="Calendar options" items={calendarItems}><DotsThree size={21} /></ActionMenu></div><h2>{planDateLabel(offsetDateKey(dateKey, -3))}–{planDateLabel(offsetDateKey(dateKey, 3))}</h2><div className="week-grid">{Array.from({ length: 7 }, (_, index) => offsetDateKey(dateKey, index - 3)).map((day) => <button type="button" key={day} className={day === dateKey ? "today" : ""} onClick={() => { onSelectDate(day); setMode("day"); }}><span>{new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</span>{day === dateKey ? <strong>{tasks.filter((task) => task.start != null).length} blocks</strong> : <small>Open</small>}</button>)}</div><p className="week-hint">Select a day to open its draggable timeline.</p></section>
-  );
+  const firstOfMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1, 12);
+  const leadingDays = (firstOfMonth.getDay() + 6) % 7;
+  const daysInMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0, 12).getDate();
+  const cellCount = Math.ceil((leadingDays + daysInMonth) / 7) * 7;
+  const monthDays = Array.from({ length: cellCount }, (_, index) => localDateKey(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), index - leadingDays + 1, 12)));
+  const monthTitle = visibleMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const selectedDateLabel = new Date(`${dateKey}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
   return (
-    <section className="calendar-panel" aria-label="Day calendar">
-      <div className="calendar-toolbar"><div className="segmented-control"><button type="button" className="active">Day</button><button type="button" onClick={() => setMode("week")}>Week</button></div><ActionMenu label="Calendar options" items={calendarItems}><DotsThree size={21} /></ActionMenu></div>
-      <h2>{new Date(`${dateKey}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</h2><div className="all-day-row"><span>all-day</span></div>
+    <section className="calendar-panel" aria-label="Calendar and continuous timeline">
+      <div className="calendar-toolbar"><div className="month-navigation"><IconButton label="Previous month" onClick={() => setVisibleMonth((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1, 12))}><CaretLeft size={16} /></IconButton><strong>{monthTitle}</strong><IconButton label="Next month" onClick={() => setVisibleMonth((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1, 12))}><CaretRight size={16} /></IconButton></div><ActionMenu label="Calendar options" items={calendarItems}><DotsThree size={21} /></ActionMenu></div>
+      <div className="month-calendar" aria-label={`${monthTitle} calendar`}><div className="month-weekdays" aria-hidden="true">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => <span key={day}>{day}</span>)}</div><div className="month-grid">{monthDays.map((day) => { const date = new Date(`${day}T12:00:00`); const isCurrentMonth = date.getMonth() === visibleMonth.getMonth(); const isSelected = day === dateKey; const isToday = day === localDateKey(); const taskCount = isSelected ? tasks.filter((task) => task.start != null).length : 0; return <button type="button" key={day} className={`month-day ${isCurrentMonth ? "" : "outside"} ${isSelected ? "selected" : ""} ${isToday ? "today" : ""}`} onClick={() => onSelectDate(day)} aria-label={`${date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}${taskCount ? `, ${taskCount} scheduled blocks` : ""}`}><span>{date.getDate()}</span>{taskCount ? <small>{taskCount}</small> : null}</button>; })}</div></div>
+      <h2>{selectedDateLabel}</h2><div className="all-day-row"><span>all-day</span></div>
       <div ref={timelineRef} className={`plan-calendar-canvas ${selectedTaskId ? "ready-to-schedule" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={drop} onClick={(event) => { if (!selectedTaskId || !timelineRef.current) return; const rect = timelineRef.current.getBoundingClientRect(); onDropTask(selectedTaskId, event.clientY - rect.top); }}>
         <HourLabels end={20} /><GridLines end={20} />
         <div className="static-calendar-block morning" style={blockStyle(8 * 60, 9 * 60)}><strong>Morning routine</strong><span>08:00–09:00</span></div>
