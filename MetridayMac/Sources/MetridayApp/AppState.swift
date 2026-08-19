@@ -227,6 +227,42 @@ final class AppState: ObservableObject {
             return .jsonObject(response)
         }
 
+        if request.method == "GET", path == "/v1/preferences" {
+            return .jsonObject(preferencesAPI())
+        }
+
+        if (request.method == "PATCH" || request.method == "PUT"), path == "/v1/preferences" {
+            guard let body = apiBody(request) else {
+                return .error("Preferences body is invalid", statusCode: 400)
+            }
+            if let value = body["idle_threshold_seconds"] as? Int {
+                preferences.idleThresholdSeconds = min(max(value, 30), 3600)
+            }
+            if let value = body["track_weekends"] as? Bool {
+                preferences.trackWeekends = value
+            }
+            if let value = body["track_only_during_working_hours"] as? Bool {
+                preferences.trackOnlyDuringWorkingHours = value
+            }
+            if let value = body["working_hours_start_minute"] as? Int {
+                preferences.workingHoursStartMinute = min(max(value, 0), 1439)
+            }
+            if let value = body["working_hours_end_minute"] as? Int {
+                preferences.workingHoursEndMinute = min(max(value, 0), 1439)
+            }
+            if let value = body["start_tracking_when_app_opens"] as? Bool {
+                preferences.startTrackingWhenAppOpens = value
+            }
+            if let value = body["auto_stop_timer_on_sleep"] as? Bool {
+                preferences.autoStopTimerOnSleep = value
+            }
+            if let value = body["allow_local_network_api"] as? Bool {
+                preferences.allowLocalNetworkAPI = value
+                localAPIServer.setAllowsLAN(value)
+            }
+            return .jsonObject(preferencesAPI())
+        }
+
         if request.method == "GET", path == "/v1/project-rules" {
             return .jsonObject([
                 "data": projectStore.rules.map(apiProjectRule),
@@ -1980,6 +2016,22 @@ final class AppState: ObservableObject {
             )
         }
         return options
+    }
+
+    private func preferencesAPI() -> [String: Any] {
+        [
+            "idle_threshold_seconds": preferences.idleThresholdSeconds,
+            "track_weekends": preferences.trackWeekends,
+            "track_only_during_working_hours": preferences.trackOnlyDuringWorkingHours,
+            "working_hours_start_minute": preferences.workingHoursStartMinute,
+            "working_hours_end_minute": preferences.workingHoursEndMinute,
+            "start_tracking_when_app_opens": preferences.startTrackingWhenAppOpens,
+            "auto_stop_timer_on_sleep": preferences.autoStopTimerOnSleep,
+            "allow_local_network_api": preferences.allowLocalNetworkAPI,
+            "tracking": activityMonitor.isTracking,
+            "api_endpoint": localAPIServer.endpoint,
+            "api_allows_lan": localAPIServer.allowsLAN,
+        ]
     }
 
     private func apiBoolean(_ rawValue: String?, default defaultValue: Bool) -> Bool {

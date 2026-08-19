@@ -510,7 +510,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 
 /* Web companion connection */
 .settings-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(29, 32, 43, 0.22); }
-.settings-dialog { width: min(520px, 100%); padding: 25px; border: 1px solid #dfe1e7; border-radius: 14px; background: #fff; box-shadow: 0 22px 60px rgba(32, 38, 66, 0.2); }
+.settings-dialog { width: min(560px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: 25px; border: 1px solid #dfe1e7; border-radius: 14px; background: #fff; box-shadow: 0 22px 60px rgba(32, 38, 66, 0.2); }
 .settings-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .settings-dialog-heading span { color: var(--accent); font-size: 12px; font-weight: 650; }
 .settings-dialog-heading h2 { margin: 5px 0 0; color: #282b34; font-size: 21px; letter-spacing: -0.03em; }
@@ -526,6 +526,21 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .settings-connection-state small { margin-left: auto; color: #9297a3; font-size: 10px; }
 .settings-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 15px; }
 .settings-actions .primary-button, .settings-actions .secondary-button { min-height: 38px; font-size: 12px; }
+.settings-section { display: grid; gap: 9px; padding-top: 15px; border-top: 1px solid #eceef2; }
+.settings-section-heading { display: flex; align-items: center; gap: 7px; color: #343842; font-size: 13px; }
+.settings-section-heading strong { font-weight: 700; }
+.settings-state-dot, .settings-connection-state i, .settings-source-status i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #c2c5ce; }
+.settings-state-dot.connected, .settings-connection-state i.connected, .settings-source-status i.connected { background: var(--success); }
+.settings-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #454a55; font-size: 12px; }
+.settings-toggle-row label, .settings-toggle-row > span { display: inline-flex; align-items: center; gap: 7px; }
+.settings-toggle-row small { color: var(--muted); font-size: 10px; text-align: right; }
+.settings-toggle-row input { accent-color: var(--accent); }
+.settings-field-row { display: flex; align-items: center; justify-content: space-between; color: #454a55; font-size: 12px; }
+.settings-field-row select, .settings-time-row input { min-height: 30px; padding: 0 7px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #343740; font-size: 11px; }
+.settings-time-row { display: flex; align-items: end; gap: 8px; color: var(--muted); font-size: 11px; }
+.settings-time-row label { display: grid; gap: 5px; color: #454a55; }
+.settings-source-status > span { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+.settings-form button:disabled, .settings-form input:disabled, .settings-form select:disabled { cursor: not-allowed; opacity: 0.55; }
 .settings-install-note { display: flex; gap: 10px; margin-top: 23px; padding-top: 17px; border-top: 1px solid #eceef2; color: var(--accent); }
 .settings-install-note > div { display: flex; flex-direction: column; gap: 4px; }
 .settings-install-note strong { color: #3a3f4d; font-size: 12px; }

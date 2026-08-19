@@ -149,6 +149,7 @@ function useMetridayAPI(dateKey, apiBase) {
     reminders: { data: [], authorized: false, status: "Reminders access not connected" },
     screenTime: { data: [], database_available: false, status: "Screen Time integration not connected" },
     projectRules: [],
+    preferences: null,
     weekly: [],
     insights: [],
   });
@@ -186,6 +187,7 @@ function useMetridayAPI(dateKey, apiBase) {
         request(`/v1/reminders?date=${date}`),
         request(`/v1/screen-time?date=${date}`),
         request("/v1/project-rules"),
+        request("/v1/preferences"),
       ]);
       const value = (index, fallback) => results[index].status === "fulfilled" ? results[index].value : fallback;
       setSnapshot({
@@ -209,6 +211,7 @@ function useMetridayAPI(dateKey, apiBase) {
         reminders: value(12, { data: [], authorized: false, status: "Reminders access not connected" }),
         screenTime: value(13, { data: [], database_available: false, status: "Screen Time integration not connected" }),
         projectRules: value(14, { data: [] })?.data || [],
+        preferences: value(15, null),
       });
       setRefreshVersion((value) => value + 1);
     } catch (error) {
@@ -254,6 +257,10 @@ function useMetridayAPI(dateKey, apiBase) {
     startTimer: (title, projectID) => mutate("/v1/timer/start", { title, projectID }),
     stopTimer: () => mutate("/v1/timer/stop"),
     toggleTracking: () => mutate(snapshot.status?.tracking ? "/v1/tracking/pause" : "/v1/tracking/resume"),
+    updatePreferences: async (preferences) => {
+      await request("/v1/preferences", { method: "PATCH", body: JSON.stringify(preferences) });
+      await refresh();
+    },
     syncNow: () => mutate("/v1/sync/now"),
     addTimeEntry: async (entry) => {
       await request("/v1/time-entries", { method: "POST", body: JSON.stringify(entry) });
@@ -659,20 +666,34 @@ function markdownWithTasks(raw, tasks) {
   return updated.join("\n");
 }
 
-function ConnectionSettings({ open, apiBase, connected, onSave, onClose }) {
+function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) {
   const [draft, setDraft] = useState(apiBase);
+  const [preferences, setPreferences] = useState({
+    idle_threshold_seconds: 120,
+    track_weekends: true,
+    track_only_during_working_hours: false,
+    working_hours_start_minute: 540,
+    working_hours_end_minute: 1080,
+    start_tracking_when_app_opens: true,
+    auto_stop_timer_on_sleep: true,
+    allow_local_network_api: false,
+  });
   const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setDraft(apiBase);
+      setPreferences((current) => ({ ...current, ...(api?.preferences || {}) }));
       setMessage("");
     }
   }, [apiBase, open]);
 
   if (!open) return null;
 
-  const save = (event) => {
+  const preferenceTime = (minutes) => `${String(Math.floor(Number(minutes || 0) / 60)).padStart(2, "0")}:${String(Number(minutes || 0) % 60).padStart(2, "0")}`;
+  const updatePreference = (key, value) => setPreferences((current) => ({ ...current, [key]: value }));
+  const save = async (event) => {
     event.preventDefault();
     const value = String(draft || "").trim();
     if (!value) {
@@ -685,10 +706,14 @@ function ConnectionSettings({ open, apiBase, connected, onSave, onClose }) {
       if (!["http:", "https:"].includes(url.protocol) || !url.host) throw new Error("unsupported protocol");
       const normalized = url.toString().replace(/\/$/, "");
       window.localStorage.setItem(API_BASE_STORAGE_KEY, normalized);
+      setSaving(true);
+      if (connected && api?.updatePreferences) await api.updatePreferences(preferences);
       onSave(normalized);
       onClose();
     } catch {
-      setMessage("请输入有效的 http:// 或 https:// API 地址。");
+      setMessage("无法保存设置，请确认原生应用仍在运行。");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -700,16 +725,30 @@ function ConnectionSettings({ open, apiBase, connected, onSave, onClose }) {
   };
 
   return <div className="settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-    <div className="settings-dialog-heading"><div><span>Connection</span><h2 id="settings-title">Metriday Web App</h2></div><IconButton label="Close settings" onClick={onClose}><X size={18} /></IconButton></div>
-    <p className="settings-description">把 Web 伴侣连接到正在运行的 Metriday 原生应用。Mac 默认使用本机地址；手机或另一台设备请填写 Mac 的局域网 IP 或 HTTPS 网关地址。</p>
+    <div className="settings-dialog-heading"><div><span>Preferences</span><h2 id="settings-title">Metriday Settings</h2></div><IconButton label="Close settings" onClick={onClose}><X size={18} /></IconButton></div>
+    <p className="settings-description">Tracking, working hours, privacy, and the local Web companion connection are kept on this Mac.</p>
     <form className="settings-form" onSubmit={save}>
-      <label htmlFor="metriday-api-base">Native API base URL</label>
-      <div className="settings-input-wrap"><LinkSimple size={18} /><input id="metriday-api-base" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="http://127.0.0.1:8765" autoFocus /></div>
-      <div className="settings-connection-state"><i className={connected ? "connected" : ""} /><span>{connected ? "Connected" : "Not connected"}</span><small>不会上传到 Metriday 云端</small></div>
+      <div className="settings-section"><div className="settings-section-heading"><strong>Tracking</strong><span className={`settings-state-dot ${connected ? "connected" : ""}`} />{connected ? api.status?.tracking ? "Running" : "Paused" : "Offline"}</div>
+        <div className="settings-toggle-row"><label><input type="checkbox" checked={Boolean(api.status?.tracking)} onChange={() => api.toggleTracking()} disabled={!connected || saving} />Automatic activity tracking</label><small>{connected ? "Window, app, browser, and idle evidence" : "Connect the native app to change tracking"}</small></div>
+        <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.start_tracking_when_app_opens)} onChange={(event) => updatePreference("start_tracking_when_app_opens", event.target.checked)} disabled={!connected || saving} />Start tracking when Metriday opens</span></label>
+        <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.auto_stop_timer_on_sleep)} onChange={(event) => updatePreference("auto_stop_timer_on_sleep", event.target.checked)} disabled={!connected || saving} />Stop timers when the Mac sleeps</span></label>
+        <label className="settings-field-row"><span>Idle detection</span><select value={preferences.idle_threshold_seconds} onChange={(event) => updatePreference("idle_threshold_seconds", Number(event.target.value))} disabled={!connected || saving}><option value={60}>1 min</option><option value={120}>2 min</option><option value={180}>3 min</option><option value={300}>5 min</option><option value={600}>10 min</option></select></label>
+      </div>
+      <div className="settings-section"><div className="settings-section-heading"><strong>Working hours</strong></div>
+        <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.track_weekends)} onChange={(event) => updatePreference("track_weekends", event.target.checked)} disabled={!connected || saving} />Track on weekends</span></label>
+        <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.track_only_during_working_hours)} onChange={(event) => updatePreference("track_only_during_working_hours", event.target.checked)} disabled={!connected || saving} />Track only during working hours</span></label>
+        <div className="settings-time-row"><label>From<input type="time" value={preferenceTime(preferences.working_hours_start_minute)} onChange={(event) => updatePreference("working_hours_start_minute", Math.max(0, Math.min(1439, Number(event.target.value.split(":")[0]) * 60 + Number(event.target.value.split(":")[1] || 0))))} disabled={!connected || saving} /></label><span>to</span><label>To<input type="time" value={preferenceTime(preferences.working_hours_end_minute)} onChange={(event) => updatePreference("working_hours_end_minute", Math.max(0, Math.min(1439, Number(event.target.value.split(":")[0]) * 60 + Number(event.target.value.split(":")[1] || 0))))} disabled={!connected || saving} /></label></div>
+      </div>
+      <div className="settings-section"><div className="settings-section-heading"><strong>Privacy & connection</strong></div>
+        <div className="settings-toggle-row"><label><input type="checkbox" checked={Boolean(preferences.allow_local_network_api)} onChange={(event) => updatePreference("allow_local_network_api", event.target.checked)} disabled={!connected || saving} />Allow local network access</label><small>Required for another device to use this Web companion</small></div>
+        <label htmlFor="metriday-api-base">Native API base URL</label><div className="settings-input-wrap"><LinkSimple size={18} /><input id="metriday-api-base" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="http://127.0.0.1:8765" /></div>
+        <div className="settings-connection-state"><i className={connected ? "connected" : ""} /><span>{connected ? "Native API connected" : "Native API not connected"}</span><small>Local-first · no cloud upload</small></div>
+      </div>
+      <div className="settings-section settings-source-status"><div className="settings-section-heading"><strong>Data sources</strong></div><span><i className={api.calendarEvents?.authorized ? "connected" : ""} />Calendar · {api.calendarEvents?.status || "Not connected"}</span><span><i className={api.reminders?.authorized ? "connected" : ""} />Reminders · {api.reminders?.status || "Not connected"}</span><span><i className={api.screenTime?.database_available ? "connected" : ""} />Screen Time · {api.screenTime?.status || "Not connected"}</span></div>
       {message ? <p className="entry-message" role="status">{message}</p> : null}
-      <div className="settings-actions"><button type="button" className="secondary-button" onClick={reset}>Use this Mac</button><button type="submit" className="primary-button">Save & connect</button></div>
+      <div className="settings-actions"><button type="button" className="secondary-button" onClick={reset}>Use this Mac</button><button type="submit" className="primary-button" disabled={saving}>{saving ? "Saving…" : "Save settings"}</button></div>
     </form>
-    <div className="settings-install-note"><Laptop size={18} /><div><strong>Install on phone</strong><span>在 Safari/Chrome 的分享或菜单中选择“添加到主屏幕”。离线时仍可打开界面，数据请求会在恢复连接后重试。</span></div></div>
+    <div className="settings-install-note"><Laptop size={18} /><div><strong>Install on phone</strong><span>在 Safari/Chrome 的分享或菜单中选择“添加到主屏幕”。切换到局域网访问后，其他设备可通过 Mac 地址连接。</span></div></div>
   </section></div>;
 }
 
@@ -1823,5 +1862,5 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const api = useMetridayAPI(dateKey, apiBase);
   const content = useMemo(() => page === "plan" ? <PlanPage tasks={tasks} setTasks={setTasks} api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "activities" ? <ActivitiesPage api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "review" ? <ReviewPage api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "rules" ? <RulesPageLive api={api} /> : <TodayPage setPage={setPage} api={api} dateKey={dateKey} setDateKey={setDateKey} />, [api, page, tasks, dateKey]);
-  return <div className="app-shell"><Sidebar page={page} setPage={setPage} api={api} onOpenSettings={() => setSettingsOpen(true)} />{content}<ConnectionSettings open={settingsOpen} apiBase={apiBase} connected={api.connected} onSave={setApiBase} onClose={() => setSettingsOpen(false)} /></div>;
+  return <div className="app-shell"><Sidebar page={page} setPage={setPage} api={api} onOpenSettings={() => setSettingsOpen(true)} />{content}<ConnectionSettings open={settingsOpen} api={api} apiBase={apiBase} connected={api.connected} onSave={setApiBase} onClose={() => setSettingsOpen(false)} /></div>;
 }
