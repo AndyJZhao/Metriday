@@ -165,7 +165,7 @@ final class ActivityCategoryStore: ObservableObject {
         )
         categories.append(definition)
         persist()
-        statusMessage = "Category created · (name)"
+        statusMessage = "Category created · \(name)"
         return definition.id
     }
 
@@ -180,7 +180,7 @@ final class ActivityCategoryStore: ObservableObject {
         updated.rules = normalizedRules(definition.rules)
         categories[index] = updated
         persist()
-        statusMessage = "Category updated · (name)"
+        statusMessage = "Category updated · \(name)"
     }
 
     func archive(_ definition: ActivityCategoryDefinition) {

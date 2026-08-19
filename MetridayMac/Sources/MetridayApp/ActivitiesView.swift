@@ -1509,7 +1509,7 @@ struct ActivitiesView: View {
                 ForEach((rows ?? categoryRows(segments)).prefix(6)) { row in
                     HStack(spacing: 7) {
                         Circle()
-                            .fill(row.isDistracted ? ActivityCategoryKind.distracting.color : ActivityCategoryKind.focused.color)
+                            .fill(categoryColor(for: row.category))
                             .frame(width: 6, height: 6)
                         Text(row.name)
                             .font(.system(size: 11))
@@ -2401,8 +2401,9 @@ struct ActivitiesView: View {
         let stopWords: Set<String> = [
             "the", "and", "for", "with", "from", "http", "https", "www", "com"
         ]
-        var values: [String: (seconds: Int, distracted: Bool)] = [:]
+        var values: [String: CategoryAggregation] = [:]
         for segment in keywordSegments {
+            let category = category(for: segment)
             let source = "\(segment.windowTitle) \(segment.resource)"
             let words = source
                 .split { character in
@@ -2411,32 +2412,46 @@ struct ActivitiesView: View {
                 .map { $0.lowercased() }
                 .filter { $0.count >= 3 && !stopWords.contains($0) }
             for word in Set(words) {
-                let current = values[word, default: (seconds: 0, distracted: false)]
-                values[word] = (
-                    seconds: current.seconds + segment.durationSeconds,
-                    distracted: current.distracted || segment.relevance == .distracted
+                values[word, default: CategoryAggregation()].add(
+                    seconds: segment.durationSeconds,
+                    category: category
                 )
             }
         }
         return values.map { name, value in
-            CategoryRow(name: name, seconds: value.seconds, isDistracted: value.distracted)
+            CategoryRow(
+                name: name,
+                seconds: value.seconds,
+                category: value.primaryCategory ?? ActivityCategoryDefinition(
+                    name: "Other",
+                    role: .other,
+                    isSystem: true
+                )
+            )
         }
         .sorted { $0.seconds > $1.seconds }
     }
 
     private func categoryRows(_ segments: [ActivitySegment]) -> [CategoryRow] {
-        var values: [String: (seconds: Int, distracted: Bool)] = [:]
+        var values: [String: CategoryAggregation] = [:]
         for segment in segments {
             let name = categoryName(for: segment)
             guard !name.isEmpty else { continue }
-            let current = values[name, default: (seconds: 0, distracted: false)]
-            values[name] = (
-                seconds: current.seconds + segment.durationSeconds,
-                distracted: current.distracted || segment.relevance == .distracted
+            values[name, default: CategoryAggregation()].add(
+                seconds: segment.durationSeconds,
+                category: category(for: segment)
             )
         }
         return values.map { name, value in
-            CategoryRow(name: name, seconds: value.seconds, isDistracted: value.distracted)
+            CategoryRow(
+                name: name,
+                seconds: value.seconds,
+                category: value.primaryCategory ?? ActivityCategoryDefinition(
+                    name: "Other",
+                    role: .other,
+                    isSystem: true
+                )
+            )
         }
         .sorted { $0.seconds > $1.seconds }
     }
@@ -3134,7 +3149,31 @@ private struct CategoryRow: Identifiable {
     var id: String { name }
     let name: String
     let seconds: Int
-    let isDistracted: Bool
+    let category: ActivityCategoryDefinition
+}
+
+private struct CategoryAggregation {
+    private struct Bucket {
+        let category: ActivityCategoryDefinition
+        var seconds: Int
+    }
+
+    private(set) var seconds = 0
+    private var buckets: [UUID: Bucket] = [:]
+
+    mutating func add(seconds: Int, category: ActivityCategoryDefinition) {
+        self.seconds += seconds
+        if var bucket = buckets[category.id] {
+            bucket.seconds += seconds
+            buckets[category.id] = bucket
+        } else {
+            buckets[category.id] = Bucket(category: category, seconds: seconds)
+        }
+    }
+
+    var primaryCategory: ActivityCategoryDefinition? {
+        buckets.values.max { first, second in first.seconds < second.seconds }?.category
+    }
 }
 
 private struct CalendarEventsPanel: View {
