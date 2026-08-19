@@ -15,6 +15,27 @@ enum ActivityTimeRange: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+enum ActivityTimelineOrientation: String, CaseIterable, Codable, Identifiable {
+    case horizontal
+    case vertical
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .horizontal: return "Horizontal"
+        case .vertical: return "Vertical"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .horizontal: return "rectangle.split.3x1"
+        case .vertical: return "rectangle.split.3x1.fill"
+        }
+    }
+}
+
 /// Display-only preferences for Activities. They do not change what the
 /// activity monitor captures or what is stored on disk.
 @MainActor
@@ -28,6 +49,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
     @Published var groupByDevice: Bool { didSet { persist() } }
     @Published var includeIdle: Bool { didSet { persist() } }
     @Published var selectedDevice: String { didSet { persist() } }
+    @Published var timelineOrientation: ActivityTimelineOrientation { didSet { persist() } }
 
     private let fileURL: URL
 
@@ -45,6 +67,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             groupByDevice = payload.groupByDevice
             includeIdle = payload.includeIdle
             selectedDevice = payload.selectedDevice
+            timelineOrientation = payload.timelineOrientation
         } else {
             includeTimeEntries = true
             showWindowTitles = true
@@ -55,6 +78,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             groupByDevice = false
             includeIdle = false
             selectedDevice = "All Devices"
+            timelineOrientation = .horizontal
             persist()
         }
     }
@@ -74,7 +98,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
                 groupByProject: groupByProject,
                 groupByDevice: groupByDevice,
                 includeIdle: includeIdle,
-                selectedDevice: selectedDevice
+                selectedDevice: selectedDevice,
+                timelineOrientation: timelineOrientation
             )
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -102,6 +127,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
         let groupByDevice: Bool
         let includeIdle: Bool
         let selectedDevice: String
+        let timelineOrientation: ActivityTimelineOrientation
 
         init(
             includeTimeEntries: Bool,
@@ -112,7 +138,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
             groupByProject: Bool,
             groupByDevice: Bool,
             includeIdle: Bool,
-            selectedDevice: String
+            selectedDevice: String,
+            timelineOrientation: ActivityTimelineOrientation
         ) {
             self.includeTimeEntries = includeTimeEntries
             self.showWindowTitles = showWindowTitles
@@ -123,6 +150,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             self.groupByDevice = groupByDevice
             self.includeIdle = includeIdle
             self.selectedDevice = selectedDevice
+            self.timelineOrientation = timelineOrientation
         }
 
         init(from decoder: Decoder) throws {
@@ -136,6 +164,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             groupByDevice = try container.decodeIfPresent(Bool.self, forKey: .groupByDevice) ?? false
             includeIdle = try container.decodeIfPresent(Bool.self, forKey: .includeIdle) ?? false
             selectedDevice = try container.decodeIfPresent(String.self, forKey: .selectedDevice) ?? "All Devices"
+            timelineOrientation = try container.decodeIfPresent(ActivityTimelineOrientation.self, forKey: .timelineOrientation) ?? .horizontal
         }
     }
 }

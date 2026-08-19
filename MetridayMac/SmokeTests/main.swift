@@ -634,6 +634,7 @@ Task { @MainActor in
     activityPreferences.groupByDevice = true
     activityPreferences.includeIdle = true
     activityPreferences.selectedDevice = "Test Mac"
+    activityPreferences.timelineOrientation = .vertical
     let reloadedActivityPreferences = ActivitiesPreferencesStore(rootDirectory: activityPreferencesRoot)
     expect(!reloadedActivityPreferences.includeTimeEntries, "Activity display preferences should persist timeline visibility")
     expect(!reloadedActivityPreferences.showWindowTitles, "Activity display preferences should persist title visibility")
@@ -641,6 +642,7 @@ Task { @MainActor in
     expect(reloadedActivityPreferences.activityDisplayMode == "unified", "Activity display mode should persist")
     expect(!reloadedActivityPreferences.groupByProject && reloadedActivityPreferences.groupByDevice, "Activity grouping preferences should persist")
     expect(reloadedActivityPreferences.includeIdle && reloadedActivityPreferences.selectedDevice == "Test Mac", "Activity filter preferences should persist")
+    expect(reloadedActivityPreferences.timelineOrientation == .vertical, "Timeline orientation should persist")
     expect(
         projectStore.addRule(
             projectID: researchProjectID,

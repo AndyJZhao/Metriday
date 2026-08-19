@@ -53,6 +53,7 @@ struct ActivitiesView: View {
     @State private var collapsedUnifiedAppGroups: Set<String> = []
     @State private var collapsedProjectIDs: Set<UUID> = []
     @State private var selectedDevice = ActivityDeviceFilter.all
+    @State private var timelineOrientation: ActivityTimelineOrientation = .horizontal
     @State private var timelineSelectionStart: Int?
     @State private var timelineSelectionEnd: Int?
     @State private var showingNewProject = false
@@ -97,6 +98,10 @@ struct ActivitiesView: View {
                             timeEntries: preferences.includeTimeEntries ? timelineTimeEntries : [],
                             selectedDate: selectedDate,
                             project: { projectStore.project($0) },
+                            orientation: timelineOrientation,
+                            onToggleOrientation: {
+                                timelineOrientation = timelineOrientation == .horizontal ? .vertical : .horizontal
+                            },
                             selectionStart: $timelineSelectionStart,
                             selectionEnd: $timelineSelectionEnd,
                             onCreateTimeEntry: { startMinute, endMinute in
@@ -270,6 +275,10 @@ struct ActivitiesView: View {
             guard displayPreferencesRestored else { return }
             preferences.selectedDevice = device
         }
+        .onChange(of: timelineOrientation) { _, orientation in
+            guard displayPreferencesRestored else { return }
+            preferences.timelineOrientation = orientation
+        }
     }
 
     private func restoreDisplayPreferences() {
@@ -278,6 +287,7 @@ struct ActivitiesView: View {
         groupActivitiesByProject = preferences.groupByProject
         groupActivitiesByDevice = preferences.groupByDevice
         includeIdle = preferences.includeIdle
+        timelineOrientation = preferences.timelineOrientation
         selectedDevice = availableDevices.contains(preferences.selectedDevice)
             ? preferences.selectedDevice
             : ActivityDeviceFilter.all
@@ -3335,6 +3345,8 @@ private struct ActivityTimelinePanel: View {
     let timeEntries: [TimeEntry]
     let selectedDate: Date
     let project: (UUID?) -> TrackingProject?
+    let orientation: ActivityTimelineOrientation
+    let onToggleOrientation: () -> Void
     @Binding var selectionStart: Int?
     @Binding var selectionEnd: Int?
     let onCreateTimeEntry: (Int?, Int?) -> Void
@@ -3357,6 +3369,13 @@ private struct ActivityTimelinePanel: View {
                         .foregroundStyle(MetridayTheme.secondary)
                 }
                 Spacer()
+                Button(action: onToggleOrientation) {
+                    Image(systemName: orientation.icon)
+                }
+                .buttonStyle(.borderless)
+                .help("Toggle timeline orientation (\(orientation.label))")
+                .accessibilityLabel("Toggle timeline orientation")
+                .accessibilityIdentifier("activities.timeline-orientation")
                 if selectionStart != nil, selectionEnd != nil {
                     Button("Create Time Entry") {
                         onCreateTimeEntry(selectionStart, selectionEnd)
@@ -3379,6 +3398,7 @@ private struct ActivityTimelinePanel: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
 
+            if orientation == .horizontal {
             GeometryReader { proxy in
                 ZStack(alignment: .topLeading) {
                     ForEach(0...24, id: \.self) { hour in
@@ -3576,6 +3596,9 @@ private struct ActivityTimelinePanel: View {
             .frame(height: 156)
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
+            } else {
+                verticalTimeline
+            }
         }
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -3583,6 +3606,146 @@ private struct ActivityTimelinePanel: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(MetridayTheme.line, lineWidth: 1)
         )
+    }
+
+    private var verticalTimeline: some View {
+        GeometryReader { proxy in
+            let labelWidth: CGFloat = 64
+            let chartWidth = max(1, proxy.size.width - labelWidth - 16)
+            VStack(alignment: .leading, spacing: 5) {
+                verticalLane(label: "MACOS", chartWidth: chartWidth) {
+                    ForEach(segments) { segment in
+                        let left = chartWidth * CGFloat(segment.startSecond) / 86_400
+                        let width = max(2, chartWidth * CGFloat(segment.durationSeconds) / 86_400)
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(color(for: segment.relevance).opacity(0.72))
+                            .frame(width: width, height: 16)
+                            .offset(x: left)
+                            .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
+                    }
+                }
+
+                verticalLane(label: "PROJECT", chartWidth: chartWidth) {
+                    ForEach(segments) { segment in
+                        let left = chartWidth * CGFloat(segment.startSecond) / 86_400
+                        let width = max(2, chartWidth * CGFloat(segment.durationSeconds) / 86_400)
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(color(for: project(segment.projectID)?.color).opacity(0.62))
+                            .frame(width: width, height: 16)
+                            .offset(x: left)
+                            .help("Project: \(project(segment.projectID)?.name ?? "None")")
+                    }
+                }
+
+                verticalLane(label: "TIME ENTRIES", chartWidth: chartWidth) {
+                    ForEach(timeEntries) { entry in
+                        if let range = clippedRange(for: entry) {
+                            let left = chartWidth * CGFloat(range.start) / 86_400
+                            let width = max(2, chartWidth * CGFloat(range.end - range.start) / 86_400)
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(MetridayTheme.warning.opacity(0.18))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                        .stroke(MetridayTheme.warning, lineWidth: 1)
+                                )
+                                .frame(width: width, height: 16)
+                                .offset(x: left)
+                                .contentShape(Rectangle())
+                                .onTapGesture { onEditTimeEntry(entry) }
+                                .help("Recorded time · \(entry.title)")
+                        }
+                    }
+                    ForEach(calendarEvents) { event in
+                        let start = max(0, min(86_400, second(of: event.start)))
+                        let end = max(start + 900, min(86_400, second(of: event.end)))
+                        let left = chartWidth * CGFloat(start) / 86_400
+                        let width = max(2, chartWidth * CGFloat(end - start) / 86_400)
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(MetridayTheme.accent.opacity(0.10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                    .strokeBorder(
+                                        MetridayTheme.accent,
+                                        style: StrokeStyle(lineWidth: 1, dash: [3, 2])
+                                    )
+                            )
+                            .frame(width: width, height: 16)
+                            .offset(x: left)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                onRecordCalendarEvent(event, NSEvent.modifierFlags.contains(.option))
+                            }
+                            .help("Calendar event · \(event.title)")
+                    }
+                }
+
+                HStack(spacing: 0) {
+                    Color.clear.frame(width: labelWidth)
+                    ForEach(0..<24, id: \.self) { hour in
+                        Text(String(format: "%02d", hour))
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(MetridayTheme.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .frame(width: proxy.size.width - 16, alignment: .leading)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 4)
+                    .onChanged { value in
+                        let minute = minute(
+                            at: value.location.x - labelWidth - 16,
+                            width: chartWidth
+                        )
+                        if dragAnchorMinute == nil {
+                            dragAnchorMinute = minute
+                        }
+                        guard let anchor = dragAnchorMinute else { return }
+                        selectionStart = min(anchor, minute)
+                        selectionEnd = min(1_440, max(anchor + 15, minute))
+                    }
+                    .onEnded { _ in
+                        dragAnchorMinute = nil
+                    }
+            )
+            .onHover { isInside in
+                if !isInside {
+                    hoveredSegmentID = nil
+                    hoveredTimeEntryID = nil
+                    hoveredCalendarEventID = nil
+                }
+            }
+        }
+        .frame(height: 156)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+    }
+
+    private func verticalLane<Content: View>(
+        label: String,
+        chartWidth: CGFloat,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(MetridayTheme.secondary)
+                .frame(width: 58, alignment: .leading)
+            ZStack(alignment: .topLeading) {
+                ForEach(0...24, id: \.self) { hour in
+                    Rectangle()
+                        .fill(MetridayTheme.line.opacity(hour % 6 == 0 ? 0.9 : 0.4))
+                        .frame(width: 1, height: 18)
+                        .offset(x: chartWidth * CGFloat(hour) / 24)
+                }
+                content()
+            }
+            .frame(width: chartWidth, height: 18, alignment: .topLeading)
+        }
     }
 
     private var selectionLabel: String {
