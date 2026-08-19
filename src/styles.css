@@ -816,6 +816,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .project-create-form input, .project-create-form select { height: 38px; min-width: 0; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #2d3038; font-size: 12px; }
 .project-create-form button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px; padding: 0 12px; border: 0; border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font-size: 12px; font-weight: 650; }
 .project-create-form button:disabled { cursor: not-allowed; opacity: 0.55; }
+.project-auto-rules-toggle { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; color: #454a55; font-size: 11px; cursor: pointer; }
+.project-auto-rules-toggle input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
+.project-auto-rules-toggle small { flex-basis: 100%; margin-left: 20px; color: var(--muted); font-size: 10px; }
 .project-table { margin-top: 18px; border-top: 1px solid var(--border); }
 .project-row { display: grid; grid-template-columns: 10px minmax(150px, 1fr) minmax(120px, 1fr) 110px 70px 130px; align-items: center; gap: 10px; min-height: 48px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
 .project-edit-row { grid-template-columns: minmax(150px, 1fr) minmax(120px, 1fr) 90px 68px 110px 110px; }

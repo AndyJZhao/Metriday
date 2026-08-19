@@ -1766,6 +1766,7 @@ function ProjectPanel({ api, onAssignActivity }) {
   const [currency, setCurrency] = useState("USD");
   const [billingStatus, setBillingStatus] = useState("billable");
   const [parentID, setParentID] = useState("");
+  const [addDefaultNameRules, setAddDefaultNameRules] = useState(true);
   const [editing, setEditing] = useState(null);
   const [message, setMessage] = useState("");
   const [dropTarget, setDropTarget] = useState(null);
@@ -1775,10 +1776,11 @@ function ProjectPanel({ api, onAssignActivity }) {
     event.preventDefault();
     if (!title.trim()) return;
     try {
-      await api.createProject({ title: title.trim(), parent: parentID || null, billing_rate: Number(rate) || 0, currency: currency.trim().toUpperCase() || "USD", default_billing_status: billingStatus });
+      await api.createProject({ title: title.trim(), parent: parentID || null, billing_rate: Number(rate) || 0, currency: currency.trim().toUpperCase() || "USD", default_billing_status: billingStatus, add_default_name_rules: addDefaultNameRules });
       setTitle("");
       setRate("0");
       setParentID("");
+      setAddDefaultNameRules(true);
       setMessage("Project saved locally.");
     } catch (error) {
       setMessage(error.message || "Could not save the project.");
@@ -1828,6 +1830,7 @@ function ProjectPanel({ api, onAssignActivity }) {
       <select value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)} aria-label="Project default billing status"><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option></select>
       <button type="submit" disabled={!api.connected}><Plus size={17} />Add project</button>
     </form>
+    <label className="project-auto-rules-toggle"><input type="checkbox" checked={addDefaultNameRules} onChange={(event) => setAddDefaultNameRules(event.target.checked)} /><span>Automatically match this project&apos;s title and path</span><small>Adds title and URL/path rules for future activity.</small></label>
     {message ? <p className="entry-message" role="status">{message}</p> : null}
     {projects.length > 0 ? <div className="project-table">{projects.map((project) => editing?.id === project.id ? <form className="project-row project-edit-row" key={project.id} onSubmit={saveEdit}>
       <input value={editing.title} onChange={(event) => setEditing((value) => ({ ...value, title: event.target.value }))} aria-label={`Edit ${project.title} name`} />

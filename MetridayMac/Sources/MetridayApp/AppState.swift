@@ -753,6 +753,9 @@ final class AppState: ObservableObject {
                 project.defaultBillingStatus = status
             }
             projectStore.updateProject(project)
+            if body["add_default_name_rules"] as? Bool == true {
+                _ = projectStore.addDefaultNameRules(projectID: projectID, projectName: title)
+            }
             return .jsonObject(["data": officialProject(projectStore.project(projectID) ?? project)], statusCode: 201)
         }
 
