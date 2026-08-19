@@ -8,6 +8,7 @@ struct TodayView: View {
     @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var timeEntryStore: TimeEntryStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
+    @State private var selectedActivity: ActivitySegment?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,6 +33,15 @@ struct TodayView: View {
                 .padding(12)
         }
         .background(.white)
+        .sheet(item: $selectedActivity) { activity in
+            TodayActivityDetailSheet(
+                activity: activity,
+                category: category(for: activity),
+                projectName: appState.projectStore.name(for: activity.projectID),
+                timeEntryStore: timeEntryStore,
+                selectedDate: appState.selectedDate
+            )
+        }
     }
 
     private var plannedColumn: some View {
@@ -98,7 +108,7 @@ struct TodayView: View {
                         )
                     }
                     .contentShape(Rectangle())
-                    .onTapGesture { appState.section = .activities }
+                    .onTapGesture { selectedActivity = segment }
                     .accessibilityAddTraits(.isButton)
                     .accessibilityLabel("Actual \(segment.displayTitle), \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
                 }
@@ -380,6 +390,116 @@ struct TodayView: View {
             return "\(summary.idleMinutes)m idle is excluded from the focus score. Distraction is visible in the actual timeline."
         }
         return "\(summary.idleMinutes)m idle is excluded from the focus score. Activity is grouped locally by app and window title."
+    }
+}
+
+private struct TodayActivityDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let activity: ActivitySegment
+    let category: ActivityCategoryDefinition
+    let projectName: String
+    @ObservedObject var timeEntryStore: TimeEntryStore
+    let selectedDate: Date
+
+    private var categoryColor: Color {
+        switch category.color {
+        case .blue: return MetridayTheme.accentDeep
+        case .green: return MetridayTheme.success
+        case .orange: return MetridayTheme.warning
+        case .purple: return .purple
+        case .red: return MetridayTheme.danger
+        case .graphite: return MetridayTheme.secondary
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "rectangle.on.rectangle")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(MetridayTheme.graphite)
+                    .frame(width: 42, height: 42)
+                    .background(MetridayTheme.sidebar)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Activity detail")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(MetridayTheme.accent)
+                    Text(activity.appName.isEmpty ? "Unknown App" : activity.appName)
+                        .font(.system(size: 19, weight: .bold))
+                        .lineLimit(2)
+                    Text(TimeFormat.range(start: activity.startMinute, end: activity.endMinute))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
+                Spacer()
+                Button("Close") { dismiss() }
+                    .buttonStyle(.borderless)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                detailRow(label: "Category", value: category.name, color: categoryColor)
+                detailRow(label: "Project", value: projectName)
+                detailRow(label: "Duration", value: formatDuration(activity.durationSeconds))
+                if !activity.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    detailRow(label: "Window", value: activity.windowTitle)
+                }
+                if let host = URL(string: activity.resource)?.host, !host.isEmpty {
+                    detailRow(label: "Website", value: host)
+                }
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(MetridayTheme.canvas)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            HStack {
+                Spacer()
+                Button("Record Time Entry") {
+                    recordTimeEntry()
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("today.activity.record-time-entry")
+            }
+        }
+        .padding(24)
+        .frame(width: 430)
+    }
+
+    private func detailRow(label: String, value: String, color: Color? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(MetridayTheme.secondary)
+                .frame(width: 72, alignment: .leading)
+            if let color {
+                Circle().fill(color).frame(width: 7, height: 7)
+            }
+            Text(value)
+                .font(.system(size: 12, weight: .medium))
+                .lineLimit(2)
+            Spacer()
+        }
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = Int((Double(seconds) / 60.0).rounded())
+        if minutes < 1 { return "<1m" }
+        let hours = minutes / 60
+        return hours > 0 ? "(hours)h (minutes % 60)m" : "(minutes)m"
+    }
+
+    private func recordTimeEntry() {
+        let day = Calendar.current.startOfDay(for: selectedDate)
+        _ = timeEntryStore.addEntry(
+            title: activity.appName.isEmpty ? "App activity" : activity.appName,
+            projectID: activity.projectID,
+            notes: activity.displayTitle,
+            start: day.addingTimeInterval(TimeInterval(activity.startSecond)),
+            end: day.addingTimeInterval(TimeInterval(activity.endSecond)),
+            billingStatus: .billable
+        )
+        dismiss()
     }
 }
 

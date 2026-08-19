@@ -68,6 +68,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 62. Web Markdown hybrid preview — verified the Plan editor renders semantic heading, quote, task, and list previews without raw task markers, reveals the active line as source syntax, keeps one editable textarea, and preserves task handle selection.
 63. Markdown Return continuation — verified in the live Plan editor that Return continues task, bullet, and numbered-list prefixes; an empty list item exits the list, and the original daily Markdown was restored exactly after the test.
 64. Rules workflow parity — verified Web Rules exposes current Focus scope, separate blocked/allowed domain forms, blocking explanation, and Today/All History project-rule reapply actions; after packaging and relaunching native Metriday, the Today action completed through the new local API endpoint and its success status remained visible.
+65. Native Today Activity detail — verified `swift build`, packaged-app launch, and native smoke tests after changing an Actual segment's full hit target from a generic Activities navigation into a detail sheet with App, Category, Project, Window/Website context, and an explicit Record Time Entry action.
 
 ## Findings applied
 
@@ -133,3 +134,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Web Plan Return behavior now mirrors the native editor for task, bullet, and numbered-list continuation, including exiting an empty list item while preserving the single Markdown source.
 - Rules now mirrors the native project-rule maintenance workflow: allowed domains can be added directly, the current scheduled scope and native blocking model are visible, and reapplying rules is an explicit Today or All History action backed by the local API.
 - Web global and Rules current-block labels now accept the native API's camelCase `startMinute` / `endMinute` fields, so a scheduled block keeps its time range instead of falling back to “No scheduled time.”
+- Native Today Actual segments now open their owning Activity detail directly, preserving category/project/context evidence and requiring an explicit Record Time Entry action before writing manual time.
