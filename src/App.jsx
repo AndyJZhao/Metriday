@@ -2104,7 +2104,7 @@ function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = nul
       const activityDateKey = activity.date || dateKey;
       const start = localEntryDateSeconds(activityDateKey, startSecond);
       const end = localEntryDateSeconds(activityDateKey, endSecond);
-      await api.addTimeEntry({ title: activityLabel(activity), start, end, billingStatus: "billable" });
+      await api.addTimeEntry({ title: activityLabel(activity), start, end, projectID: activity.projectID || undefined, billingStatus: "billable" });
       setMessage("Recorded as a time entry.");
     } catch (error) {
       setMessage(error.message || "Could not record this activity.");
