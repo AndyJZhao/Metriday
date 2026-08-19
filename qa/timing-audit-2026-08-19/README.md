@@ -175,3 +175,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 85. Stats summary semantics — verified that Web uses native-style weighted productivity (Focused 100 / Other 50 / Distracting 0) and reports actual Distraction duration instead of a segment count.
 86. Native source-row hit targets — verified that Calendar Events, Completed Reminders, and Phone Calls keep the left information banner clickable while Record/Edit/Delete controls remain independent instead of firing the row action together.
 87. Web source-row hit targets — verified that Calendar Events, Completed Reminders, and Phone Calls expose full row/keyboard Record targets while nested Record and Hide controls remain independent.
+88. Web Review parity — verified that Review now mirrors native summary cards, seven-day focus-quality evidence, application/hour/project breakdowns, weekly time entries, Report Builder navigation, and local CSV export.
