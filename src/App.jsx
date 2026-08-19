@@ -2479,7 +2479,47 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     const start = Math.floor(Number(activity.startSecond || 0) / 60);
     const end = Math.ceil(Number(activity.endSecond || 0) / 60);
     const duration = Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
-    return <button className="activity-table-row" key={activity.id} type="button" draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-metriday-activity", activity.id); event.dataTransfer.setData("application/x-metriday-activity-date", activity.date || dateKey); }} onClick={() => onSelect(activity)} aria-label={`Open details for ${app} ${formatRange(start, end)}`} title="Drag this activity to a project to assign it">
+    const activityAPI = () => typeof window !== "undefined" ? window.__metridayActivityAPI : null;
+    const assignProject = async (event) => {
+      event.stopPropagation();
+      const api = activityAPI();
+      if (!api?.assignActivity) return;
+      await api.assignActivity(activity.id, event.target.value || null, activity.date || dateKey);
+    };
+    const createRule = async (event) => {
+      event.stopPropagation();
+      const api = activityAPI();
+      const projectID = resourceID(activity.projectID);
+      if (!api?.createProjectRule || !projectID) return;
+      let rule = null;
+      try {
+        const host = new URL(activity.resource || "").host;
+        if (host) rule = { field: "domain", comparison: "contains", pattern: host, case_sensitive: false };
+      } catch {
+        // Fall through to application metadata.
+      }
+      if (!rule && activity.bundleIdentifier) rule = { field: "bundleIdentifier", comparison: "contains", pattern: activity.bundleIdentifier, case_sensitive: false };
+      if (!rule && activity.windowTitle) rule = { field: "titleContains", comparison: "contains", pattern: activity.windowTitle, case_sensitive: false };
+      if (rule) await api.createProjectRule({ ...rule, project_id: projectID });
+    };
+    const openDetails = (event) => {
+      if (event.target.closest(".activity-row-action")) return;
+      onSelect(activity);
+    };
+    const openTimeEntry = (event) => {
+      if (event.target.closest(".activity-row-action")) return;
+      event.preventDefault();
+      const handler = typeof window !== "undefined" ? window.__metridayOpenActivityTimeEntry : null;
+      handler?.(activity);
+    };
+    const handleKeyDown = (event) => {
+      if (event.target.closest(".activity-row-action")) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onSelect(activity);
+      }
+    };
+    return <div className="activity-table-row" key={activity.id} role="button" tabIndex={0} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-metriday-activity", activity.id); event.dataTransfer.setData("text/plain", activity.id); event.dataTransfer.setData("application/x-metriday-activity-date", activity.date || dateKey); }} onClick={openDetails} onDoubleClick={openTimeEntry} onKeyDown={handleKeyDown} aria-label={`Open details for ${app} ${formatRange(start, end)}`} title="Drag this activity to a project to assign it">
       <div className="activity-app-cell">
         <span className="activity-table-icon"><Icon size={19} weight="duotone" /></span>
         <span className="activity-app-copy"><strong>{app}</strong>{context ? <small>{context}</small> : null}</span>
@@ -2487,12 +2527,13 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
       <span className={`activity-category ${category.key}`} style={activityCategoryStyle(category)}><i />{category.label}</span>
       <span>{activity.date && activity.date !== dateKey ? `${activity.date} · ` : ""}{formatRange(start, end)}</span>
       <small>{formatDurationSeconds(duration)} · {activity.deviceName || "This Mac"}</small>
-    </button>;
+      <span className="activity-row-project activity-row-action" onClick={(event) => event.stopPropagation()}><select value={resourceID(activity.projectID)} onChange={assignProject} aria-label={`Project for ${app}`}><option value="">Unassigned</option>{projects.map((project) => <option key={project.id} value={resourceID(project.id)}>{project.title || project.name}</option>)}</select>{activity.projectID ? <button type="button" className="activity-row-rule activity-row-action" onClick={createRule} aria-label={`Create project rule from ${app}`} title="Create a rule from this activity"><Sparkle size={14} /></button> : null}</span>
+    </div>;
   };
   const grouping = viewMode === "category" ? "category" : groupMode !== "none" ? groupMode : viewMode === "unified" ? "application" : "none";
   if (grouping === "none") {
     return <div className="activity-table">
-      <div className="activity-table-head" aria-hidden="true"><span>App</span><span>Category</span><span>Time</span><span>Device</span></div>
+      <div className="activity-table-head" aria-hidden="true"><span>App</span><span>Category</span><span>Time</span><span>Device</span><span>Project</span></div>
       {rows.map(activityRow)}
     </div>;
   }
@@ -3167,8 +3208,12 @@ function ActivitiesPage({ api, dateKey, setDateKey }) {
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     window.__metridayCreateProjectFromActivities = createProjectFromActivities;
+    window.__metridayActivityAPI = api;
+    window.__metridayOpenActivityTimeEntry = openActivityTimeEntry;
     return () => {
       if (window.__metridayCreateProjectFromActivities === createProjectFromActivities) delete window.__metridayCreateProjectFromActivities;
+      if (window.__metridayActivityAPI === api) delete window.__metridayActivityAPI;
+      if (window.__metridayOpenActivityTimeEntry === openActivityTimeEntry) delete window.__metridayOpenActivityTimeEntry;
     };
   }, [api, currentActivities, dateKey]);
   const saveDisplayPreferences = async (patch) => {
