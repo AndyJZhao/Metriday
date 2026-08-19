@@ -2171,6 +2171,7 @@ function WebReportPanel({ api, dateKey }) {
   const [dataset, setDataset] = useState({ activities: [], entries: [] });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const controlsRef = useRef(null);
   useEffect(() => {
     const weekStart = weekStartDateKey(dateKey);
     setRangeStart(weekStart);
@@ -2191,15 +2192,15 @@ function WebReportPanel({ api, dateKey }) {
     return () => { current = false; };
   }, [api.connected, api.fetchRange, api.refreshVersion, rangeStart, rangeEnd]);
   const reportPresets = [
-    { key: "timesheet", label: "Timesheet", include: "both", group: "exact" },
-    { key: "timesheet-week-day", label: "Timesheet (Week + Day)", include: "both", group: "day" },
-    { key: "weekly-snippet", label: "Weekly Snippet", include: "both", group: "week" },
-    { key: "time-project", label: "Time Per Project", include: "time", group: "project" },
-    { key: "time-application", label: "Time Per Application", include: "app", group: "application" },
-    { key: "time-document", label: "Time Per Document", include: "time", group: "document" },
-    { key: "ultra-detailed", label: "Ultra-Detailed", include: "both", group: "exact" },
-    { key: "raw-time-entries", label: "Raw Time Entries", include: "time", group: "exact" },
-    { key: "raw-app-usage", label: "Raw App Usage", include: "app", group: "exact" },
+    { key: "timesheet", label: "Timesheet", include: "both", group: "exact", icon: CalendarBlank },
+    { key: "timesheet-week-day", label: "Timesheet (Week + Day)", include: "both", group: "day", icon: CalendarBlank },
+    { key: "weekly-snippet", label: "Weekly Snippet", include: "both", group: "week", icon: CalendarBlank },
+    { key: "time-project", label: "Time Per Project", include: "time", group: "project", icon: FolderSimple },
+    { key: "time-application", label: "Time Per Application", include: "app", group: "application", icon: Browsers },
+    { key: "time-document", label: "Time Per Document", include: "time", group: "document", icon: FileText },
+    { key: "ultra-detailed", label: "Ultra-Detailed", include: "both", group: "exact", icon: ChartBar },
+    { key: "raw-time-entries", label: "Raw Time Entries", include: "time", group: "exact", icon: Clock },
+    { key: "raw-app-usage", label: "Raw App Usage", include: "app", group: "exact", icon: Waveform },
   ];
   const report = useMemo(() => {
     const startBound = new Date(`${rangeStart}T00:00:00`);
@@ -2368,12 +2369,27 @@ function WebReportPanel({ api, dateKey }) {
       setMessage(error.message || `Could not export ${format.toUpperCase()} report.`);
     }
   };
+  const entrySeconds = dataset.entries.reduce((total, entry) => {
+    const start = new Date(entry.start_date || entry.start).getTime();
+    const end = new Date(entry.end_date || entry.end).getTime();
+    return Number.isFinite(start) && Number.isFinite(end) ? total + Math.max(0, Math.round((end - start) / 1000)) : total;
+  }, 0);
+  const reportRangeLabel = rangeStart === rangeEnd ? rangeStart : `${rangeStart}–${rangeEnd}`;
   return <section className="web-report-panel">
+    <section className="report-summary">
+      <div><Clock size={22} /><span>Tracked time</span><strong>{formatReportDuration(report.totalSeconds)}</strong><small>{reportRangeLabel}</small></div>
+      <div><Timer size={22} /><span>Time entries</span><strong>{formatReportDuration(entrySeconds)}</strong><small>Manual + timer</small></div>
+      <div><TrendUp size={22} /><span>Export formats</span><strong>5</strong><small>CSV · XLSX · JSON · HTML · PDF</small></div>
+    </section>
+    <section className="report-builder-panel">
+      <div className="chart-heading"><div><h2>Report Builder</h2><p>Timing-style presets with custom date, project, grouping, billing, and duration options.</p></div><button type="button" className="report-builder-open" onClick={() => controlsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>Open Builder</button></div>
+      <div className="report-preset-cards">{reportPresets.map((preset) => { const Icon = preset.icon; return <button type="button" className={`report-preset-card${reportPreset === preset.key ? " active" : ""}`} key={preset.key} onClick={() => applyReportPreset(preset.key)}><span className="report-preset-icon"><Icon size={18} /></span><strong>{preset.label}</strong><CaretRight size={14} /></button>; })}</div>
+    </section>
     <div className="chart-heading">
       <div><h2>Reports & exports</h2><p>Timing-style reports from local activities, time entries, projects, and billing status.</p></div>
       <div className="report-actions"><button type="button" onClick={exportCSV} disabled={!report.rows.length}>Export CSV</button><button type="button" onClick={exportJSON} disabled={!report.rows.length}>Export JSON</button><button type="button" onClick={exportHTML} disabled={!report.rows.length}>Export HTML</button><button type="button" onClick={() => exportNativeReport("xlsx")} disabled={!report.rows.length || !api.connected}>Export XLSX</button><button type="button" onClick={() => exportNativeReport("pdf")} disabled={!report.rows.length || !api.connected}>Export PDF</button></div>
     </div>
-    <div className="report-presets">
+    <div className="report-presets" ref={controlsRef}>
       <label>Report<select value={reportPreset} onChange={(event) => applyReportPreset(event.target.value)}>{reportPresets.map((preset) => <option value={preset.key} key={preset.key}>{preset.label}</option>)}</select></label>
       <button type="button" onClick={() => setDatePreset("today")}>Today</button><button type="button" onClick={() => setDatePreset("week")}>This week</button><button type="button" onClick={() => setDatePreset("last-seven")}>Last 7 days</button><button type="button" onClick={() => setDatePreset("month")}>This month</button>
       <label>From<input type="date" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} /></label><label>To<input type="date" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} /></label>
