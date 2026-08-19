@@ -420,10 +420,11 @@ struct StatsView: View {
 
     private var productivityScore: Int {
         guard totalActiveSeconds > 0 else { return 0 }
-        let weighted = weekDates
-            .flatMap(activitySegments(for:))
-            .filter { $0.relevance != .idle }
-            .reduce(0.0) { $0 + productivityValue(for: $1) * Double($1.durationSeconds) }
+        let weighted = datedWeekSegments
+            .filter { $0.segment.relevance != .idle }
+            .reduce(0.0) { total, item in
+                total + productivityValue(for: item.segment, date: item.date) * Double(item.segment.durationSeconds)
+            }
         return Int((weighted / Double(totalActiveSeconds)).rounded()).clamped(to: -100...100)
     }
 
@@ -442,6 +443,12 @@ struct StatsView: View {
         return "\(formatter.string(from: first))–\(formatter.string(from: last))"
     }
 
+    private var datedWeekSegments: [(date: Date, segment: ActivitySegment)] {
+        weekDates.flatMap { date in
+            activitySegments(for: date).map { (date: date, segment: $0) }
+        }
+    }
+
     private var weekdayPoints: [StatsDayPoint] {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -450,7 +457,7 @@ struct StatsView: View {
             let segments = activitySegments(for: date).filter { $0.relevance != .idle }
             let activeSeconds = segments.reduce(0) { $0 + $1.durationSeconds }
             let score = activeSeconds > 0
-                ? Int((segments.reduce(0.0) { $0 + productivityValue(for: $1) * Double($1.durationSeconds) } / Double(activeSeconds)).rounded())
+                ? Int((segments.reduce(0.0) { $0 + productivityValue(for: $1, date: date) * Double($1.durationSeconds) } / Double(activeSeconds)).rounded())
                 : 0
             return StatsDayPoint(
                 id: date,
@@ -465,11 +472,11 @@ struct StatsView: View {
         var active = Array(repeating: 0, count: 24)
         var weighted = Array(repeating: 0.0, count: 24)
         var totals = Array(repeating: 0, count: 24)
-        for segment in weekDates.flatMap(activitySegments(for:)) where segment.relevance != .idle {
-            let hour = min(23, max(0, segment.startSecond / 3600))
-            active[hour] += segment.durationSeconds
-            totals[hour] += segment.durationSeconds
-            weighted[hour] += productivityValue(for: segment) * Double(segment.durationSeconds)
+        for item in datedWeekSegments where item.segment.relevance != .idle {
+            let hour = min(23, max(0, item.segment.startSecond / 3600))
+            active[hour] += item.segment.durationSeconds
+            totals[hour] += item.segment.durationSeconds
+            weighted[hour] += productivityValue(for: item.segment, date: item.date) * Double(item.segment.durationSeconds)
         }
         return (0..<24).map { hour in
             StatsHourPoint(
@@ -511,14 +518,14 @@ struct StatsView: View {
 
     private var categoryPoints: [StatsCategoryPoint] {
         var totals: [String: (name: String, seconds: Int, color: Color)] = [:]
-        for segment in weekDates.flatMap(activitySegments(for:)) {
-            let definition = category(for: segment)
+        for item in datedWeekSegments {
+            let definition = category(for: item.segment, date: item.date)
             guard definition.role != .idle else { continue }
             let key = definition.name + "::" + definition.role.rawValue
             let current = totals[key] ?? (name: definition.name, seconds: 0, color: categoryColor(for: definition))
             totals[key] = (
                 name: current.name,
-                seconds: current.seconds + segment.durationSeconds,
+                seconds: current.seconds + item.segment.durationSeconds,
                 color: current.color
             )
         }
@@ -537,14 +544,14 @@ struct StatsView: View {
 
     private var applicationPoints: [StatsApplicationPoint] {
         var totals: [String: (name: String, categoryName: String, seconds: Int, color: Color)] = [:]
-        for segment in weekDates.flatMap(activitySegments(for:)) where segment.relevance != .idle {
-            let definition = category(for: segment)
-            let key = "\(segment.displayTitle)::\(definition.name)::\(definition.role.rawValue)"
-            let existing = totals[key, default: (name: segment.displayTitle, categoryName: definition.name, seconds: 0, color: categoryColor(for: definition))]
+        for item in datedWeekSegments where item.segment.relevance != .idle {
+            let definition = category(for: item.segment, date: item.date)
+            let key = "\(item.segment.displayTitle)::\(definition.name)::\(definition.role.rawValue)"
+            let existing = totals[key, default: (name: item.segment.displayTitle, categoryName: definition.name, seconds: 0, color: categoryColor(for: definition))]
             totals[key] = (
                 name: existing.name,
                 categoryName: existing.categoryName,
-                seconds: existing.seconds + segment.durationSeconds,
+                seconds: existing.seconds + item.segment.durationSeconds,
                 color: existing.color
             )
         }
@@ -564,8 +571,8 @@ struct StatsView: View {
         )
     }
 
-    private func category(for segment: ActivitySegment) -> ActivityCategoryDefinition {
-        categoryStore.category(for: segment, filterStore: filterStore, date: selectedDate)
+    private func category(for segment: ActivitySegment, date: Date? = nil) -> ActivityCategoryDefinition {
+        categoryStore.category(for: segment, filterStore: filterStore, date: date ?? selectedDate)
     }
 
     private func categoryColor(for category: ActivityCategoryDefinition) -> Color {
@@ -579,11 +586,11 @@ struct StatsView: View {
         }
     }
 
-    private func productivityValue(for segment: ActivitySegment) -> Double {
+    private func productivityValue(for segment: ActivitySegment, date: Date? = nil) -> Double {
         if let project = projectStore.project(segment.projectID) {
             return Double(project.productivity)
         }
-        switch category(for: segment).role {
+        switch category(for: segment, date: date).role {
         case .focused: return 100
         case .distracting: return 0
         case .other: return 50
