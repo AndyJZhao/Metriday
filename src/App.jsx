@@ -627,7 +627,7 @@ function activityContext(activity, options = {}) {
   return "";
 }
 
-function liveActivityBlocks(activities) {
+function liveActivityBlocks(activities, projects = []) {
   const primaryKind = (totals) => [...totals.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || "other";
   const normalized = activities
     .map((activity) => {
@@ -637,6 +637,7 @@ function liveActivityBlocks(activities) {
       const end = Math.min(DAY_END, Math.ceil(rawEndSecond / 60));
       if (end <= start) return null;
       const category = activityCategory(activity);
+      const projectID = activity.projectID ? resourceID(activity.projectID) : "";
       return {
         id: activity.id || `${start}-${end}-${activity.appName}`,
         start,
@@ -646,6 +647,8 @@ function liveActivityBlocks(activities) {
         kind: category.key,
         categoryColor: category.color,
         categoryLabel: category.label,
+        projectID: projectID || null,
+        projectLabel: projectID ? projectTitleFor(projects, projectID) : "None",
         label: category.key === "idle" ? "Idle" : activityLabel(activity),
         icon: category.key === "idle" ? null : activityIcon(activity),
       };
@@ -676,6 +679,7 @@ function liveActivityBlocks(activities) {
         categorySeconds: new Map([[activity.kind, Math.max(1, activity.endSecond - activity.startSecond)]]),
         categoryColors: new Map([[activity.kind, activity.categoryColor]]),
         categoryLabels: new Map([[activity.kind, activity.categoryLabel]]),
+        projectLabels: new Map([[activity.projectID || "", activity.projectLabel]]),
         rowMap: new Map([[`${activity.kind}|${activity.label}`, {
           icon: activity.icon,
           label: activity.label,
@@ -698,6 +702,7 @@ function liveActivityBlocks(activities) {
     );
     previous.categoryColors.set(activity.kind, activity.categoryColor);
     previous.categoryLabels.set(activity.kind, activity.categoryLabel);
+    previous.projectLabels.set(activity.projectID || "", activity.projectLabel);
     previous.kind = primaryKind(previous.categorySeconds);
     previous.categoryColor = previous.categoryColors.get(previous.kind) || previous.categoryColor;
     previous.categoryLabel = previous.categoryLabels.get(previous.kind) || previous.categoryLabel;
@@ -727,6 +732,15 @@ function liveActivityBlocks(activities) {
     kind: block.kind,
     categoryColor: block.categoryColor,
     categoryLabel: block.categoryLabel,
+    projectID: (() => {
+      const entries = [...block.projectLabels.entries()];
+      return entries.length === 1 && entries[0][0] ? entries[0][0] : null;
+    })(),
+    projectLabel: (() => {
+      const entries = [...block.projectLabels.values()];
+      if (entries.length === 1) return entries[0] || "None";
+      return entries.length > 1 ? "Multiple projects" : "None";
+    })(),
     label: block.label,
     detail: block.kind === "idle" ? block.detail : formatRange(block.start, block.end),
     rows: block.kinds.size === 1 && block.kinds.has("idle") ? null : [...block.rowMap.values()]
@@ -1103,14 +1117,14 @@ function ActualHoverCard({ block, onRecord }) {
     <span className="actual-hover-duration">({preciseDuration(endSecond - startSecond)})</span>
     <div className="actual-hover-meta"><span>App:</span><b>{appLabel}</b></div>
     <div className="actual-hover-meta"><span>Category:</span><i className={`hover-category-dot ${block.kind}`} style={{ background: categoryStyle.color }} /><b>{categoryLabel}</b></div>
-    <div className="actual-hover-meta"><span>Project:</span><i className="hover-project-dot" /><b>None</b><small>From the app usage</small></div>
+    <div className="actual-hover-meta"><span>Project:</span><i className="hover-project-dot" /><b>{block.projectLabel || "None"}</b>{block.projectLabel === "None" ? <small>From the app usage</small> : null}</div>
     {onRecord ? <div className="actual-hover-actions"><button type="button" className="actual-record-button" onClick={record} disabled={busy}>{message || (busy ? "Recording…" : "Record time")}</button></div> : null}
   </div>;
 }
 
-function ActualTrack({ activities, connected, onRecord, onSelect }) {
- const [hoveredBlockId, setHoveredBlockId] = useState(null);
- const blocks = connected && activities.length > 0 ? liveActivityBlocks(activities) : actualBlocks;
+function ActualTrack({ activities, connected, onRecord, onSelect, projects = [] }) {
+  const [hoveredBlockId, setHoveredBlockId] = useState(null);
+  const blocks = connected && activities.length > 0 ? liveActivityBlocks(activities, projects) : actualBlocks;
   const selectActivity = (block) => activities.find((activity) => String(activity.id) === String(block.id)) || null;
  return (
    <section className="today-track actual-track" aria-label="Actual activity timeline">
@@ -1130,6 +1144,7 @@ function TodayPage({ setPage, api, dateKey, setDateKey }) {
       title: block.rows?.[0]?.label || block.label || "App activity",
       start,
       end,
+      projectID: block.projectID || undefined,
       billingStatus: "billable",
     });
   };
@@ -1138,7 +1153,7 @@ function TodayPage({ setPage, api, dateKey, setDateKey }) {
   const nowStyle = showNow ? { top: `${56 + ((now.minute - DAY_START) / 60) * HOUR_HEIGHT}px` } : { display: "none" };
   return (
     <main className="page today-page">
-      <div className="today-comparison"><div className="timeline-label-column"><HourLabels /></div><PlannedTrack tasks={api.plan?.tasks} connected={api.connected} onSelect={() => setPage("plan")} /><ActualTrack activities={api.activities} connected={api.connected} onRecord={recordActivity} onSelect={setSelectedActivity} /><div className="now-marker" style={nowStyle} aria-label={`Current time ${now.label}`}><span /></div></div>
+      <div className="today-comparison"><div className="timeline-label-column"><HourLabels /></div><PlannedTrack tasks={api.plan?.tasks} connected={api.connected} onSelect={() => setPage("plan")} /><ActualTrack activities={api.activities} connected={api.connected} onRecord={recordActivity} onSelect={setSelectedActivity} projects={api.projects} /><div className="now-marker" style={nowStyle} aria-label={`Current time ${now.label}`}><span /></div></div>
       <TodayInsightBar api={api} setPage={setPage} />
       {api.connected ? <WebActivityInsights insights={api.insights} dateKey={dateKey} /> : null}{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} displayPreferences={api.activityPreferences} onClose={() => setSelectedActivity(null)} /> : null}
     </main>

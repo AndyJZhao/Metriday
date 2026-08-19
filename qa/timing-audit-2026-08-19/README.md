@@ -78,6 +78,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 72. Native Time Entry row hit target — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after constraining the primary Time Entry edit button to fill the complete row area left of the independent Edit/Delete controls.
 73. Native Activity detail duration formatting — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after correcting the Activity detail sheet's duration formatter to render numeric hours/minutes instead of placeholder text.
 74. Web Plan scroll-aware scheduling — verified `npm run build`, Sites tests, and diff checks after unifying selected-task clicks, HTML5 drops, and pointer drags around the scroll offset of the continuous timeline body before converting Y to a 15-minute Markdown time range.
+75. Web Today project evidence — verified `npm run build`, Sites tests, and diff checks after preserving project IDs and labels through Actual activity aggregation; the hover detail now shows `None`, a project name, or `Multiple projects`, and recording a single-project block carries its assignment into the Time Entry payload.
 
 ## Findings applied
 
@@ -153,3 +154,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Native Activities Time Entry rows now give the primary edit action the full remaining row hit target, matching Web row behavior while keeping destructive and secondary controls separate.
 - Native Activity details now render the actual rounded duration (`h` / `m`) in the detail sheet, keeping the App / Category evidence readable and truthful.
 - Web Plan scheduling now preserves the correct time after the continuous timeline scrolls: click-to-place and drag/drop both convert document-space Y coordinates rather than viewport-space coordinates.
+- Web Today Actual evidence now preserves the App / Category / Project relationship already present in native activity data; project information is no longer hard-coded to `None` in hover details or silently dropped when recording time.
