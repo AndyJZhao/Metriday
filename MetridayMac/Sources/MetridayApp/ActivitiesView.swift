@@ -121,6 +121,7 @@ struct ActivitiesView: View {
     @State private var newEntryEnd = Date()
     @State private var editingProject: TrackingProject?
     @State private var editingEntry: TimeEntry?
+    @State private var selectedActivity: ActivitySegment?
     @State private var editingFilter: ActivityFilterDefinition?
     @State private var showingFilterEditor = false
     @State private var showingActivitySettings = false
@@ -294,6 +295,15 @@ struct ActivitiesView: View {
                 timeEntryStore.update(updatedEntry)
                 editingEntry = nil
             }
+        }
+        .sheet(item: $selectedActivity) { activity in
+            ActivityDetailSheet(
+                activity: activity,
+                category: category(for: activity),
+                projectName: projectStore.name(for: activity.projectID),
+                timeEntryStore: timeEntryStore,
+                selectedDate: selectedDate
+            )
         }
         .alert("Overlapping Time Entry", isPresented: $showingOverlapConfirmation) {
             Button("Cancel", role: .cancel) {
@@ -1618,6 +1628,9 @@ struct ActivitiesView: View {
         .onTapGesture(count: 2) {
             prepareNewEntry(startMinute: segment.startMinute, endMinute: segment.endMinute)
             showingNewEntry = true
+        }
+        .onTapGesture {
+            selectedActivity = segment
         }
         .contextMenu {
             Button("Create Time Entry") {

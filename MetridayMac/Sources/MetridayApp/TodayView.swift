@@ -34,7 +34,7 @@ struct TodayView: View {
         }
         .background(.white)
         .sheet(item: $selectedActivity) { activity in
-            TodayActivityDetailSheet(
+            ActivityDetailSheet(
                 activity: activity,
                 category: category(for: activity),
                 projectName: appState.projectStore.name(for: activity.projectID),
@@ -393,7 +393,7 @@ struct TodayView: View {
     }
 }
 
-private struct TodayActivityDetailSheet: View {
+struct ActivityDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     let activity: ActivitySegment
     let category: ActivityCategoryDefinition
