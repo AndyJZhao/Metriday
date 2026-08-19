@@ -1213,6 +1213,17 @@ function MarkdownPreviewLine({ line, index, active }) {
   return <div className="markdown-live-line" key={index}>{markdownInlineNodes(source, `text-${index}`)}</div>;
 }
 
+function markdownListContinuation(line) {
+  const source = String(line || "");
+  const task = source.match(/^([\t ]*)[-*+]\s+\[[ xX]\]\s*(.*)$/);
+  if (task) return task[2].trim() ? `${task[1]}- [ ] ` : "";
+  const bullet = source.match(/^([\t ]*)[-*+]\s+(.*)$/);
+  if (bullet) return bullet[2].trim() ? `${bullet[1]}- ` : "";
+  const ordered = source.match(/^([\t ]*)(\d+)[.)]\s+(.*)$/);
+  if (ordered) return ordered[3].trim() ? `${ordered[1]}${Number(ordered[2]) + 1}. ` : "";
+  return null;
+}
+
 function MarkdownEditor({ tasks, markdown, planDate, onMarkdownChange, onMarkdownCommit, onTaskDragStart, onPointerDragStart, onSelectTask, onComplete }) {
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -1226,11 +1237,39 @@ function MarkdownEditor({ tasks, markdown, planDate, onMarkdownChange, onMarkdow
     const caret = event.currentTarget.selectionStart || 0;
     setActiveLine(value.slice(0, caret).split("\n").length - 1);
   };
+  const handleEditorKeyDown = (event) => {
+    if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
+    const editor = event.currentTarget;
+    const source = editor.value || "";
+    const start = editor.selectionStart || 0;
+    const end = editor.selectionEnd || start;
+    const lineStart = source.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+    const nextNewline = source.indexOf("\n", start);
+    const lineEnd = nextNewline === -1 ? source.length : nextNewline;
+    const line = source.slice(lineStart, lineEnd);
+    const continuation = markdownListContinuation(line);
+    if (continuation === null) return;
+    event.preventDefault();
+    const isEmptyListItem = continuation === "";
+    const insertion = isEmptyListItem ? "\n" : `\n${continuation}`;
+    const next = isEmptyListItem
+      ? source.slice(0, lineStart) + source.slice(lineEnd)
+      : source.slice(0, start) + insertion + source.slice(end);
+    const caret = isEmptyListItem ? lineStart : start + insertion.length;
+    onMarkdownChange(next);
+    setActiveLine(next.slice(0, caret).split("\n").length - 1);
+    window.requestAnimationFrame(() => {
+      if (editorRef.current) {
+        editorRef.current.focus();
+        editorRef.current.setSelectionRange(caret, caret);
+      }
+    });
+  };
   return (
     <section className="markdown-editor" aria-label="Markdown daily plan">
       <div className="editor-toolbar"><div className="file-name"><FileText size={18} /> {planDate}.md <span>{markdown ? "Markdown document" : "Blank Markdown document"}</span></div><div className="editor-actions"><span>Markdown</span><ActionMenu label="Document actions" items={[{ label: "Copy Markdown", onSelect: copyMarkdown }]}><DotsThree size={22} /></ActionMenu></div></div>
       <div className="editor-body markdown-source-wrap">
-        <textarea ref={editorRef} className="markdown-source-editor" aria-label="Markdown editor" value={markdown || ""} spellCheck={false} onChange={(event) => { onMarkdownChange(event.target.value); updateActiveLine(event); }} onFocus={updateActiveLine} onClick={updateActiveLine} onKeyUp={updateActiveLine} onSelect={updateActiveLine} onBlur={(event) => { onMarkdownCommit(event.currentTarget.value); setActiveLine(null); }} onScroll={(event) => { setScrollTop(event.currentTarget.scrollTop); setScrollLeft(event.currentTarget.scrollLeft); }} />
+        <textarea ref={editorRef} className="markdown-source-editor" aria-label="Markdown editor" value={markdown || ""} spellCheck={false} onChange={(event) => { onMarkdownChange(event.target.value); updateActiveLine(event); }} onKeyDown={handleEditorKeyDown} onFocus={updateActiveLine} onClick={updateActiveLine} onKeyUp={updateActiveLine} onSelect={updateActiveLine} onBlur={(event) => { onMarkdownCommit(event.currentTarget.value); setActiveLine(null); }} onScroll={(event) => { setScrollTop(event.currentTarget.scrollTop); setScrollLeft(event.currentTarget.scrollLeft); }} />
         <div className="markdown-live-preview" style={{ transform: `translate(${-scrollLeft}px, ${-scrollTop}px)` }} aria-hidden="true">
           {lines.map((line, index) => <MarkdownPreviewLine line={line} index={index} active={activeLine === index} key={index} />)}
         </div>
