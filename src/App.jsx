@@ -383,8 +383,9 @@ function useMetridayAPI(dateKey, apiBase) {
       await refresh();
     },
     createProject: async (project) => {
-      await request("/api/v1/projects", { method: "POST", body: JSON.stringify(project) });
+      const result = await request("/api/v1/projects", { method: "POST", body: JSON.stringify(project) });
       await refresh();
+      return result?.data || result;
     },
     updateProject: async (id, project) => {
       await request(`/api/v1/projects/${resourceID(id)}`, { method: "PATCH", body: JSON.stringify(project) });
@@ -2835,8 +2836,10 @@ function WebActivityFiltersMenu({ open, filters, projectFilterID, savedFilterID,
   return <div className="activity-toolbar-popover"><button type="button" className={`quiet-pill activity-toolbar-popover-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />{title}</button>{open ? <div className="activity-toolbar-popover-panel" role="dialog" aria-label="Activity filters"><strong>Filters</strong><button type="button" className={`activity-popover-option ${allSelected ? "active" : ""}`} onClick={selectAll}><span><Waveform size={15} /></span><strong>All activity</strong>{allSelected ? <Check size={14} weight="bold" /> : null}</button><button type="button" className={`activity-popover-option ${projectFilterID === "unassigned" ? "active" : ""}`} onClick={selectProject}><span><TrayIcon /></span><strong>Unassigned</strong>{projectFilterID === "unassigned" ? <Check size={14} weight="bold" /> : null}</button><div className="activity-popover-divider" /><span className="activity-popover-label">Built-in Filters</span>{activityBuiltinFilters.map((filter) => <button type="button" className={`activity-popover-option ${builtinKey === filter.key ? "active" : ""}`} key={filter.key} onClick={() => selectBuiltin(filter.key)}><span className="activity-popover-category-dot other" /><strong>{filter.label}</strong>{builtinKey === filter.key ? <Check size={14} weight="bold" /> : null}</button>)}<div className="activity-popover-divider" />{["focused", "distracting", "other", "idle"].map((value) => <button type="button" className={`activity-popover-option ${categoryFilter === value ? "active" : ""}`} key={value} onClick={() => selectCategory(value)}><span className={`activity-popover-category-dot ${value}`} /><strong>{value[0].toUpperCase() + value.slice(1)}</strong>{categoryFilter === value ? <Check size={14} weight="bold" /> : null}</button>)}{filters.length > 0 ? <><div className="activity-popover-divider" /><span className="activity-popover-label">Saved Filters</span>{filters.map((filter) => <button type="button" className={`activity-popover-option ${savedFilterID === resourceID(filter.id) ? "active" : ""}`} key={filter.id} onClick={() => { onProjectFilter("all"); onCategoryFilter("all"); onSavedFilter(resourceID(filter.id)); }}><span><Waveform size={15} /></span><strong>{filter.name}</strong>{savedFilterID === resourceID(filter.id) ? <Check size={14} weight="bold" /> : null}</button>)}</> : null}</div> : null}</div>;
 }
 
-function WebActivityProjectSidebar({ projects, filters, activities, projectFilterID, savedFilterID, onProjectFilter, onSavedFilter, onEditProject }) {
+function WebActivityProjectSidebar({ projects, filters, activities, projectFilterID, savedFilterID, onProjectFilter, onSavedFilter, onEditProject, onCreateProjectFromActivities }) {
   const [collapsedProjectIDs, setCollapsedProjectIDs] = useState(() => new Set());
+  const [dropTarget, setDropTarget] = useState(false);
+  const [dropMessage, setDropMessage] = useState("");
   const projectClickTimer = useRef(null);
   useEffect(() => () => { if (projectClickTimer.current) window.clearTimeout(projectClickTimer.current); }, []);
   const activeActivities = activities.filter((activity) => activityCategory(activity).key !== "idle");
@@ -2873,6 +2876,24 @@ function WebActivityProjectSidebar({ projects, filters, activities, projectFilte
     projectClickTimer.current = null;
     onEditProject?.(resourceID(project.id));
   };
+  const handleCreateProjectDrop = async (event) => {
+    event.preventDefault();
+    setDropTarget(false);
+    const raw = event.dataTransfer.getData("application/x-metriday-activity") || event.dataTransfer.getData("text/plain");
+    const activityIDs = [...new Set(raw.split(/\r?\n/).map((value) => resourceID(value.trim())).filter(Boolean))];
+    const createProject = onCreateProjectFromActivities || (typeof window !== "undefined" ? window.__metridayCreateProjectFromActivities : null);
+    if (!activityIDs.length || !createProject) {
+      setDropMessage("Drop an App / Category activity row here.");
+      return;
+    }
+    const parentProjectID = projects.some((project) => resourceID(project.id) === projectFilterID) ? projectFilterID : null;
+    try {
+      await createProject(activityIDs, { parentProjectID, separateItems: event.metaKey, createActivityRules: event.altKey });
+      setDropMessage(`${event.metaKey ? activityIDs.length : 1} project${event.metaKey && activityIDs.length !== 1 ? "s" : ""} created.`);
+    } catch (error) {
+      setDropMessage(error.message || "Could not create a project from this activity.");
+    }
+  };
   const projectTree = (parentID = "", depth = 0) => projects.filter((project) => projectParentID(project) === parentID).sort((left, right) => String(left.title || "").localeCompare(String(right.title || ""))).map((project) => {
     const id = resourceID(project.id);
     const children = projects.some((candidate) => projectParentID(candidate) === id);
@@ -2880,7 +2901,7 @@ function WebActivityProjectSidebar({ projects, filters, activities, projectFilte
     const projectActivities = projectActivitiesFor(project);
     return <div className="activity-project-tree-node" key={id}><div className="activity-project-tree-row">{children ? <button type="button" className="activity-project-disclosure" aria-label={`${collapsed ? "Expand" : "Collapse"} ${project.title}`} onClick={() => setCollapsedProjectIDs((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })}><CaretDown size={13} className={collapsed ? "collapsed" : ""} /></button> : <span className="activity-project-disclosure-placeholder" />}{sidebarButton(projectFilterID === id, () => selectProject(project), <FolderSimple size={16} />, project.title, `${projectActivities.length} · ${formatDurationSeconds(secondsFor(projectActivities))}`, { paddingLeft: `${7 + depth * 12}px` }, () => editProject(project))}</div>{children && !collapsed ? projectTree(id, depth + 1) : null}</div>;
   });
-  return <aside className="activity-project-sidebar" aria-label="Activity projects and filters"><div className="activity-project-sidebar-heading"><h2>Projects</h2><span>{formatDurationSeconds(secondsFor(activeActivities))}</span><button type="button" className="activity-project-new" aria-label="New project" title="New project" onClick={() => { const panel = document.getElementById("web-projects-panel"); panel?.scrollIntoView({ behavior: "smooth", block: "center" }); window.setTimeout(() => panel?.querySelector('input[aria-label="Project name"]')?.focus(), 250); }}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(projectFilterID === "all" && savedFilterID === "all", () => onProjectFilter("all"), <Waveform size={16} />, "All Activities", `${activeActivities.length} segments`)}{sidebarButton(projectFilterID === "unassigned", () => onProjectFilter("unassigned"), <TrayIcon />, "Unassigned", `${activeActivities.filter((activity) => !activity.projectID).length} segments`)}{projects.length > 0 ? <div className="activity-project-sidebar-label">My Projects</div> : null}{projectTree()}</div><div className="activity-project-sidebar-divider" /><div className="activity-project-sidebar-heading"><h2>Filters</h2><span>{filters.length}</span><button type="button" className="activity-project-new" aria-label="New filter" title="New filter" onClick={() => { const panel = document.getElementById("web-activity-filters-panel"); panel?.scrollIntoView({ behavior: "smooth", block: "center" }); window.setTimeout(() => panel?.querySelector('input[aria-label="Activity filter name"]')?.focus(), 250); }}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(savedFilterID === "all" && projectFilterID === "all", () => onSavedFilter("all"), <SlidersHorizontal size={16} />, "All activity", "No saved filter")}{filters.map((filter) => sidebarButton(savedFilterID === resourceID(filter.id), () => onSavedFilter(resourceID(filter.id)), <Waveform size={16} />, filter.name, `${(filter.rules || []).length} rule${(filter.rules || []).length === 1 ? "" : "s"}`))}</div><p className="activity-project-sidebar-hint">Drag an App / Category row to a project below to assign it.</p></aside>;
+  return <aside className="activity-project-sidebar" aria-label="Activity projects and filters"><div className="activity-project-sidebar-heading"><h2>Projects</h2><span>{formatDurationSeconds(secondsFor(activeActivities))}</span><button type="button" className="activity-project-new" aria-label="New project" title="New project" onClick={() => { const panel = document.getElementById("web-projects-panel"); panel?.scrollIntoView({ behavior: "smooth", block: "center" }); window.setTimeout(() => panel?.querySelector('input[aria-label="Project name"]')?.focus(), 250); }}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(projectFilterID === "all" && savedFilterID === "all", () => onProjectFilter("all"), <Waveform size={16} />, "All Activities", `${activeActivities.length} segments`)}{sidebarButton(projectFilterID === "unassigned", () => onProjectFilter("unassigned"), <TrayIcon />, "Unassigned", `${activeActivities.filter((activity) => !activity.projectID).length} segments`)}{projects.length > 0 ? <div className="activity-project-sidebar-label">My Projects</div> : null}{projectTree()}<div className={`activity-project-drop-zone ${dropTarget ? "active" : ""}`} onDragOver={(event) => { event.preventDefault(); setDropTarget(true); }} onDragLeave={() => setDropTarget(false)} onDrop={handleCreateProjectDrop} role="button" tabIndex={0} aria-label="Create project from activity"><FolderSimple size={17} /><span><strong>{dropTarget ? "Release to create project" : "Create from activity"}</strong><small>{dropMessage || "Drop an App / Category row · ⌘ splits · ⌥ adds rules"}</small></span></div></div><div className="activity-project-sidebar-divider" /><div className="activity-project-sidebar-heading"><h2>Filters</h2><span>{filters.length}</span><button type="button" className="activity-project-new" aria-label="New filter" title="New filter" onClick={() => { const panel = document.getElementById("web-activity-filters-panel"); panel?.scrollIntoView({ behavior: "smooth", block: "center" }); window.setTimeout(() => panel?.querySelector('input[aria-label="Activity filter name"]')?.focus(), 250); }}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(savedFilterID === "all" && projectFilterID === "all", () => onSavedFilter("all"), <SlidersHorizontal size={16} />, "All activity", "No saved filter")}{filters.map((filter) => sidebarButton(savedFilterID === resourceID(filter.id), () => onSavedFilter(resourceID(filter.id)), <Waveform size={16} />, filter.name, `${(filter.rules || []).length} rule${(filter.rules || []).length === 1 ? "" : "s"}`))}</div><p className="activity-project-sidebar-hint">Drag an App / Category row to a project below to assign it.</p></aside>;
 }
 
 function TrayIcon() {
@@ -3096,6 +3117,60 @@ function ActivitiesPage({ api, dateKey, setDateKey }) {
     setProjectFilterID("all");
     setCategoryFilter("all");
   };
+  const createProjectFromActivities = async (activityIDs, options = {}) => {
+    if (!api.connected) throw new Error("Connect Metriday before creating a project.");
+    const sourceActivities = activityIDs
+      .map((id) => currentActivities.find((activity) => resourceID(activity.id) === resourceID(id)))
+      .filter(Boolean);
+    if (!sourceActivities.length) throw new Error("Drop a visible App / Category activity row here.");
+    const parentID = api.projects.some((project) => resourceID(project.id) === resourceID(options.parentProjectID))
+      ? resourceID(options.parentProjectID)
+      : null;
+    const nameFor = (activity) => {
+      try {
+        const host = new URL(activity.resource || "").host;
+        if (host) return host;
+      } catch {
+        // Fall through to the captured application name.
+      }
+      return activity.appName || activity.deviceName || "New Project";
+    };
+    const ruleFor = (activity) => {
+      try {
+        const host = new URL(activity.resource || "").host;
+        if (host) return { field: "domain", comparison: "contains", pattern: host, case_sensitive: false };
+      } catch {
+        // Fall through to bundle or window metadata.
+      }
+      if (activity.bundleIdentifier) return { field: "bundleIdentifier", comparison: "contains", pattern: activity.bundleIdentifier, case_sensitive: false };
+      if (activity.windowTitle) return { field: "titleContains", comparison: "contains", pattern: activity.windowTitle, case_sensitive: false };
+      return null;
+    };
+    const createOne = async (items) => {
+      const project = await api.createProject({ title: nameFor(items[0]), parent: parentID });
+      const projectID = resourceID(project?.id || project?.project_id);
+      if (!projectID) throw new Error("The native app did not return the new project ID.");
+      for (const activity of items) {
+        await api.assignActivity(activity.id, projectID, activity.date || dateKey);
+        if (options.createActivityRules) {
+          const rule = ruleFor(activity);
+          if (rule) await api.createProjectRule({ ...rule, project_id: projectID });
+        }
+      }
+    };
+    if (options.separateItems) {
+      for (const activity of sourceActivities) await createOne([activity]);
+    } else {
+      await createOne(sourceActivities);
+    }
+  };
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    window.__metridayCreateProjectFromActivities = createProjectFromActivities;
+    return () => {
+      if (window.__metridayCreateProjectFromActivities === createProjectFromActivities) delete window.__metridayCreateProjectFromActivities;
+    };
+  }, [api, currentActivities, dateKey]);
   const saveDisplayPreferences = async (patch) => {
     if (!api.connected || !api.updateActivityPreferences) return;
     setDisplayMessage("");
