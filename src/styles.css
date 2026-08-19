@@ -976,7 +976,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   .web-global-rule svg { width: 24px; height: 24px; }
   .web-global-focus { padding: 0 9px; }
   .manual-entry-form { grid-template-columns: minmax(140px, 1fr) 90px 90px minmax(110px, 1fr) 110px auto; }
-  .project-create-form { grid-template-columns: minmax(140px, 1fr) minmax(110px, 1fr) 80px 62px 110px auto; }
+  .project-create-form { grid-template-columns: minmax(140px, 1fr) minmax(110px, 1fr) minmax(110px, 1fr) 80px 62px 110px auto; }
   .report-metrics { grid-template-columns: repeat(2, 1fr); }
   .stats-grid { grid-template-columns: minmax(0, 1fr); }
   .teams-layout { grid-template-columns: minmax(0, 1fr); }
