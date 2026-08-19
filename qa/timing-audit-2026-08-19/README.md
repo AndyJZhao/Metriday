@@ -25,6 +25,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 19. `19-activities-filters.png` — Activities after adding reusable local Activity Filters with field, comparison, and value controls plus the saved-filter empty state.
 20. `20-activities-categories.png` — Activities after exposing the native Category store in Web, with built-in Focused / Distracting / Other / Idle colors and custom rule creation.
 21. `21-activities-calendar-reminders.png` — Activities after adding Calendar Events and Completed Reminders source panels, with per-date loading and explicit local permission empty states.
+22. `22-activities-screen-time.png` — Activities after adding the read-only Screen Time source panel, including the current Full Disk Access status and its inclusion in the activity evidence.
 
 ## Findings applied
 
@@ -45,3 +46,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Activities now supports reusable Activity Filters backed by the native local API; selecting one narrows the same App / Category rows, while creating or deleting a filter persists on this Mac.
 - Activities now exposes the native Activity Categories store; custom categories can classify an App, website, or item and immediately drive the App / Category colors, while Focused remains deep blue and Distracting remains red.
 - Activities now mirrors the native Calendar Events and Completed Reminders panels; both are read-only by default, use the selected date, and show a truthful not-connected state until macOS access is granted.
+- Activities now surfaces the native Screen Time import state separately while keeping its records in the shared App / Category evidence list; the Web panel reports the exact local permission requirement when access is unavailable.

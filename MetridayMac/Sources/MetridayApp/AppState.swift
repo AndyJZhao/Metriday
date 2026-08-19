@@ -1005,6 +1005,19 @@ final class AppState: ObservableObject {
             ])
         }
 
+        if request.method == "GET", path == "/v1/screen-time" {
+            let date = apiDate(from: request.query["date"]) ?? selectedDate
+            screenTimeStore.load(for: date)
+            let segments = screenTimeStore.segments(for: date)
+            return .jsonObject([
+                "date": apiDayKey(date),
+                "data": segments.map { apiActivity($0, date: date) },
+                "database_available": screenTimeStore.databaseAvailable,
+                "status": screenTimeStore.statusMessage,
+                "read_only": true
+            ])
+        }
+
         if request.method == "POST", path == "/v1/phone-calls/hide" {
             guard let body = apiBody(request),
                   let address = body["address"] as? String,
@@ -1298,6 +1311,7 @@ final class AppState: ObservableObject {
                     "POST /v1/phone-calls/hide",
                     "GET /v1/calendar-events?date=YYYY-MM-DD",
                     "GET /v1/reminders?date=YYYY-MM-DD",
+                    "GET /v1/screen-time?date=YYYY-MM-DD",
                     "GET /v1/reports?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&format=json",
                     "GET /v1/activity-hierarchy?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD",
                     "GET /v1/rules",
