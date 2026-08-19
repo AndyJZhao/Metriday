@@ -21,6 +21,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 15. `15-activities-timeline.png` — Activities after adding the missing full-day timeline above the App / Category list, with 00:00–24:00 labels and clickable activity blocks.
 16. `16-activities-project-drop.png` — Activities after adding the Project assignment drop target below the App / Category list; activity rows advertise the drag affordance and projects accept the drop.
 17. `17-activities-view-modes.png` — Activities after adding Unified, By Category, and Chronological views with full-width collapsible group headers.
+18. `18-activities-phone-calls.png` — Activities after bringing the native read-only Phone Calls source into the Web timeline context, including its local connection state.
 
 ## Findings applied
 
@@ -37,3 +38,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Activities now exposes the same high-level timeline workflow as the native surface: full-day activity overview, category-colored blocks, click-through details, and a selection path for recording manual time.
 - Activities now supports assigning a captured activity to a project by dragging its App / Category row onto a Project row; the local API persists the assignment for the selected date, including historical dates.
 - Activities now supports the native three-way view switch: Unified app groups, category groups, and Chronological rows; group headers are full-width buttons and preserve the App / Category row semantics.
+- Activities now surfaces the native read-only Phone Calls source beside the full-day timeline, with per-date loading, local connection status, and address hiding when call history is available.

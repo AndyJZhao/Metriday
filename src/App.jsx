@@ -142,6 +142,7 @@ function useMetridayAPI(dateKey, apiBase) {
     sync: null,
     rules: [],
     focusActive: false,
+    phoneCalls: { data: [], database_available: false, status: "Phone Calls integration not connected" },
     weekly: [],
     insights: [],
   });
@@ -160,6 +161,7 @@ function useMetridayAPI(dateKey, apiBase) {
         request(`/v1/plans?date=${date}`),
         request("/v1/sync/status"),
         request("/v1/rules"),
+        request(`/v1/phone-calls?date=${date}`),
         Promise.all(weekKeys.map(async (weekDate) => {
           const [activityResult, planResult] = await Promise.allSettled([
             request(`/v1/activities?date=${weekDate}`),
@@ -186,8 +188,9 @@ function useMetridayAPI(dateKey, apiBase) {
         sync: value(4, null),
         rules: value(5, { data: [] })?.data || [],
         focusActive: Boolean(value(5, { focusActive: false })?.focusActive),
-        weekly: value(6, []),
-        insights: value(7, { data: [] })?.data || [],
+        phoneCalls: value(6, { data: [], database_available: false, status: "Phone Calls integration not connected" }),
+        weekly: value(7, []),
+        insights: value(8, { data: [] })?.data || [],
       });
       setRefreshVersion((value) => value + 1);
     } catch (error) {
@@ -272,6 +275,10 @@ function useMetridayAPI(dateKey, apiBase) {
     },
     setFocusActive: async (active) => {
       await request("/v1/focus", { method: "POST", body: JSON.stringify({ active }) });
+      await refresh();
+    },
+    hidePhoneCallAddress: async (address, hidden = true) => {
+      await request("/v1/phone-calls/hide", { method: "POST", body: JSON.stringify({ address, hidden }) });
       await refresh();
     },
     savePlan: async (markdown, date = dateKey || localDateKey()) => {
@@ -1441,6 +1448,16 @@ function ActivityDetailDialog({ activity, api, dateKey, onClose }) {
   </div>;
 }
 
+function WebPhoneCallsPanel({ api }) {
+  const payload = api.phoneCalls || {};
+  const calls = Array.isArray(payload.data) ? payload.data : [];
+  const formatCallTime = (value) => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  };
+  return <section className="web-source-panel" aria-label="Phone Calls"><div className="web-source-heading"><div><h2>Phone Calls</h2><p>Read-only call history that can be recorded as local time evidence.</p></div><div className="web-source-actions"><span className={`api-badge ${payload.database_available ? "online" : ""}`}>{payload.database_available ? `${calls.length} calls` : "Not connected"}</span><button type="button" className="quiet-pill" onClick={api.refresh}>Refresh</button></div></div>{calls.length > 0 ? <div className="web-source-list">{calls.map((call) => <div className="web-source-row" key={call.id}><span className="web-source-icon"><Clock size={18} /></span><div><strong>{call.address || "Phone call"}</strong><small>{call.service_provider || "Call history"} · {formatCallTime(call.start)}–{formatCallTime(call.end)}</small></div><span>{formatDurationSeconds(Number(call.duration_seconds || 0))}</span><IconButton label={`Hide calls from ${call.address || "this address"}`} onClick={() => api.hidePhoneCallAddress(call.address, true)}><X size={15} /></IconButton></div>)}</div> : <div className="web-source-empty"><Clock size={22} /><span>{payload.status || "No phone calls for this date."}</span></div>}</section>;
+}
+
 function ActivitiesPage({ api, dateKey, setDateKey }) {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -1480,7 +1497,7 @@ function ActivitiesPage({ api, dateKey, setDateKey }) {
     }
   };
   useEffect(() => setSelectedActivity(null), [dateKey]);
-  return <main className="page supporting-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Activities date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button type="button" className={`status-pill activities-timer ${timerRunning ? "active" : ""}`} onClick={toggleTimer} disabled={timerBusy || !api.connected}><Timer size={16} weight={timerRunning ? "fill" : "regular"} />{timerBusy ? "Updating…" : timerRunning ? "Stop timer" : "Start timer"}</button><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="activities-page-toolbar"><div className="activity-view-switcher" role="group" aria-label="Activity view"><button type="button" className={activityView === "unified" ? "active" : ""} onClick={() => setActivityView("unified")}>Unified</button><button type="button" className={activityView === "category" ? "active" : ""} onClick={() => setActivityView("category")}>By Category</button><button type="button" className={activityView === "chronological" ? "active" : ""} onClick={() => setActivityView("chronological")}>Chronological</button></div><label className="activity-search"><Waveform size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search app, website, window title…" aria-label="Search activities" />{query ? <IconButton label="Clear activity search" onClick={() => setQuery("")}><X size={15} /></IconButton> : null}</label><label className="activity-filter-control">Category<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Activity category filter"><option value="all">All categories</option><option value="focused">Focused</option><option value="distracting">Distracting</option><option value="other">Other</option><option value="idle">Idle</option></select></label><label className="activity-filter-control">Device<select value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)} aria-label="Activity device filter"><option value="all">All devices</option>{devices.map((device) => <option key={device} value={device}>{device}</option>)}</select></label><button type="button" className="quiet-pill activity-reset" onClick={resetFilters} disabled={!hasFilters}>Reset</button></div>{timerMessage ? <p className="entry-message activities-timer-message" role="status">{timerMessage}</p> : null}<WebActivityTimeline activities={activities} dateKey={dateKey} api={api} onSelect={setSelectedActivity} /><section className="activities-list"><div className="activities-list-heading"><div><h2>Today’s activity</h2><p>{api.connected ? hasFilters ? `${activities.length} of ${allActivities.length} locally recorded segments` : `${activities.length} locally recorded segments` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? allActivities.length > 0 ? "No activity matches these filters" : "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || (hasFilters ? "Clear the filters to see all local activity." : "The hosted view keeps working with preview data until the loopback API is available.")}</span></div> : <ActivityTable activities={activities} viewMode={activityView} onSelect={setSelectedActivity} />}</section><ProjectPanel api={api} onAssignActivity={(id, projectID) => api.assignActivity(id, projectID, dateKey)} /><TimeEntriesPanel api={api} dateKey={dateKey} />{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} onClose={() => setSelectedActivity(null)} /> : null}</main>;
+  return <main className="page supporting-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Activities date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button type="button" className={`status-pill activities-timer ${timerRunning ? "active" : ""}`} onClick={toggleTimer} disabled={timerBusy || !api.connected}><Timer size={16} weight={timerRunning ? "fill" : "regular"} />{timerBusy ? "Updating…" : timerRunning ? "Stop timer" : "Start timer"}</button><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="activities-page-toolbar"><div className="activity-view-switcher" role="group" aria-label="Activity view"><button type="button" className={activityView === "unified" ? "active" : ""} onClick={() => setActivityView("unified")}>Unified</button><button type="button" className={activityView === "category" ? "active" : ""} onClick={() => setActivityView("category")}>By Category</button><button type="button" className={activityView === "chronological" ? "active" : ""} onClick={() => setActivityView("chronological")}>Chronological</button></div><label className="activity-search"><Waveform size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search app, website, window title…" aria-label="Search activities" />{query ? <IconButton label="Clear activity search" onClick={() => setQuery("")}><X size={15} /></IconButton> : null}</label><label className="activity-filter-control">Category<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Activity category filter"><option value="all">All categories</option><option value="focused">Focused</option><option value="distracting">Distracting</option><option value="other">Other</option><option value="idle">Idle</option></select></label><label className="activity-filter-control">Device<select value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)} aria-label="Activity device filter"><option value="all">All devices</option>{devices.map((device) => <option key={device} value={device}>{device}</option>)}</select></label><button type="button" className="quiet-pill activity-reset" onClick={resetFilters} disabled={!hasFilters}>Reset</button></div>{timerMessage ? <p className="entry-message activities-timer-message" role="status">{timerMessage}</p> : null}<WebActivityTimeline activities={activities} dateKey={dateKey} api={api} onSelect={setSelectedActivity} /><WebPhoneCallsPanel api={api} /><section className="activities-list"><div className="activities-list-heading"><div><h2>Today’s activity</h2><p>{api.connected ? hasFilters ? `${activities.length} of ${allActivities.length} locally recorded segments` : `${activities.length} locally recorded segments` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? allActivities.length > 0 ? "No activity matches these filters" : "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || (hasFilters ? "Clear the filters to see all local activity." : "The hosted view keeps working with preview data until the loopback API is available.")}</span></div> : <ActivityTable activities={activities} viewMode={activityView} onSelect={setSelectedActivity} />}</section><ProjectPanel api={api} onAssignActivity={(id, projectID) => api.assignActivity(id, projectID, dateKey)} /><TimeEntriesPanel api={api} dateKey={dateKey} />{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} onClose={() => setSelectedActivity(null)} /> : null}</main>;
 }
 
 function RulesPage() {
