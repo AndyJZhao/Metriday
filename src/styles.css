@@ -402,6 +402,15 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-ranking-row > i { display: block; height: 7px; overflow: hidden; border-radius: 99px; background: #eff0f3; }
 .stats-ranking-row > i b { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
 .stats-ranking-row > strong { color: #353a44; font-size: 11px; white-space: nowrap; }
+.stats-category-list { display: grid; gap: 15px; margin-top: 18px; }
+.stats-category-row { display: grid; gap: 7px; }
+.stats-category-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 9px; color: #353a44; font-size: 12px; }
+.stats-category-name { display: flex; align-items: center; min-width: 0; gap: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-category-name i { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; }
+.stats-category-heading strong { font-size: 12px; }
+.stats-category-heading small { min-width: 48px; color: var(--muted); font-size: 10px; text-align: right; }
+.stats-category-track { height: 8px; overflow: hidden; border-radius: 99px; background: #eff0f3; }
+.stats-category-track b { display: block; height: 100%; min-width: 4px; border-radius: inherit; }
 .reports-page .web-report-panel { max-width: 1120px; margin: 0 auto; }
 .teams-intro { display: flex; align-items: center; gap: 12px; max-width: 1120px; margin: 0 auto 14px; padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
 .teams-intro svg { flex: 0 0 auto; color: var(--accent); }
