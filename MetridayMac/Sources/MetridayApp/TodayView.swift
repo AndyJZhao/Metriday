@@ -49,6 +49,13 @@ struct TodayView: View {
                             isCurrent: appState.currentTask?.id == task.id
                         )
                         .padding(.horizontal, 10)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            appState.section = .plan
+                            appState.selectedTaskID = task.id
+                        }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityLabel("Plan (task.title), (TimeFormat.range(start: start, end: end))")
                     }
                 }
                 if Calendar.current.isDateInToday(appState.selectedDate) {
@@ -90,9 +97,17 @@ struct TodayView: View {
                             categoryColor: categoryColor(for: category(for: segment))
                         )
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture { appState.section = .activities }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel("Actual (segment.displayTitle), (TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
                 }
                 ForEach(visibleTimeEntries) { entry in
                     recordedTimeBlock(entry)
+                        .contentShape(Rectangle())
+                        .onTapGesture { appState.section = .activities }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityLabel("Recorded (entry.title), (TimeFormat.range(start: entry.startSecond / 60, end: Int(ceil(Double(entry.endSecond) / 60.0))))")
                 }
                 if Calendar.current.isDateInToday(appState.selectedDate) {
                     currentTimeLine
