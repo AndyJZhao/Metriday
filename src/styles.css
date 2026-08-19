@@ -540,6 +540,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .review-detail-project-row span { display: flex; align-items: center; min-width: 0; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-detail-project-row i { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--accent); }
 .review-detail-project-row strong { color: #353a44; font-size: 11px; white-space: nowrap; }
+.review-project-total { flex-direction: column; align-items: flex-end !important; gap: 1px !important; }
+.review-project-total small { color: var(--success); font-size: 10px; white-space: nowrap; }
 .review-notes ul { display: grid; gap: 12px; margin: 22px 0 0; padding-left: 18px; color: #555b66; font-size: 12px; line-height: 1.5; }
 .web-report-panel { max-width: 1120px; margin: 20px auto 0; padding: 26px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
 .report-actions { display: flex; gap: 8px; }

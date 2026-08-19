@@ -1893,16 +1893,34 @@ function WebReviewDetails({ api, days }) {
     return { hour, active, related, distracted };
   });
   const maxHour = Math.max(1, ...hourRows.map((row) => row.active));
+  const projectAmounts = new Map();
+  const projectCurrencies = new Map();
+  const addProjectAmount = (projectValue, key, seconds) => {
+    const project = api.projects.find((item) => resourceID(item.id) === resourceID(projectValue));
+    const rate = Number(project?.billing_rate || 0);
+    if (!project || !rate || seconds <= 0) return;
+    projectAmounts.set(key, (projectAmounts.get(key) || 0) + seconds / 3600 * rate);
+    projectCurrencies.set(key, project.currency || "USD");
+  };
   const projectTotals = activities.filter((activity) => activityCategory(activity).key !== "idle").reduce((groups, activity) => {
     const key = projectTitleFor(api.projects, activity.projectID);
-    groups.set(key, (groups.get(key) || 0) + secondsForActivity(activity));
+    const seconds = secondsForActivity(activity);
+    groups.set(key, (groups.get(key) || 0) + seconds);
+    addProjectAmount(activity.projectID, key, seconds);
     return groups;
   }, new Map());
   entries.forEach((entry) => {
     const key = projectTitleFor(api.projects, entry.project);
-    projectTotals.set(key, (projectTotals.get(key) || 0) + Math.max(0, Number(entry.duration || 0)));
+    const seconds = Math.max(0, Number(entry.duration || 0));
+    projectTotals.set(key, (projectTotals.get(key) || 0) + seconds);
+    addProjectAmount(entry.project, key, seconds);
   });
   const projectRows = [...projectTotals.entries()].sort((left, right) => right[1] - left[1]).slice(0, 10);
+  const projectAmountLabel = (name) => {
+    const amount = projectAmounts.get(name) || 0;
+    if (amount <= 0) return "";
+    return new Intl.NumberFormat(undefined, { style: "currency", currency: projectCurrencies.get(name) || "USD" }).format(amount);
+  };
   const exportCSV = () => {
     const header = ["Kind", "Date", "Title", "Project", "Category", "Start", "End", "Duration Seconds"];
     const activityRows = activities.filter((activity) => activityCategory(activity).key !== "idle").map((activity) => ["Activity", activity.date, activityLabel(activity), projectTitleFor(api.projects, activity.projectID), activityCategory(activity).label, activity.startSecond, activity.endSecond, secondsForActivity(activity)]);
@@ -1913,7 +1931,7 @@ function WebReviewDetails({ api, days }) {
   return <>
     <section className="review-detail-panel review-weekly-quality"><div className="chart-heading"><div><h2>Weekly focus quality</h2><p>Focused and Distracting minutes from the same App / Category evidence.</p></div><div className="review-detail-actions"><button type="button" onClick={exportCSV}>Export CSV</button></div></div><div className="review-quality-chart">{dayRows.map((row) => <div className="review-quality-day" key={row.date}><div className="review-quality-pair"><i className="focused" style={{ height: Math.max(4, (row.related / maxDay) * 100) + "%" }} /><i className="distracting" style={{ height: Math.max(4, (row.distracted / maxDay) * 100) + "%" }} /></div><span>{row.label}</span></div>)}</div><div className="legend"><span><i className="focused" />Focused</span><span><i className="distracting" />Distracting</span></div></section>
     <section className="review-detail-grid"><section className="review-detail-panel"><div className="chart-heading"><div><h2>Applications &amp; Websites</h2><p>Top App / Category sources this week.</p></div><span className="api-badge">Top 8</span></div><div className="review-ranking">{applicationRows.length ? applicationRows.map((row) => <div className="review-ranking-row" key={`${row.name}:${row.category.label}`}><div><strong>{row.name}</strong><small className={`activity-category ${row.category.key}`} style={activityCategoryStyle(row.category)}><i />{row.category.label}</small></div><span><b style={{ width: Math.max(4, (row.seconds / Math.max(1, applicationRows[0].seconds)) * 100) + "%", background: activityCategoryStyle(row.category).color }} /></span><em>{formatDurationSeconds(row.seconds)}</em></div>) : <div className="entries-empty"><Browsers size={22} /><span>No active application time this week.</span></div>}</div></section><section className="review-detail-panel"><div className="chart-heading"><div><h2>Hourly focus</h2><p>Focused, Distracting, and other active time by hour.</p></div></div><div className="review-hour-chart">{hourRows.map((row) => <div className="review-hour-column" key={row.hour} title={`${String(row.hour).padStart(2, "0")}:00 · ${formatDurationSeconds(row.active)}`}><div className="review-hour-track"><i className="focused" style={{ height: Math.max(2, (row.related / maxHour) * 100) + "%" }} /><i className="distracting" style={{ height: Math.max(2, (row.distracted / maxHour) * 100) + "%" }} /></div><span>{row.hour % 6 === 0 || row.hour === 23 ? String(row.hour).padStart(2, "0") : ""}</span></div>)}</div></section></section>
-    <section className="review-detail-grid"><section className="review-detail-panel"><div className="chart-heading"><div><h2>Projects &amp; Time Entries</h2><p>Tracked activity and manual/timer entries.</p></div><span className="api-badge">{formatDurationSeconds(projectRows.reduce((total, row) => total + row[1], 0))}</span></div><div className="review-ranking">{projectRows.length ? projectRows.map(([name, seconds]) => <div className="review-detail-project-row" key={name}><span><i />{name}</span><strong>{formatDurationSeconds(seconds)}</strong></div>) : <div className="entries-empty"><FolderSimple size={22} /><span>No project-assigned activity yet.</span></div>}</div></section><section className="review-detail-panel review-notes"><div className="chart-heading"><div><h2>Next actions</h2><p>Keep the evidence loop actionable.</p></div><Sparkle size={20} color="#4e5ff2" /></div><ul><li>Assign recurring App / Category activity to a project.</li><li>Use New Time Entry for meetings or time away from the Mac.</li><li>Reports use the same local activity and time-entry source.</li></ul></section></section>
+    <section className="review-detail-grid"><section className="review-detail-panel"><div className="chart-heading"><div><h2>Projects &amp; Time Entries</h2><p>Tracked activity and manual/timer entries.</p></div><span className="api-badge">{formatDurationSeconds(projectRows.reduce((total, row) => total + row[1], 0))}</span></div><div className="review-ranking">{projectRows.length ? projectRows.map(([name, seconds]) => <div className="review-detail-project-row" key={name}><span><i />{name}</span><span className="review-project-total"><strong>{formatDurationSeconds(seconds)}</strong>{projectAmountLabel(name) ? <small>{projectAmountLabel(name)}</small> : null}</span></div>) : <div className="entries-empty"><FolderSimple size={22} /><span>No project-assigned activity yet.</span></div>}</div></section><section className="review-detail-panel review-notes"><div className="chart-heading"><div><h2>Next actions</h2><p>Keep the evidence loop actionable.</p></div><Sparkle size={20} color="#4e5ff2" /></div><ul><li>Assign recurring App / Category activity to a project.</li><li>Use New Time Entry for meetings or time away from the Mac.</li><li>Reports use the same local activity and time-entry source.</li></ul></section></section>
   </>;
 }
 
