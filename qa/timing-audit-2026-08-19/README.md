@@ -64,6 +64,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 58. Calendar overlay entry parity — verified the Web New Time Entry sheet still opens and dismisses with Escape after adding its prefill path; Calendar timeline clicks now open a time-entry form with the event title and range instead of writing immediately.
 59. Source record-entry parity — verified the Web Activities build and Sites tests after routing Calendar Events, Completed Reminders, and Phone Calls Record actions through the same prefilled New Time Entry flow used by native Activities.
 60. Activity source affordances — verified the source-panel implementations keep App / Category evidence read-only while exposing explicit Record actions for Calendar, Reminders, and Phone Calls; no source action writes without opening the shared editor first.
+61. Native timeline segment hit targets — verified `swift build` and native smoke tests after making both horizontal and vertical App activity segments respond to the same full-segment double-click Time Entry action already available on activity rows.
 
 ## Findings applied
 
@@ -124,3 +125,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Today Plan / Actual hit targets now expose truthful labels containing the visible task or activity and its range on both native and Web surfaces.
 - Calendar timeline overlays now follow the native flow: selecting an event opens an editable, prefilled New Time Entry sheet; saving remains an explicit user action.
 - Calendar Events, Completed Reminders, and Phone Calls now expose the native Record affordance and share the same explicit prefilled time-entry workflow in the Web companion.
+- Native Activities now keeps timeline orientation behavior consistent: horizontal and vertical App segments expose a full visual double-click target for creating a Time Entry, while hover and context-menu actions remain available.

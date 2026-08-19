@@ -4315,6 +4315,12 @@ private struct ActivityTimelinePanel: View {
                             }
                         }
                         .frame(width: width, height: 18)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) {
+                            let start = max(0, segment.startMinute)
+                            let end = min(1_440, max(start + 15, segment.endMinute))
+                            onCreateTimeEntry(start, end)
+                        }
                         .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))\(segment.resource.isEmpty ? "" : " · \(segment.resource)")")
                         .onHover { isHovered in
                             // Timeline blocks can overlap. Clearing the shared
@@ -4498,6 +4504,12 @@ private struct ActivityTimelinePanel: View {
                             .fill(activityColor(segment).opacity(0.72))
                             .frame(width: width, height: 16)
                             .offset(x: left)
+                            .contentShape(Rectangle())
+                            .onTapGesture(count: 2) {
+                                let start = max(0, segment.startMinute)
+                                let end = min(1_440, max(start + 15, segment.endMinute))
+                                onCreateTimeEntry(start, end)
+                            }
                             .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
                     }
                 }
