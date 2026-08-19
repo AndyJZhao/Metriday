@@ -2219,6 +2219,18 @@ function WebReportPanel({ api, dateKey }) {
     const startBound = new Date(`${rangeStart}T00:00:00`);
     const endBound = new Date(`${offsetDateKey(rangeEnd, 1)}T00:00:00`);
     const projectFor = (value) => projectTitleFor(api.projects, value);
+    const projectPathFor = (value) => {
+      const path = [];
+      const seen = new Set();
+      let current = api.projects.find((project) => resourceID(project.id) === resourceID(value) || (project.title || project.name || "") === String(value || ""));
+      while (current && !seen.has(resourceID(current.id))) {
+        seen.add(resourceID(current.id));
+        path.unshift(current.title || current.name || "Untitled project");
+        const parentID = resourceID(current.parent || current.parent_id || current.parentID);
+        current = parentID ? api.projects.find((project) => resourceID(project.id) === parentID) : null;
+      }
+      return path.length ? path.join(" > ") : "Unassigned";
+    };
     const projectDetails = (value) => {
       const project = api.projects.find((item) => resourceID(item.id) === resourceID(value));
       return { rate: project?.billing_rate || 0, currency: project?.currency || "USD" };
@@ -2282,7 +2294,10 @@ function WebReportPanel({ api, dateKey }) {
       const application = row.kind === "Activity" ? row.application : "Time entries";
       const document = row.notes || row.title;
       const rowDate = localDateKey(row.start);
-      const key = groupBy === "project" ? row.project : groupBy === "application" ? application : groupBy === "document" ? document : groupBy === "day" ? row.start.toLocaleDateString() : groupBy === "weekAndDay" ? `Week of ${weekStartDateKey(rowDate)} / ${row.start.toLocaleDateString()}` : groupBy === "week" ? `Week of ${weekStartDateKey(rowDate)}` : row.start.toLocaleDateString();
+      const projectPath = projectPathFor(row.project);
+      const projectComponents = projectPath.split(" > ");
+      const hour = String(row.start.getHours()).padStart(2, "0");
+      const key = groupBy === "project" ? row.project : groupBy === "topLevelProject" ? projectComponents[0] : groupBy === "secondLevelProject" ? (projectComponents[1] || projectComponents[0]) : groupBy === "projectHierarchy" ? projectPath : groupBy === "application" ? application : groupBy === "document" ? document : groupBy === "day" ? row.start.toLocaleDateString() : groupBy === "weekAndDay" ? `Week of ${weekStartDateKey(rowDate)} / ${row.start.toLocaleDateString()}` : groupBy === "week" ? `Week of ${weekStartDateKey(rowDate)}` : groupBy === "month" ? rowDate.slice(0, 7) : groupBy === "year" ? rowDate.slice(0, 4) : groupBy === "hour" ? `${rowDate} ${hour}:00` : row.start.toLocaleDateString();
       const current = groups.get(key) || { ...row, kind: "Summary", type: "Grouped", title: "", displayTitle: key, group: key, seconds: 0, billableSeconds: 0, amount: 0, notes: "" };
       current.seconds += row.seconds;
       current.billableSeconds += row.billableSeconds;
@@ -2410,7 +2425,7 @@ function WebReportPanel({ api, dateKey }) {
     </div>
     <div className="report-filters">
       <label>Include<select value={includeMode} onChange={(event) => setIncludeMode(event.target.value)}><option value="both">Time entries + app activity</option><option value="time">Time entries only</option><option value="app">App activity only</option></select></label>
-      <label>Group by<select value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="exact">Exact rows</option><option value="day">Day</option><option value="weekAndDay">Week + Day</option><option value="week">Week</option><option value="project">Project</option><option value="application">Application</option><option value="document">Document</option></select></label>
+      <label>Group by<select value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="exact">Exact rows</option><option value="day">Day</option><option value="weekAndDay">Week + Day</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option><option value="hour">Hour</option><option value="project">Project</option><option value="topLevelProject">Top-level Project</option><option value="secondLevelProject">Second-level Project</option><option value="projectHierarchy">Project (Hierarchical)</option><option value="application">Application</option><option value="document">Document</option></select></label>
       <label>Billing<select value={billingFilter} onChange={(event) => setBillingFilter(event.target.value)}><option value="all">All statuses</option><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select></label>
       <label>Rounding<select value={rounding} onChange={(event) => setRounding(event.target.value)}><option value="none">Exact</option><option value="up">Round up</option><option value="down">Round down</option><option value="nearest">Nearest</option></select></label>
       <label>Interval<select value={roundingInterval} onChange={(event) => setRoundingInterval(Number(event.target.value))}><option value={1}>1 min</option><option value={5}>5 min</option><option value={6}>6 min</option><option value={10}>10 min</option><option value={12}>12 min</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label>
