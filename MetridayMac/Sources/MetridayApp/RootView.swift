@@ -24,6 +24,8 @@ struct RootView: View {
                         TodayView(
                             store: appState.markdownStore,
                             monitor: appState.activityMonitor,
+                            filterStore: appState.filterStore,
+                            categoryStore: appState.categoryStore,
                             timeEntryStore: appState.timeEntryStore,
                             screenTimeStore: appState.screenTimeStore
                         )
@@ -47,6 +49,8 @@ struct RootView: View {
                     case .stats:
                         StatsView(
                             monitor: appState.activityMonitor,
+                            filterStore: appState.filterStore,
+                            categoryStore: appState.categoryStore,
                             screenTimeStore: appState.screenTimeStore,
                             projectStore: appState.projectStore,
                             timeEntryStore: appState.timeEntryStore,

@@ -98,12 +98,13 @@ struct ActivityRow: View {
     let range: String
     let symbol: String?
     let relevance: ActivityRelevance
+    let categoryColor: Color
 
     var body: some View {
         HStack(spacing: 9) {
             Text(minutes.map { "\($0)m" } ?? "")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(relevance == .distracted ? MetridayTheme.danger : (relevance == .related ? MetridayTheme.success : MetridayTheme.graphite))
+                .foregroundStyle(categoryColor)
                 .frame(width: 40, alignment: .leading)
             if let symbol {
                 Image(systemName: symbol).font(.system(size: 15)).frame(width: 18)
@@ -116,6 +117,6 @@ struct ActivityRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 30)
-        .background(relevance == .distracted ? Color.red.opacity(0.055) : .clear)
+        .background(categoryColor.opacity(relevance == .distracted ? 0.055 : 0.035))
     }
 }

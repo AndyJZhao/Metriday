@@ -4,6 +4,8 @@ struct TodayView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var store: MarkdownStore
     @ObservedObject var monitor: AppActivityMonitor
+    @ObservedObject var filterStore: ActivityFilterStore
+    @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var timeEntryStore: TimeEntryStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
 
@@ -84,7 +86,8 @@ struct TodayView: View {
                             title: segment.displayTitle,
                             range: TimeFormat.range(start: segment.startMinute, end: segment.endMinute),
                             symbol: symbol(for: segment),
-                            relevance: segment.relevance
+                            relevance: segment.relevance,
+                            categoryColor: categoryColor(for: category(for: segment))
                         )
                     }
                 }
@@ -189,7 +192,7 @@ struct TodayView: View {
             }
 
             let last = result[lastIndex]
-            let canMerge = last.relevance == segment.relevance
+            let canMerge = category(for: last).id == category(for: segment).id
                 && segment.startSecond - last.endSecond <= maximumGap
                 && segment.endSecond - last.startSecond <= maximumRun
             guard canMerge else {
@@ -245,7 +248,8 @@ struct TodayView: View {
     @ViewBuilder
     private func actualBlock<Content: View>(segment: ActivitySegment, @ViewBuilder content: () -> Content) -> some View {
         let height = TimelineMetrics.height(startSecond: segment.startSecond, endSecond: segment.endSecond)
-        if segment.relevance == .idle {
+        let category = category(for: segment)
+        if category.role == .idle {
             ZStack(alignment: .topLeading) {
                 Rectangle()
                     .fill(Color.black.opacity(0.025))
@@ -265,7 +269,7 @@ struct TodayView: View {
             .help("\(segment.displayTitle) · \(segment.duration)m")
         } else if segment.durationSeconds < 30 * 60 {
             Rectangle()
-                .fill(activityColor(for: segment.relevance))
+                .fill(categoryColor(for: category))
                 .frame(maxWidth: .infinity)
                 .frame(height: max(3, height))
                 .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
@@ -275,7 +279,7 @@ struct TodayView: View {
         } else {
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .background(activityColor(for: segment.relevance).opacity(0.8))
+                .background(categoryColor(for: category).opacity(0.8))
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(MetridayTheme.line, lineWidth: 1))
                 .frame(height: height)
@@ -284,17 +288,21 @@ struct TodayView: View {
         }
     }
 
-    private func activityColor(for relevance: ActivityRelevance) -> Color {
-        switch relevance {
-        case .related:
-            return MetridayTheme.successSoft
-        case .distracted:
-            return MetridayTheme.danger.opacity(0.16)
-        case .other:
-            return Color(red: 0.88, green: 0.89, blue: 0.92)
-        case .idle:
-            return Color(red: 0.94, green: 0.945, blue: 0.955)
+    private func category(for segment: ActivitySegment) -> ActivityCategoryDefinition {
+        categoryStore.category(for: segment, filterStore: filterStore, date: appState.selectedDate)
+    }
+
+    private func categoryColor(for category: ActivityCategoryDefinition) -> Color {
+        let color: Color
+        switch category.color {
+        case .blue: color = MetridayTheme.accentDeep
+        case .green: color = MetridayTheme.success
+        case .orange: color = MetridayTheme.warning
+        case .purple: color = .purple
+        case .red: color = MetridayTheme.danger
+        case .graphite: color = MetridayTheme.secondary
         }
+        return color
     }
 
     private var currentTimeLine: some View {

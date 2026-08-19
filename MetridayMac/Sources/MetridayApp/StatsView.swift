@@ -4,6 +4,8 @@ import SwiftUI
 struct StatsView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var monitor: AppActivityMonitor
+    @ObservedObject var filterStore: ActivityFilterStore
+    @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
     @ObservedObject var projectStore: ProjectStore
     @ObservedObject var timeEntryStore: TimeEntryStore
@@ -301,7 +303,7 @@ struct StatsView: View {
                                 .foregroundStyle(MetridayTheme.secondary)
                         }
                         ProgressView(value: Double(point.seconds), total: Double(maximum))
-                            .tint(point.isDistracted ? MetridayTheme.danger : MetridayTheme.accent)
+                            .tint(point.color)
                     }
                 }
             }
@@ -451,16 +453,16 @@ struct StatsView: View {
     }
 
     private var applicationPoints: [StatsApplicationPoint] {
-        var totals: [String: (seconds: Int, distracted: Bool)] = [:]
+        var totals: [String: (seconds: Int, color: Color)] = [:]
         for segment in weekDates.flatMap(activitySegments(for:)) where segment.relevance != .idle {
-            let existing = totals[segment.displayTitle, default: (seconds: 0, distracted: false)]
+            let existing = totals[segment.displayTitle, default: (seconds: 0, color: categoryColor(for: category(for: segment)))]
             totals[segment.displayTitle] = (
                 seconds: existing.seconds + segment.durationSeconds,
-                distracted: existing.distracted || segment.relevance == .distracted
+                color: existing.color
             )
         }
         return totals.map { name, value in
-            StatsApplicationPoint(name: name, seconds: value.seconds, isDistracted: value.distracted)
+            StatsApplicationPoint(name: name, seconds: value.seconds, color: value.color)
         }
         .sorted { $0.seconds > $1.seconds }
         .prefix(8)
@@ -471,13 +473,28 @@ struct StatsView: View {
         monitor.segments(for: date) + screenTimeStore.segments(for: date)
     }
 
+    private func category(for segment: ActivitySegment) -> ActivityCategoryDefinition {
+        categoryStore.category(for: segment, filterStore: filterStore, date: selectedDate)
+    }
+
+    private func categoryColor(for category: ActivityCategoryDefinition) -> Color {
+        switch category.color {
+        case .blue: return MetridayTheme.accentDeep
+        case .green: return MetridayTheme.success
+        case .orange: return MetridayTheme.warning
+        case .purple: return .purple
+        case .red: return MetridayTheme.danger
+        case .graphite: return MetridayTheme.secondary
+        }
+    }
+
     private func productivityValue(for segment: ActivitySegment) -> Double {
         if let project = projectStore.project(segment.projectID) {
             return Double(project.productivity)
         }
-        switch segment.relevance {
-        case .related: return 100
-        case .distracted: return 0
+        switch category(for: segment).role {
+        case .focused: return 100
+        case .distracting: return 0
         case .other: return 50
         case .idle: return 0
         }
@@ -549,7 +566,7 @@ private struct StatsApplicationPoint: Identifiable {
     var id: String { name }
     let name: String
     let seconds: Int
-    let isDistracted: Bool
+    let color: Color
 }
 
 private extension Int {
