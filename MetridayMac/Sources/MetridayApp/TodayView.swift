@@ -9,6 +9,7 @@ struct TodayView: View {
     @ObservedObject var timeEntryStore: TimeEntryStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
     @State private var selectedActivity: ActivitySegment?
+    @State private var selectedTimeEntry: TimeEntry?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,6 +41,13 @@ struct TodayView: View {
                 projectName: appState.projectStore.name(for: activity.projectID),
                 timeEntryStore: timeEntryStore,
                 selectedDate: appState.selectedDate
+            )
+        }
+        .sheet(item: $selectedTimeEntry) { entry in
+            TodayTimeEntryDetailSheet(
+                entry: entry,
+                projects: appState.projectStore.activeProjects,
+                timeEntryStore: timeEntryStore
             )
         }
     }
@@ -115,7 +123,9 @@ struct TodayView: View {
                 ForEach(visibleTimeEntries) { entry in
                     recordedTimeBlock(entry)
                         .contentShape(Rectangle())
-                        .onTapGesture { appState.section = .activities }
+                        .onTapGesture {
+                            selectedTimeEntry = timeEntryStore.materializedEntries().first(where: { $0.id == entry.id })
+                        }
                         .accessibilityAddTraits(.isButton)
                         .accessibilityLabel("Recorded \(entry.title), \(TimeFormat.range(start: entry.startSecond / 60, end: Int(ceil(Double(entry.endSecond) / 60.0))))")
                 }
@@ -500,6 +510,91 @@ struct ActivityDetailSheet: View {
             billingStatus: .billable
         )
         dismiss()
+    }
+}
+
+private struct TodayTimeEntryDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let entry: TimeEntry
+    let projects: [TrackingProject]
+    @ObservedObject var timeEntryStore: TimeEntryStore
+
+    @State private var title: String
+    @State private var projectID: UUID?
+    @State private var billingStatus: BillingStatus
+    @State private var start: Date
+    @State private var end: Date
+    @State private var notes: String
+
+    init(entry: TimeEntry, projects: [TrackingProject], timeEntryStore: TimeEntryStore) {
+        self.entry = entry
+        self.projects = projects
+        self.timeEntryStore = timeEntryStore
+        _title = State(initialValue: entry.title)
+        _projectID = State(initialValue: entry.projectID)
+        _billingStatus = State(initialValue: entry.billingStatus)
+        _start = State(initialValue: entry.start)
+        _end = State(initialValue: entry.end)
+        _notes = State(initialValue: entry.notes)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack {
+                Text("Edit Time Entry")
+                    .font(.system(size: 18, weight: .bold))
+                Spacer()
+                Button("Close") { dismiss() }
+                    .buttonStyle(.borderless)
+            }
+
+            TextField("What did you work on?", text: $title)
+                .textFieldStyle(.roundedBorder)
+
+            Picker("Project", selection: $projectID) {
+                Text("Unassigned").tag(nil as UUID?)
+                ForEach(projects) { project in
+                    Text(project.name).tag(project.id as UUID?)
+                }
+            }
+
+            Picker("Billing Status", selection: $billingStatus) {
+                ForEach(BillingStatus.allCases) { status in
+                    Text(status.label).tag(status)
+                }
+            }
+
+            DatePicker("Start", selection: $start, displayedComponents: [.date, .hourAndMinute])
+            DatePicker("End", selection: $end, displayedComponents: [.date, .hourAndMinute])
+
+            TextField("Notes (optional)", text: $notes, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(3, reservesSpace: true)
+
+            HStack {
+                Button("Delete", role: .destructive) {
+                    timeEntryStore.delete(entry)
+                    dismiss()
+                }
+                Spacer()
+                Button("Save") {
+                    var updated = entry
+                    updated.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                    updated.projectID = projectID
+                    updated.billingStatus = billingStatus
+                    updated.start = start
+                    updated.end = end
+                    updated.notes = notes
+                    guard !updated.title.isEmpty, updated.end > updated.start else { return }
+                    timeEntryStore.update(updated)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || end <= start)
+            }
+        }
+        .padding(24)
+        .frame(width: 430)
     }
 }
 
