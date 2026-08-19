@@ -554,15 +554,22 @@ function activityCategoryStyle(category) {
 }
 
 function activityFilterValues(activity, field) {
+  const startSecond = Math.max(0, Number(activity?.startSecond || 0));
+  const startMinute = Math.floor(startSecond / 60);
+  const startDate = new Date(`${activity?.date || localDateKey()}T00:00:00`);
+  if (!Number.isNaN(startDate.getTime())) startDate.setSeconds(Math.round(startSecond));
   switch (field) {
     case "application": return [activity.appName || ""];
     case "bundleIdentifier": return [activity.bundleIdentifier || ""];
     case "windowTitle": return [activity.windowTitle || ""];
     case "resource": return [activity.resource || ""];
-    case "domain": return [activity.resource || ""];
+    case "domain":
+      try { return [new URL(activity.resource || "").host]; } catch { return [""]; }
     case "fullURL": return [activity.resource || ""];
-    case "keyword": return [activity.appName, activity.windowTitle, activity.resource].filter(Boolean);
+    case "keyword": return [activity.windowTitle, activity.resource].filter(Boolean);
     case "device": return [activity.deviceName || "This Mac"];
+    case "startTime": return [String(Math.floor(startMinute / 60)).padStart(2, "0") + ":" + String(startMinute % 60).padStart(2, "0")];
+    case "dayOfWeek": return Number.isNaN(startDate.getTime()) ? [] : [startDate.toLocaleDateString("en-US", { weekday: "long" })];
     default: return [];
   }
 }
@@ -2261,8 +2268,8 @@ function WebActivityCategoriesPanel({ api }) {
   const [rules, setRules] = useState(() => [{ field: "application", comparison: "contains", pattern: "", case_sensitive: false }]);
   const [editingID, setEditingID] = useState(null);
   const [message, setMessage] = useState("");
-  const fields = { application: "Application", bundleIdentifier: "Bundle identifier", windowTitle: "Window title", resource: "URL or path", domain: "Domain", keyword: "Keyword", device: "Device" };
-  const comparisons = { contains: "contains", equals: "is", beginsWith: "begins with", endsWith: "ends with", matchesRegex: "matches regex" };
+  const fields = { application: "Application", bundleIdentifier: "Bundle identifier", windowTitle: "Window title", resource: "URL or path", domain: "Domain", fullURL: "Full website URL", keyword: "Keyword", device: "Device", startTime: "Start time", dayOfWeek: "Day of week" };
+  const comparisons = { contains: "contains", equals: "is", beginsWith: "begins with", endsWith: "ends with", like: "is like", isNot: "is not", matchesRegex: "matches regex" };
   const emptyRule = () => ({ field: "application", comparison: "contains", pattern: "", case_sensitive: false });
   const resetEditor = () => {
     setName("");
