@@ -228,7 +228,7 @@ final class MetridayExportReportCommand: NSScriptCommand {
                 destination = URL(fileURLWithPath: requestedPath)
             } else {
                 destination = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("metriday-report-(UUID().uuidString)")
+                    .appendingPathComponent("metriday-report-\(UUID().uuidString)")
                     .appendingPathExtension(format.fileExtension)
             }
             do {

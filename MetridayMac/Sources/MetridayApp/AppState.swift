@@ -1007,7 +1007,7 @@ final class AppState: ObservableObject {
                     contentType = "text/html; charset=utf-8"
                 case .xlsx, .pdf:
                     let temporaryURL = FileManager.default.temporaryDirectory
-                        .appendingPathComponent("metriday-report-(UUID().uuidString)")
+                        .appendingPathComponent("metriday-report-\(UUID().uuidString)")
                         .appendingPathExtension(format.fileExtension)
                     defer { try? FileManager.default.removeItem(at: temporaryURL) }
                     try ReportExporter.write(
