@@ -102,6 +102,14 @@ function offsetDateKey(dateKey, offset) {
   return localDateKey(date);
 }
 
+function weekStartDateKey(dateKey) {
+  const date = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return dateKey;
+  const day = date.getDay();
+  date.setDate(date.getDate() - (day === 0 ? 6 : day - 1));
+  return localDateKey(date);
+}
+
 function dateKeysBetween(startDate, endDate) {
   const keys = [];
   for (let offset = 0; offset < 90; offset += 1) {
@@ -159,6 +167,7 @@ function useMetridayAPI(dateKey, apiBase) {
     teams: [],
     sourcePreferences: null,
     weekly: [],
+    calendarWeekly: [],
     insights: [],
   });
 
@@ -167,6 +176,20 @@ function useMetridayAPI(dateKey, apiBase) {
   const refresh = useCallback(async () => {
     const date = dateKey || localDateKey();
     const weekKeys = Array.from({ length: 7 }, (_, index) => offsetDateKey(date, index - 6));
+    const calendarWeekKeys = Array.from({ length: 7 }, (_, index) => offsetDateKey(weekStartDateKey(date), index));
+    const loadWeek = (keys) => Promise.all(keys.map(async (weekDate) => {
+      const [activityResult, planResult, entryResult] = await Promise.allSettled([
+        request(`/v1/activities?date=${weekDate}`),
+        request(`/v1/plans?date=${weekDate}`),
+        request(`/api/v1/time-entries?start_date_min=${weekDate}&start_date_max=${weekDate}`),
+      ]);
+      return {
+        date: weekDate,
+        activities: activityResult.status === "fulfilled" && Array.isArray(activityResult.value) ? activityResult.value : [],
+        plan: planResult.status === "fulfilled" ? planResult.value : null,
+        entries: entryResult.status === "fulfilled" ? entryResult.value?.data || [] : [],
+      };
+    }));
     try {
       const status = await request("/v1/status");
       const results = await Promise.allSettled([
@@ -177,19 +200,7 @@ function useMetridayAPI(dateKey, apiBase) {
         request("/v1/sync/status"),
         request("/v1/rules"),
         request(`/v1/phone-calls?date=${date}`),
-        Promise.all(weekKeys.map(async (weekDate) => {
-          const [activityResult, planResult, entryResult] = await Promise.allSettled([
-            request(`/v1/activities?date=${weekDate}`),
-            request(`/v1/plans?date=${weekDate}`),
-            request(`/api/v1/time-entries?start_date_min=${weekDate}&start_date_max=${weekDate}`),
-          ]);
-          return {
-            date: weekDate,
-            activities: activityResult.status === "fulfilled" && Array.isArray(activityResult.value) ? activityResult.value : [],
-            plan: planResult.status === "fulfilled" ? planResult.value : null,
-            entries: entryResult.status === "fulfilled" ? entryResult.value?.data || [] : [],
-          };
-        })),
+        loadWeek(weekKeys),
         request(`/v1/insights?date=${date}`),
         request("/v1/filters"),
         request("/v1/categories"),
@@ -203,6 +214,7 @@ function useMetridayAPI(dateKey, apiBase) {
         request("/v1/activity-preferences"),
         request("/v1/teams"),
         request("/v1/source-preferences"),
+        loadWeek(calendarWeekKeys),
       ]);
       const value = (index, fallback) => results[index].status === "fulfilled" ? results[index].value : fallback;
       setSnapshot({
@@ -232,6 +244,7 @@ function useMetridayAPI(dateKey, apiBase) {
         activityPreferences: value(18, null),
         teams: value(19, { data: [] })?.data || [],
         sourcePreferences: value(20, null),
+        calendarWeekly: value(21, []),
       });
       setRefreshVersion((value) => value + 1);
     } catch (error) {
@@ -1779,7 +1792,8 @@ function WebTimeEntryRow({ entry, projects, onEdit, onDelete }) {
 
 function ReviewPage({ api, dateKey, setDateKey, setPage }) {
   const fallbackDays = [{ label: "Mon", planned: 7.2, actual: 6.6 }, { label: "Tue", planned: 6.5, actual: 7.1 }, { label: "Wed", planned: 7.8, actual: 6.9 }, { label: "Thu", planned: 6.2, actual: 5.8 }, { label: "Fri", planned: 7.1, actual: 6.5 }, { label: "Sat", planned: 5.5, actual: 4.8 }, { label: "Sun", planned: 4.8, actual: 4.2 }];
-  const days = api.weekly.length >= 7 ? api.weekly.slice(-7).map((day) => {
+  const reviewWeekly = api.calendarWeekly.length >= 7 ? api.calendarWeekly : api.weekly;
+  const days = reviewWeekly.length >= 7 ? reviewWeekly.slice(-7).map((day) => {
     const plannedMinutes = (day.plan?.tasks || []).reduce((total, task) => total + (Number.isFinite(task.start_minute) && Number.isFinite(task.end_minute) ? Math.max(0, task.end_minute - task.start_minute) : 0), 0);
     const activeSeconds = (day.activities || []).reduce((total, activity) => total + (activity.relevance === "idle" ? 0 : Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0))), 0);
     return { label: new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short" }), planned: plannedMinutes / 60, actual: activeSeconds / 3600 };
@@ -1790,7 +1804,10 @@ function ReviewPage({ api, dateKey, setDateKey, setPage }) {
   const taskRelated = totalActive > 0 ? Math.round((relatedSeconds / totalActive) * 100) : 0;
   const deepWork = api.connected ? formatDurationSeconds(relatedSeconds) : "22h 14m";
   const distraction = api.connected ? formatDurationSeconds(distractedSeconds) : "91%";
-  const categoryRows = api.connected ? [...api.activities.reduce((groups, activity) => {
+  const categoryActivities = api.connected
+    ? (api.calendarWeekly.length >= 7 ? api.calendarWeekly.flatMap((day) => day.activities || []) : api.activities)
+    : [];
+  const categoryRows = api.connected ? [...categoryActivities.reduce((groups, activity) => {
     const category = activityCategory(activity);
     const seconds = Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
     if (seconds <= 0 || category.key === "idle") return groups;
@@ -2759,7 +2776,7 @@ function ActivitiesPage({ api, dateKey, setDateKey }) {
 }
 
 function StatsPage({ api, dateKey, setDateKey, setPage }) {
-  const days = api.weekly.slice(-7);
+  const days = (api.calendarWeekly.length >= 7 ? api.calendarWeekly : api.weekly).slice(-7);
   const secondsForActivity = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
   const productivityValue = (activity) => {
     const category = activityCategory(activity).key;
@@ -2819,7 +2836,7 @@ function StatsPage({ api, dateKey, setDateKey, setPage }) {
   const maxHour = Math.max(1, ...hourRows.map((row) => row.active));
   const maxApp = Math.max(1, ...appRows.map((row) => row.seconds));
   const formatStat = (seconds) => formatDurationSeconds(seconds);
-  return <main className="page supporting-page stats-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? "Native statistics · Last 7 days" : "Local preview"}</span><h1>Stats</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Stats date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button className="quiet-pill" type="button" onClick={() => setPage?.("activities")}>Open Activities</button><button className="quiet-pill" type="button" onClick={() => api.refresh()}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><section className="stats-summary"><div><Clock size={22} /><span>Total time</span><strong>{formatStat(totalActive)}</strong><small>Active app usage</small></div><div><ShieldCheck size={22} /><span>Productivity score</span><strong>{totalActive ? `${productivityScore}%` : "—"}</strong><small>Weighted by category relevance</small></div><div><Timer size={22} /><span>Focused time</span><strong>{formatStat(totalFocused)}</strong><small>Focused category</small></div><div><TrendUp size={22} /><span>Distraction</span><strong>{formatStat(totalDistracted)}</strong><small>Detected locally</small></div></section><section className="stats-grid"><section className="stats-panel"><div className="chart-heading"><div><h2>Most active weekdays</h2><p>Active minutes from native activity evidence.</p></div></div><div className="stats-bars"><span className="stats-visually-hidden">Active minutes by weekday</span>{dayRows.map((day) => <div className="stats-bar-column" key={day.date}><div className="stats-bar-track"><i style={{ height: Math.max(3, (day.active / maxDay) * 100) + "%" }} /></div><strong>{day.active ? formatStat(day.active) : "—"}</strong><span>{day.label}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most productive weekdays</h2><p>Productivity score</p></div></div><div className="stats-bars stats-score-bars"><span className="stats-visually-hidden">Productivity score by weekday</span>{dayRows.map((day) => <div className="stats-bar-column" key={day.date}><div className="stats-bar-track"><i style={{ height: Math.max(3, day.productivityScore) + "%", background: "var(--success)" }} /></div><strong>{day.productivityScore}%</strong><span>{day.label}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most active hours</h2><p>Active minutes</p></div></div><div className="stats-hour-bars"><span className="stats-visually-hidden">Active minutes by hour</span>{hourRows.map((row) => <div className="stats-hour-column" key={row.hour}><div className="stats-hour-track"><i style={{ height: Math.max(3, (row.active / maxHour) * 100) + "%" }} /></div><span>{row.hour % 6 === 0 || row.hour === 23 ? String(row.hour).padStart(2, "0") : ""}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most productive hours</h2><p>Productivity score</p></div></div><div className="stats-hour-bars stats-score-bars"><span className="stats-visually-hidden">Productivity score by hour</span>{hourRows.map((row) => <div className="stats-hour-column" key={row.hour}><div className="stats-hour-track"><i style={{ height: Math.max(3, row.productivityScore) + "%", background: "var(--success)" }} /></div><span>{row.hour % 6 === 0 || row.hour === 23 ? String(row.hour).padStart(2, "0") : ""}</span></div>)}</div></section><section className="stats-panel stats-category-panel"><div className="chart-heading"><div><h2>Time by Category</h2><p>Category owns the color for every App, website, and item.</p></div></div><div className="stats-category-list">{categoryRows.length ? categoryRows.map((row) => { const categoryStyle = activityCategoryStyle({ color: row.color }); const percentage = categoryTotal ? Math.round((row.seconds / categoryTotal) * 100) : 0; return <div className="stats-category-row" key={row.key + row.label}><div className="stats-category-heading"><span className="stats-category-name"><i style={{ background: categoryStyle.color }} />{row.label}</span><strong>{percentage}%</strong><small>{formatStat(row.seconds)}</small></div><div className="stats-category-track"><b style={{ width: Math.max(4, (row.seconds / maxCategory) * 100) + "%", background: categoryStyle.color }} /></div></div>; }) : <div className="entries-empty"><ChartBar size={22} /><span>No categorized activity yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Time per Project</h2><p>Tracked activity grouped by assigned project.</p></div></div><div className="stats-ranking">{projectRows.length ? projectRows.map(([name, seconds]) => <div className="stats-ranking-row" key={name}><span>{name}</span><i><b style={{ width: `${Math.max(4, (seconds / Math.max(1, projectRows[0][1])) * 100)}%` }} /></i><strong>{formatStat(seconds)}</strong></div>) : <div className="entries-empty"><FolderSimple size={22} /><span>No project activity yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Projects &amp; Time Entries</h2><p>Tracked activity and time entries</p></div><span className="api-badge">{formatStat(projectRows.reduce((total, row) => total + row[1], 0))}</span></div><div className="stats-ranking">{projectRows.length ? projectRows.map(([name, seconds]) => <div className="stats-ranking-row" key={"entries-" + name}><span>{name}</span><i><b style={{ width: Math.max(4, (seconds / Math.max(1, projectRows[0][1])) * 100) + "%" }} /></i><strong>{formatStat(seconds)}</strong></div>) : <div className="entries-empty"><Clock size={22} /><span>No project-assigned activity or time entry yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most active applications</h2><p>Top App / website sources by captured time.</p></div></div><div className="stats-ranking">{appRows.length ? appRows.map((row) => <div className="stats-ranking-row" key={`${row.name}:${row.category.label}`}><div className="stats-ranking-name"><span>{row.name}</span><small className={`activity-category ${row.category.key}`} style={activityCategoryStyle(row.category)}><i />{row.category.label}</small></div><i><b style={{ width: `${Math.max(4, (row.seconds / maxApp) * 100)}%`, background: activityCategoryStyle(row.category).color }} /></i><strong>{formatStat(row.seconds)}</strong></div>) : <div className="entries-empty"><Browsers size={22} /><span>No application activity yet.</span></div>}</div></section></section></main>;
+  return <main className="page supporting-page stats-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? "Native statistics · This week" : "Local preview"}</span><h1>Stats</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Stats date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button className="quiet-pill" type="button" onClick={() => setPage?.("activities")}>Open Activities</button><button className="quiet-pill" type="button" onClick={() => api.refresh()}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><section className="stats-summary"><div><Clock size={22} /><span>Total time</span><strong>{formatStat(totalActive)}</strong><small>Active app usage</small></div><div><ShieldCheck size={22} /><span>Productivity score</span><strong>{totalActive ? `${productivityScore}%` : "—"}</strong><small>Weighted by category relevance</small></div><div><Timer size={22} /><span>Focused time</span><strong>{formatStat(totalFocused)}</strong><small>Focused category</small></div><div><TrendUp size={22} /><span>Distraction</span><strong>{formatStat(totalDistracted)}</strong><small>Detected locally</small></div></section><section className="stats-grid"><section className="stats-panel"><div className="chart-heading"><div><h2>Most active weekdays</h2><p>Active minutes from native activity evidence.</p></div></div><div className="stats-bars"><span className="stats-visually-hidden">Active minutes by weekday</span>{dayRows.map((day) => <div className="stats-bar-column" key={day.date}><div className="stats-bar-track"><i style={{ height: Math.max(3, (day.active / maxDay) * 100) + "%" }} /></div><strong>{day.active ? formatStat(day.active) : "—"}</strong><span>{day.label}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most productive weekdays</h2><p>Productivity score</p></div></div><div className="stats-bars stats-score-bars"><span className="stats-visually-hidden">Productivity score by weekday</span>{dayRows.map((day) => <div className="stats-bar-column" key={day.date}><div className="stats-bar-track"><i style={{ height: Math.max(3, day.productivityScore) + "%", background: "var(--success)" }} /></div><strong>{day.productivityScore}%</strong><span>{day.label}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most active hours</h2><p>Active minutes</p></div></div><div className="stats-hour-bars"><span className="stats-visually-hidden">Active minutes by hour</span>{hourRows.map((row) => <div className="stats-hour-column" key={row.hour}><div className="stats-hour-track"><i style={{ height: Math.max(3, (row.active / maxHour) * 100) + "%" }} /></div><span>{row.hour % 6 === 0 || row.hour === 23 ? String(row.hour).padStart(2, "0") : ""}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most productive hours</h2><p>Productivity score</p></div></div><div className="stats-hour-bars stats-score-bars"><span className="stats-visually-hidden">Productivity score by hour</span>{hourRows.map((row) => <div className="stats-hour-column" key={row.hour}><div className="stats-hour-track"><i style={{ height: Math.max(3, row.productivityScore) + "%", background: "var(--success)" }} /></div><span>{row.hour % 6 === 0 || row.hour === 23 ? String(row.hour).padStart(2, "0") : ""}</span></div>)}</div></section><section className="stats-panel stats-category-panel"><div className="chart-heading"><div><h2>Time by Category</h2><p>Category owns the color for every App, website, and item.</p></div></div><div className="stats-category-list">{categoryRows.length ? categoryRows.map((row) => { const categoryStyle = activityCategoryStyle({ color: row.color }); const percentage = categoryTotal ? Math.round((row.seconds / categoryTotal) * 100) : 0; return <div className="stats-category-row" key={row.key + row.label}><div className="stats-category-heading"><span className="stats-category-name"><i style={{ background: categoryStyle.color }} />{row.label}</span><strong>{percentage}%</strong><small>{formatStat(row.seconds)}</small></div><div className="stats-category-track"><b style={{ width: Math.max(4, (row.seconds / maxCategory) * 100) + "%", background: categoryStyle.color }} /></div></div>; }) : <div className="entries-empty"><ChartBar size={22} /><span>No categorized activity yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Time per Project</h2><p>Tracked activity grouped by assigned project.</p></div></div><div className="stats-ranking">{projectRows.length ? projectRows.map(([name, seconds]) => <div className="stats-ranking-row" key={name}><span>{name}</span><i><b style={{ width: `${Math.max(4, (seconds / Math.max(1, projectRows[0][1])) * 100)}%` }} /></i><strong>{formatStat(seconds)}</strong></div>) : <div className="entries-empty"><FolderSimple size={22} /><span>No project activity yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Projects &amp; Time Entries</h2><p>Tracked activity and time entries</p></div><span className="api-badge">{formatStat(projectRows.reduce((total, row) => total + row[1], 0))}</span></div><div className="stats-ranking">{projectRows.length ? projectRows.map(([name, seconds]) => <div className="stats-ranking-row" key={"entries-" + name}><span>{name}</span><i><b style={{ width: Math.max(4, (seconds / Math.max(1, projectRows[0][1])) * 100) + "%" }} /></i><strong>{formatStat(seconds)}</strong></div>) : <div className="entries-empty"><Clock size={22} /><span>No project-assigned activity or time entry yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most active applications</h2><p>Top App / website sources by captured time.</p></div></div><div className="stats-ranking">{appRows.length ? appRows.map((row) => <div className="stats-ranking-row" key={`${row.name}:${row.category.label}`}><div className="stats-ranking-name"><span>{row.name}</span><small className={`activity-category ${row.category.key}`} style={activityCategoryStyle(row.category)}><i />{row.category.label}</small></div><i><b style={{ width: `${Math.max(4, (row.seconds / maxApp) * 100)}%`, background: activityCategoryStyle(row.category).color }} /></i><strong>{formatStat(row.seconds)}</strong></div>) : <div className="entries-empty"><Browsers size={22} /><span>No application activity yet.</span></div>}</div></section></section></main>;
 }
 
 function ReportsPage({ api, dateKey, setDateKey }) {
