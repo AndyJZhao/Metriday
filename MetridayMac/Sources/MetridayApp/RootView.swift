@@ -43,6 +43,14 @@ struct RootView: View {
                             teamStore: appState.teamStore,
                             selectedDate: appState.selectedDate
                         )
+                    case .stats:
+                        StatsView(
+                            monitor: appState.activityMonitor,
+                            screenTimeStore: appState.screenTimeStore,
+                            projectStore: appState.projectStore,
+                            timeEntryStore: appState.timeEntryStore,
+                            selectedDate: appState.selectedDate
+                        )
                     case .review:
                         ReviewView(
                             monitor: appState.activityMonitor,
