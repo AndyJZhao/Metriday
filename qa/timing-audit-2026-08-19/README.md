@@ -74,6 +74,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 68. Native Today Time Entry detail — verified `swift build`, native smoke tests, packaged-app launch, and relaunch after making recorded-time blocks open an editor with title, time, project, billing, notes, Save, and Delete actions instead of only navigating to Activities.
 69. Native Activity click disambiguation — verified `swift build`, native smoke tests, packaged-app build, and relaunch after replacing overlapping single/double tap handlers with an exclusive gesture: single click opens Activity detail, double click creates a Time Entry.
 70. Native Timeline click parity — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after making horizontal and vertical App activity blocks open the shared detail sheet on single click while retaining double-click Time Entry creation; Project rows now also use an exclusive single-select / double-edit gesture.
+71. Native saved-filter click disambiguation — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after replacing the saved-filter row's competing Button and double-tap handlers with one exclusive recognizer: single click selects the filter and double click opens its editor.
 
 ## Findings applied
 
@@ -145,3 +146,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Native Today recorded-time blocks now open a direct editor with Save/Delete actions, matching the Web timeline overlay workflow and preserving the full block as the hit target.
 - Native Activity row gestures now use one exclusive click recognizer, preserving both single-click detail and double-click Time Entry behavior without competing callbacks.
 - Native Timeline activity blocks now use the same exclusive click semantics as activity rows: single click opens App / Category detail, double click creates a Time Entry, and Project rows no longer compete between selection and edit callbacks.
+- Saved Activity Filter rows now keep single-click selection and double-click editing mutually exclusive, so the same click cannot both change the activity scope and open the editor.

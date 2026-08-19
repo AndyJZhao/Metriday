@@ -1699,9 +1699,10 @@ struct ActivitiesView: View {
         icon: String,
         filter target: ActivityFilter,
         tint: Color? = nil,
-        summarySeconds: Int? = nil
+        summarySeconds: Int? = nil,
+        onDoubleTap: (() -> Void)? = nil
     ) -> some View {
-        Button {
+        let button = Button {
             filter = target
         } label: {
             HStack(spacing: 10) {
@@ -1729,6 +1730,25 @@ struct ActivitiesView: View {
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
+
+        if let onDoubleTap {
+            return AnyView(
+                button.gesture(
+                    TapGesture(count: 2)
+                        .exclusively(before: TapGesture())
+                        .onEnded { result in
+                            switch result {
+                            case .first:
+                                onDoubleTap()
+                            case .second:
+                                filter = target
+                            }
+                        }
+                )
+            )
+        }
+
+        return AnyView(button)
     }
 
     private func savedFilterButton(_ savedFilter: ActivityFilterDefinition) -> some View {
@@ -1736,7 +1756,11 @@ struct ActivitiesView: View {
             title: savedFilter.name,
             icon: "line.3.horizontal.decrease.circle",
             filter: .saved(savedFilter.id),
-            tint: color(for: savedFilter.color)
+            tint: color(for: savedFilter.color),
+            onDoubleTap: {
+                editingFilter = savedFilter
+                showingFilterEditor = true
+            }
         )
         .contextMenu {
             Button("Edit Filter") {
@@ -1755,10 +1779,6 @@ struct ActivitiesView: View {
                     filter = .all
                 }
             }
-        }
-        .onTapGesture(count: 2) {
-            editingFilter = savedFilter
-            showingFilterEditor = true
         }
     }
 
