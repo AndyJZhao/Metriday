@@ -327,7 +327,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .report-presets, .report-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; margin-top: 20px; }
 .report-presets label, .report-filters label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
 .report-presets label { flex-direction: column; align-items: flex-start; gap: 5px; }
-.report-presets input, .report-filters select { height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #343740; font-size: 11px; }
+.report-presets input, .report-presets select, .report-filters select { height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #343740; font-size: 11px; }
 .report-filters { padding-top: 15px; border-top: 1px solid #eceef1; }
 .report-filters label:not(:first-child) { padding-left: 8px; }
 .report-filters select { margin-left: 2px; }

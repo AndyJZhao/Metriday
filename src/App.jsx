@@ -1314,7 +1314,9 @@ function downloadReport(filename, content, type) {
 function WebReportPanel({ api, dateKey }) {
   const [rangeStart, setRangeStart] = useState(offsetDateKey(dateKey, -6));
   const [rangeEnd, setRangeEnd] = useState(dateKey);
-  const [includeActivities, setIncludeActivities] = useState(true);
+  const [reportPreset, setReportPreset] = useState("timesheet");
+  const [includeMode, setIncludeMode] = useState("both");
+  const [groupBy, setGroupBy] = useState("exact");
   const [billingFilter, setBillingFilter] = useState("all");
   const [rounding, setRounding] = useState("none");
   const [roundingInterval, setRoundingInterval] = useState(15);
@@ -1339,6 +1341,17 @@ function WebReportPanel({ api, dateKey }) {
     });
     return () => { current = false; };
   }, [api.connected, api.fetchRange, api.refreshVersion, rangeStart, rangeEnd]);
+  const reportPresets = [
+    { key: "timesheet", label: "Timesheet", include: "both", group: "exact" },
+    { key: "timesheet-week-day", label: "Timesheet (Week + Day)", include: "both", group: "day" },
+    { key: "weekly-snippet", label: "Weekly Snippet", include: "both", group: "week" },
+    { key: "time-project", label: "Time Per Project", include: "time", group: "project" },
+    { key: "time-application", label: "Time Per Application", include: "app", group: "application" },
+    { key: "time-document", label: "Time Per Document", include: "time", group: "document" },
+    { key: "ultra-detailed", label: "Ultra-Detailed", include: "both", group: "exact" },
+    { key: "raw-time-entries", label: "Raw Time Entries", include: "time", group: "exact" },
+    { key: "raw-app-usage", label: "Raw App Usage", include: "app", group: "exact" },
+  ];
   const report = useMemo(() => {
     const startBound = new Date(`${rangeStart}T00:00:00`);
     const endBound = new Date(`${offsetDateKey(rangeEnd, 1)}T00:00:00`);
@@ -1348,7 +1361,7 @@ function WebReportPanel({ api, dateKey }) {
       return { rate: project?.billing_rate || 0, currency: project?.currency || "USD" };
     };
     const rows = [];
-    dataset.entries.forEach((entry) => {
+    if (includeMode !== "app") dataset.entries.forEach((entry) => {
       const start = new Date(entry.start_date || entry.start);
       const end = new Date(entry.end_date || entry.end);
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start || end <= startBound || start >= endBound) return;
@@ -1359,7 +1372,7 @@ function WebReportPanel({ api, dateKey }) {
       const details = projectDetails(entry.project);
       rows.push({ kind: "Time entry", title: entry.title || "Untitled", project: projectFor(entry.project), billing: billingLabel(entry.billing_status), currency: details.currency, start: clippedStart, end: clippedEnd, seconds, amount: seconds / 3600 * details.rate, notes: entry.notes || "" });
     });
-    if (includeActivities && billingFilter === "all") {
+    if (includeMode !== "time" && billingFilter === "all") {
       dataset.activities.forEach((activity) => {
         if (activity.relevance === "idle") return;
         const start = reportDateTime(activity.date, activity.startSecond);
@@ -1373,9 +1386,24 @@ function WebReportPanel({ api, dateKey }) {
       });
     }
     rows.sort((left, right) => left.start - right.start);
-    return { rows, totalSeconds: rows.reduce((sum, row) => sum + row.seconds, 0), billableSeconds: rows.filter((row) => row.billing === "Billable").reduce((sum, row) => sum + row.seconds, 0), amount: rows.reduce((sum, row) => sum + row.amount, 0), currencies: [...new Set(rows.map((row) => row.currency).filter(Boolean))] };
-  }, [api.projects, billingFilter, dataset, includeActivities, rangeEnd, rangeStart, rounding, roundingInterval]);
-  const setPreset = (preset) => {
+    rows.forEach((row) => { row.billableSeconds = row.billing === "Billable" ? row.seconds : 0; });
+    const groupedRows = groupBy === "exact" ? rows : [...rows.reduce((groups, row) => {
+      const application = row.kind === "Activity" ? row.title.split(" · ")[0] : "Time entries";
+      const document = row.notes || row.title;
+      const key = groupBy === "project" ? row.project : groupBy === "application" ? application : groupBy === "document" ? document : groupBy === "day" ? row.start.toLocaleDateString() : groupBy === "week" ? `Week of ${row.start.toLocaleDateString()}` : row.start.toLocaleDateString();
+      const current = groups.get(key) || { ...row, kind: "Summary", title: key, seconds: 0, billableSeconds: 0, amount: 0, notes: "" };
+      current.seconds += row.seconds;
+      current.billableSeconds += row.billableSeconds;
+      current.amount += row.amount;
+      current.start = current.start < row.start ? current.start : row.start;
+      current.end = current.end > row.end ? current.end : row.end;
+      current.billing = current.billing === row.billing ? row.billing : "Mixed";
+      groups.set(key, current);
+      return groups;
+    }, new Map()).values()].sort((left, right) => left.start - right.start);
+    return { rows: groupedRows, totalSeconds: groupedRows.reduce((sum, row) => sum + row.seconds, 0), billableSeconds: groupedRows.reduce((sum, row) => sum + row.billableSeconds, 0), amount: groupedRows.reduce((sum, row) => sum + row.amount, 0), currencies: [...new Set(groupedRows.map((row) => row.currency).filter(Boolean))] };
+  }, [api.projects, billingFilter, dataset, groupBy, includeMode, rangeEnd, rangeStart, rounding, roundingInterval]);
+  const setDatePreset = (preset) => {
     if (preset === "today") {
       setRangeStart(dateKey);
       setRangeEnd(dateKey);
@@ -1389,6 +1417,13 @@ function WebReportPanel({ api, dateKey }) {
       setRangeEnd(dateKey);
     }
   };
+  const applyReportPreset = (preset) => {
+    const selected = reportPresets.find((item) => item.key === preset);
+    if (!selected) return;
+    setReportPreset(selected.key);
+    setIncludeMode(selected.include);
+    setGroupBy(selected.group);
+  };
   const exportRows = report.rows.map((row) => ({ kind: row.kind, title: row.title, project: row.project, billing_status: row.billing, currency: row.currency, start: row.start.toISOString(), end: row.end.toISOString(), duration_seconds: row.seconds, amount: Number(row.amount.toFixed(2)), notes: row.notes }));
   const exportCSV = () => {
     const headers = ["Kind", "Title", "Project", "Billing Status", "Currency", "Start", "End", "Duration Seconds", "Amount", "Notes"];
@@ -1401,7 +1436,27 @@ function WebReportPanel({ api, dateKey }) {
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Metriday report ${rangeStart} to ${rangeEnd}</title><style>body{font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#252832;margin:36px}h1{font-size:24px}p{color:#626978}table{border-collapse:collapse;width:100%;margin-top:24px}th,td{border:1px solid #dfe1e6;padding:8px;text-align:left;font-size:12px}th{background:#f4f5f8}</style></head><body><h1>Metriday report</h1><p>${rangeStart} to ${rangeEnd} · Total ${reportHTMLCell(formatDurationSeconds(report.totalSeconds))} · Billable ${reportHTMLCell(formatDurationSeconds(report.billableSeconds))} · Amount ${reportHTMLCell(report.amount.toFixed(2))} ${reportHTMLCell(report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD")}</p><table><thead><tr><th>Kind</th><th>Title</th><th>Project</th><th>Billing</th><th>Currency</th><th>Start</th><th>End</th><th>Duration (s)</th><th>Amount</th></tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
     downloadReport(`metriday-report-${rangeStart}-${rangeEnd}.html`, html, "text/html;charset=utf-8");
   };
-  return <section className="web-report-panel"><div className="chart-heading"><div><h2>Reports & exports</h2><p>Timing-style reports from local activities, time entries, projects, and billing status.</p></div><div className="report-actions"><button type="button" onClick={exportCSV} disabled={!report.rows.length}>Export CSV</button><button type="button" onClick={exportJSON} disabled={!report.rows.length}>Export JSON</button><button type="button" onClick={exportHTML} disabled={!report.rows.length}>Export HTML</button></div></div><div className="report-presets"><button type="button" onClick={() => setPreset("today")}>Today</button><button type="button" className="active" onClick={() => setPreset("week")}>Last 7 days</button><button type="button" onClick={() => setPreset("month")}>This month</button><label>From<input type="date" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} /></label><label>To<input type="date" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} /></label></div><div className="report-filters"><label><input type="checkbox" checked={includeActivities} onChange={(event) => setIncludeActivities(event.target.checked)} />Include app activity</label><label>Billing<select value={billingFilter} onChange={(event) => setBillingFilter(event.target.value)}><option value="all">All statuses</option><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select></label><label>Rounding<select value={rounding} onChange={(event) => setRounding(event.target.value)}><option value="none">Exact</option><option value="up">Round up</option><option value="down">Round down</option><option value="nearest">Nearest</option></select></label><label>Interval<select value={roundingInterval} onChange={(event) => setRoundingInterval(Number(event.target.value))}><option value={1}>1 min</option><option value={5}>5 min</option><option value={6}>6 min</option><option value={10}>10 min</option><option value={12}>12 min</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label></div>{message ? <p className="entry-message" role="status">{message}</p> : null}<div className="report-metrics"><div><span>Total</span><strong>{formatDurationSeconds(report.totalSeconds)}</strong></div><div><span>Billable</span><strong>{formatDurationSeconds(report.billableSeconds)}</strong></div><div><span>Amount</span><strong>{report.amount.toFixed(2)} {report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD"}</strong></div><div><span>Rows</span><strong>{loading ? "…" : report.rows.length}</strong></div></div>{report.rows.length > 0 ? <div className="report-table"><div className="report-table-head"><span>Title</span><span>Project</span><span>Timespan</span><span>Duration</span><span>Billing</span></div>{report.rows.slice(0, 40).map((row, index) => <div className="report-table-row" key={`${row.kind}-${row.start.toISOString()}-${index}`}><strong>{row.title}</strong><span>{row.project}</span><span>{row.start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} {entryClock(row.start)}–{entryClock(row.end)}</span><span>{formatDurationSeconds(row.seconds)}</span><small>{row.billing}</small></div>)}</div> : <div className="entries-empty"><ChartBar size={24} /><span>{loading ? "Loading report data…" : api.connected ? "No rows match this report." : "Connect the native app to generate a report."}</span></div>}</section>;
+  return <section className="web-report-panel">
+    <div className="chart-heading">
+      <div><h2>Reports & exports</h2><p>Timing-style reports from local activities, time entries, projects, and billing status.</p></div>
+      <div className="report-actions"><button type="button" onClick={exportCSV} disabled={!report.rows.length}>Export CSV</button><button type="button" onClick={exportJSON} disabled={!report.rows.length}>Export JSON</button><button type="button" onClick={exportHTML} disabled={!report.rows.length}>Export HTML</button></div>
+    </div>
+    <div className="report-presets">
+      <label>Report<select value={reportPreset} onChange={(event) => applyReportPreset(event.target.value)}>{reportPresets.map((preset) => <option value={preset.key} key={preset.key}>{preset.label}</option>)}</select></label>
+      <button type="button" onClick={() => setDatePreset("today")}>Today</button><button type="button" onClick={() => setDatePreset("week")}>Last 7 days</button><button type="button" onClick={() => setDatePreset("month")}>This month</button>
+      <label>From<input type="date" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} /></label><label>To<input type="date" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} /></label>
+    </div>
+    <div className="report-filters">
+      <label>Include<select value={includeMode} onChange={(event) => setIncludeMode(event.target.value)}><option value="both">Time entries + app activity</option><option value="time">Time entries only</option><option value="app">App activity only</option></select></label>
+      <label>Group by<select value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="exact">Exact rows</option><option value="day">Day</option><option value="week">Week</option><option value="project">Project</option><option value="application">Application</option><option value="document">Document</option></select></label>
+      <label>Billing<select value={billingFilter} onChange={(event) => setBillingFilter(event.target.value)}><option value="all">All statuses</option><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select></label>
+      <label>Rounding<select value={rounding} onChange={(event) => setRounding(event.target.value)}><option value="none">Exact</option><option value="up">Round up</option><option value="down">Round down</option><option value="nearest">Nearest</option></select></label>
+      <label>Interval<select value={roundingInterval} onChange={(event) => setRoundingInterval(Number(event.target.value))}><option value={1}>1 min</option><option value={5}>5 min</option><option value={6}>6 min</option><option value={10}>10 min</option><option value={12}>12 min</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label>
+    </div>
+    {message ? <p className="entry-message" role="status">{message}</p> : null}
+    <div className="report-metrics"><div><span>Total</span><strong>{formatDurationSeconds(report.totalSeconds)}</strong></div><div><span>Billable</span><strong>{formatDurationSeconds(report.billableSeconds)}</strong></div><div><span>Amount</span><strong>{report.amount.toFixed(2)} {report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD"}</strong></div><div><span>Rows</span><strong>{loading ? "…" : report.rows.length}</strong></div></div>
+    {report.rows.length > 0 ? <div className="report-table"><div className="report-table-head"><span>Title</span><span>Project</span><span>Timespan</span><span>Duration</span><span>Billing</span></div>{report.rows.slice(0, 40).map((row, index) => <div className="report-table-row" key={`${row.kind}-${row.start.toISOString()}-${index}`}><strong>{row.title}</strong><span>{row.project}</span><span>{row.start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} {entryClock(row.start)}–{entryClock(row.end)}</span><span>{formatDurationSeconds(row.seconds)}</span><small>{row.billing}</small></div>)}</div> : <div className="entries-empty"><ChartBar size={24} /><span>{loading ? "Loading report data…" : api.connected ? "No rows match this report." : "Connect the native app to generate a report."}</span></div>}
+  </section>;
 }
 
 function WebActivityTimeline({ activities, dateKey, api, onSelect }) {
