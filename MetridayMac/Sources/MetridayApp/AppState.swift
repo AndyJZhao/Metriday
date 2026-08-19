@@ -334,6 +334,8 @@ final class AppState: ObservableObject {
                 return .error("Source access request needs a source", statusCode: 400)
             }
             switch source {
+            case "accessibility":
+                activityMonitor.requestAccessibilityAccess()
             case "calendar":
                 calendarStore.requestAccess()
             case "reminders":
@@ -2194,6 +2196,12 @@ final class AppState: ObservableObject {
             "screen_time": [
                 "database_available": screenTimeStore.databaseAvailable,
                 "status": screenTimeStore.statusMessage
+            ],
+            "permissions": [
+                "accessibility_trusted": activityMonitor.accessibilityTrusted,
+                "status": activityMonitor.accessibilityTrusted
+                    ? "Accessibility access available"
+                    : "Accessibility access needed for window titles"
             ]
         ]
     }

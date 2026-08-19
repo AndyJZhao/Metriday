@@ -166,6 +166,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Web Settings now exposes native source preferences: Calendar selections, Reminder lists and recurring-item filtering, Phone Calls hidden numbers, and Screen Time access state. App identity remains source metadata while Category remains the only color owner for captured activity. :codex-annotation{index="1"}
 - Web weekly analytics now separates the native calendar week (Monday–Sunday) used by Review/Stats from the trailing seven-day range used by Activities, so selecting a mid-week date no longer mixes adjacent weeks.
 - Web Reports now defaults to the selected date's native calendar week and exposes separate This week, Last 7 days, and This month shortcuts instead of conflating the first two ranges.
+- Web Settings now surfaces native Accessibility permission state and can trigger the native accessibility request flow, keeping permission requirements explicit for App / website capture.
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
 78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
@@ -182,3 +183,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 89. Web Settings source preferences — verified native/Web build and Sites tests, packaged native smoke tests, and live `/v1/source-preferences` GET/PATCH plus Phone Calls hide-all routes after adding shared Calendar, Reminders, Phone Calls, and Screen Time source settings.
 90. Web calendar-week parity — verified Web build, Sites tests, and diff checks after fetching a separate Monday–Sunday range for Review/Stats while preserving trailing-seven-day Activities behavior.
 91. Web Reports date-range parity — verified Web build, Sites tests, and diff checks after matching native Report Builder's calendar-week default and adding distinct This week / Last 7 days shortcuts.
+92. Web Accessibility permission parity — verified native build/smoke, Web build/Sites tests, packaged-app relaunch, and live `/v1/source-preferences` response containing Accessibility state after adding the request-access action.
