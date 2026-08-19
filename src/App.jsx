@@ -191,17 +191,31 @@ function useMetridayAPI(dateKey, apiBase) {
     const date = dateKey || localDateKey();
     const weekKeys = Array.from({ length: 7 }, (_, index) => offsetDateKey(date, index - 6));
     const calendarWeekKeys = Array.from({ length: 7 }, (_, index) => offsetDateKey(weekStartDateKey(date), index));
-    const loadWeek = (keys) => Promise.all(keys.map(async (weekDate) => {
+    const loadWeek = (keys, options = {}) => Promise.all(keys.map(async (weekDate) => {
+      const overlapEntries = Boolean(options.overlapEntries);
       const [activityResult, planResult, entryResult] = await Promise.allSettled([
         request(`/v1/activities?date=${weekDate}`),
         request(`/v1/plans?date=${weekDate}`),
-        request(`/api/v1/time-entries?start_date_min=${weekDate}&start_date_max=${weekDate}`),
+        request(`/api/v1/time-entries?start_date_min=${overlapEntries ? offsetDateKey(weekDate, -1) : weekDate}&start_date_max=${weekDate}`),
       ]);
+      const rawEntries = entryResult.status === "fulfilled" ? entryResult.value?.data || [] : [];
+      const entries = overlapEntries
+        ? rawEntries.map((entry) => {
+          const range = entrySecondsForDate(entry, weekDate);
+          if (!range) return null;
+          return {
+            ...entry,
+            start_date: localEntryDateSeconds(weekDate, range.startSecond),
+            end_date: localEntryDateSeconds(weekDate, range.endSecond),
+            duration: range.endSecond - range.startSecond,
+          };
+        }).filter(Boolean)
+        : rawEntries;
       return {
         date: weekDate,
         activities: activityResult.status === "fulfilled" && Array.isArray(activityResult.value) ? activityResult.value : [],
         plan: planResult.status === "fulfilled" ? planResult.value : null,
-        entries: entryResult.status === "fulfilled" ? entryResult.value?.data || [] : [],
+        entries,
       };
     }));
     try {
@@ -214,7 +228,7 @@ function useMetridayAPI(dateKey, apiBase) {
         request("/v1/sync/status"),
         request("/v1/rules"),
         request(`/v1/phone-calls?date=${date}`),
-        loadWeek(weekKeys),
+        loadWeek(weekKeys, { overlapEntries: true }),
         request(`/v1/insights?date=${date}`),
         request("/v1/filters"),
         request("/v1/categories"),
@@ -228,7 +242,7 @@ function useMetridayAPI(dateKey, apiBase) {
         request("/v1/activity-preferences"),
         request("/v1/teams"),
         request("/v1/source-preferences"),
-        loadWeek(calendarWeekKeys),
+        loadWeek(calendarWeekKeys, { overlapEntries: true }),
       ]);
       const value = (index, fallback) => results[index].status === "fulfilled" ? results[index].value : fallback;
       setSnapshot({

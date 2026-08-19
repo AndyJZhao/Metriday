@@ -240,3 +240,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 128. Web report grouping parity — verified Web exposes the full native ReportGroupBy set and computes month/year/hour plus top-level, second-level, and hierarchical project keys before local aggregation.
 129. Web productivity weighting parity — verified Stats and Review now use the assigned project productivity score when present, falling back to Focused=100, Other=50, and Distracting=0 like native.
 130. Web Activities cross-day action parity — verified Last 7 days activity rows create Time Entries on the activity's own date, project creation drops resolve activities from the visible range, and the project sidebar totals use the same displayed range.
+131. Web weekly time-entry clipping parity — verified Review/Stats week payloads fetch overlapping entries from the prior day and clip each entry to the individual calendar day before aggregating project totals.
