@@ -77,7 +77,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 71. Native saved-filter click disambiguation — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after replacing the saved-filter row's competing Button and double-tap handlers with one exclusive recognizer: single click selects the filter and double click opens its editor.
 72. Native Time Entry row hit target — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after constraining the primary Time Entry edit button to fill the complete row area left of the independent Edit/Delete controls.
 73. Native Activity detail duration formatting — verified `swift build`, native smoke tests, packaged-app build, relaunch, and local API availability after correcting the Activity detail sheet's duration formatter to render numeric hours/minutes instead of placeholder text.
-74. Web Plan scroll-aware scheduling — verified `npm run build`, Sites tests, and diff checks after making selected-task clicks and drops add the continuous timeline's scroll offset before converting Y to a 15-minute Markdown time range.
+74. Web Plan scroll-aware scheduling — verified `npm run build`, Sites tests, and diff checks after unifying selected-task clicks, HTML5 drops, and pointer drags around the scroll offset of the continuous timeline body before converting Y to a 15-minute Markdown time range.
 
 ## Findings applied
 
