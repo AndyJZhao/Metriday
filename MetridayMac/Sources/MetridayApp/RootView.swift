@@ -649,67 +649,75 @@ struct PageDateHeader: View {
             }
             Spacer()
             if showsDateControls {
-                HStack(spacing: 7) {
-                    Button {
-                        showingDatePicker.toggle()
-                    } label: {
-                        Image(systemName: "calendar")
-                            .frame(width: 30, height: 30)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Choose date")
-                    .accessibilityIdentifier("\(title.lowercased()).date-picker")
-                    .popover(isPresented: $showingDatePicker, arrowEdge: .bottom) {
-                        DatePicker(
-                            "Choose date",
-                            selection: Binding(
-                                get: { appState.selectedDate },
-                                set: { appState.selectDate($0); showingDatePicker = false }
-                            ),
-                            displayedComponents: .date
-                        )
-                        .datePickerStyle(.graphical)
-                        .padding(12)
-                    }
+                ZStack(alignment: .leading) {
+                    Color.clear
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .onTapGesture { appState.goToToday() }
+                        .accessibilityHidden(true)
 
-                    HStack(spacing: 0) {
-                    Button {
-                        appState.moveSelectedDate(byDays: -1)
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .frame(width: 30, height: 30)
+                    HStack(spacing: 7) {
+                        Button {
+                            showingDatePicker.toggle()
+                        } label: {
+                            Image(systemName: "calendar")
+                                .frame(width: 30, height: 30)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Choose date")
+                        .accessibilityIdentifier("\(title.lowercased()).date-picker")
+                        .popover(isPresented: $showingDatePicker, arrowEdge: .bottom) {
+                            DatePicker(
+                                "Choose date",
+                                selection: Binding(
+                                    get: { appState.selectedDate },
+                                    set: { appState.selectDate($0); showingDatePicker = false }
+                                ),
+                                displayedComponents: .date
+                            )
+                            .datePickerStyle(.graphical)
+                            .padding(12)
+                        }
+
+                        HStack(spacing: 0) {
+                            Button {
+                                appState.moveSelectedDate(byDays: -1)
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Previous day")
+                            .accessibilityIdentifier("\(title.lowercased()).date-previous")
+
+                            Divider()
+                                .frame(height: 19)
+
+                            Button {
+                                appState.goToToday()
+                            } label: {
+                                Text(dateRangeTitle)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .frame(minWidth: 86, minHeight: 30)
+                            }
+                            .buttonStyle(.plain)
+                            .contentShape(Rectangle())
+                            .accessibilityLabel("Today")
+                            .accessibilityIdentifier("\(title.lowercased()).date-today")
+
+                            Divider()
+                                .frame(height: 19)
+
+                            Button {
+                                appState.moveSelectedDate(byDays: 1)
+                            } label: {
+                                Image(systemName: "chevron.right")
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Next day")
+                            .accessibilityIdentifier("\(title.lowercased()).date-next")
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Previous day")
-                    .accessibilityIdentifier("\(title.lowercased()).date-previous")
-
-                    Divider()
-                        .frame(height: 19)
-
-                    Button {
-                        appState.goToToday()
-                    } label: {
-                        Text(dateRangeTitle)
-                            .font(.system(size: 12, weight: .semibold))
-                            .frame(minWidth: 86, minHeight: 30)
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
-                    .accessibilityLabel("Today")
-                    .accessibilityIdentifier("\(title.lowercased()).date-today")
-
-                    Divider()
-                        .frame(height: 19)
-
-                    Button {
-                        appState.moveSelectedDate(byDays: 1)
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .frame(width: 30, height: 30)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Next day")
-                    .accessibilityIdentifier("\(title.lowercased()).date-next")
                 }
                 .padding(.horizontal, 4)
                 .background(MetridayTheme.canvas)
@@ -722,7 +730,6 @@ struct PageDateHeader: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Date range")
                 .accessibilityIdentifier("\(title.lowercased()).date-range")
-                }
             }
         }
     }
