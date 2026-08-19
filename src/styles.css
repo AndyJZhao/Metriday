@@ -189,9 +189,27 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .editor-actions > span { color: #969aa4; font-size: 12px; }
 .editor-body { padding: 23px 16px 34px 9px; overflow: auto; font-family: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace; scrollbar-width: thin; }
 .markdown-source-wrap { position: relative; min-height: 0; padding: 0; overflow: hidden; }
-.markdown-source-editor { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; padding: 18px 18px 34px 92px; border: 0; outline: 0; resize: none; overflow: auto; background: #fff; color: #282a31; font: 14px/46px "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace; white-space: pre; tab-size: 2; scrollbar-width: thin; }
-.markdown-source-editor:focus { background: #fdfdff; }
-.markdown-source-overlays { position: absolute; top: 18px; right: 0; left: 0; min-height: 100%; pointer-events: none; font-family: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace; }
+.markdown-source-editor { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; box-sizing: border-box; padding: 18px 18px 34px 92px; border: 0; outline: 0; resize: none; overflow: auto; background: transparent; color: transparent; caret-color: var(--accent); font: 14px/46px "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace; white-space: pre; tab-size: 2; scrollbar-width: thin; }
+.markdown-source-editor:focus { background: rgba(253, 253, 255, 0.22); }
+.markdown-source-editor::selection { background: rgba(78, 95, 242, 0.18); color: transparent; }
+.markdown-live-preview { position: absolute; z-index: 1; top: 18px; left: 92px; min-width: calc(100% - 110px); min-height: 100%; pointer-events: none; font: 14px/46px "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace; white-space: pre; }
+.markdown-live-line { height: 46px; overflow: hidden; color: #343841; text-overflow: ellipsis; white-space: pre; }
+.markdown-live-line-active { color: #282a31; }
+.markdown-live-heading { overflow: visible; color: #242735; font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; font-weight: 700; letter-spacing: -0.015em; }
+.markdown-live-heading.level-1 { font-size: 20px; }
+.markdown-live-heading.level-2 { font-size: 17px; }
+.markdown-live-heading.level-3 { font-size: 15px; }
+.markdown-live-task { color: #2d3140; font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; font-size: 14px; }
+.markdown-live-task strong { font-weight: 700; }
+.markdown-live-quote { padding-left: 12px; border-left: 3px solid #c8cdfc; color: #60677b; font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; font-style: italic; }
+.markdown-live-list { display: flex; align-items: center; gap: 9px; color: #343841; font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+.markdown-live-bullet, .markdown-live-number { display: inline-block; min-width: 15px; color: var(--accent); font-weight: 700; text-align: center; }
+.markdown-live-preview strong { font-weight: 750; }
+.markdown-live-preview em { font-style: italic; }
+.markdown-live-preview del { color: #858a96; text-decoration-thickness: 1px; }
+.markdown-live-preview code { padding: 2px 5px; border-radius: 4px; background: #f0f1f5; color: #5a3f88; font-size: 12px; }
+.markdown-preview-link { color: var(--accent); text-decoration: underline; text-decoration-color: rgba(78, 95, 242, 0.32); text-underline-offset: 2px; }
+.markdown-source-overlays { position: absolute; z-index: 3; top: 18px; right: 0; left: 0; min-height: 100%; pointer-events: none; font-family: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace; }
 .markdown-source-line-number { display: block; width: 57px; height: 46px; color: #a0a4ae; font-size: 12px; line-height: 46px; text-align: right; user-select: none; }
 .markdown-source-task-actions { position: absolute; left: 67px; display: flex; align-items: center; gap: 2px; height: 46px; pointer-events: auto; }
 .markdown-source-task-actions .drag-handle { opacity: 1; }

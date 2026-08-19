@@ -1175,17 +1175,66 @@ function MarkdownTaskLine({ task, line, active, onDragStart, onPointerDragStart,
   );
 }
 
+function markdownInlineNodes(value, keyPrefix = "inline") {
+  const source = String(value || "");
+  const pattern = /(\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\([^\)]+\)|(?<!\*)\*[^*]+\*(?!\*))/g;
+  const nodes = [];
+  let cursor = 0;
+  let match;
+  let index = 0;
+  while ((match = pattern.exec(source))) {
+    if (match.index > cursor) nodes.push(source.slice(cursor, match.index));
+    const token = match[0];
+    if (token.startsWith("**")) nodes.push(<strong key={`${keyPrefix}-bold-${index}`}>{token.slice(2, -2)}</strong>);
+    else if (token.startsWith("~~")) nodes.push(<del key={`${keyPrefix}-strike-${index}`}>{token.slice(2, -2)}</del>);
+    else if (token.startsWith("`")) nodes.push(<code key={`${keyPrefix}-code-${index}`}>{token.slice(1, -1)}</code>);
+    else if (token.startsWith("[")) nodes.push(<span className="markdown-preview-link" key={`${keyPrefix}-link-${index}`}>{token.slice(1, token.indexOf("]("))}</span>);
+    else nodes.push(<em key={`${keyPrefix}-italic-${index}`}>{token.slice(1, -1)}</em>);
+    cursor = match.index + token.length;
+    index += 1;
+  }
+  if (cursor < source.length) nodes.push(source.slice(cursor));
+  return nodes.length ? nodes : [source || "\u00a0"];
+}
+
+function MarkdownPreviewLine({ line, index, active }) {
+  if (active) return <div className="markdown-live-line markdown-live-line-active" key={index}>{line || "\u00a0"}</div>;
+  const source = String(line || "");
+  const heading = source.match(/^\s*(#{1,6})\s+(.+)$/);
+  if (heading) return <div className={`markdown-live-line markdown-live-heading level-${heading[1].length}`} key={index}>{markdownInlineNodes(heading[2], `heading-${index}`)}</div>;
+  const task = source.match(/^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s+(?:(\d{1,2}:\d{2}\s*[–—-]\s*\d{1,2}:\d{2})\s+)?(.+)$/);
+  if (task) return <div className="markdown-live-line markdown-live-task" key={index}>{markdownInlineNodes(task[3], `task-${index}`)}</div>;
+  const quote = source.match(/^\s*&gt;\s?(.+)$/) || source.match(/^\s*>\s?(.+)$/);
+  if (quote) return <div className="markdown-live-line markdown-live-quote" key={index}>{markdownInlineNodes(quote[1], `quote-${index}`)}</div>;
+  const unordered = source.match(/^\s*[-*+]\s+(.+)$/);
+  if (unordered) return <div className="markdown-live-line markdown-live-list" key={index}><span className="markdown-live-bullet">•</span>{markdownInlineNodes(unordered[1], `bullet-${index}`)}</div>;
+  const ordered = source.match(/^\s*\d+[.)]\s+(.+)$/);
+  if (ordered) return <div className="markdown-live-line markdown-live-list" key={index}><span className="markdown-live-number">{source.match(/^\s*(\d+)/)?.[1]}.</span>{markdownInlineNodes(ordered[1], `number-${index}`)}</div>;
+  return <div className="markdown-live-line" key={index}>{markdownInlineNodes(source, `text-${index}`)}</div>;
+}
+
 function MarkdownEditor({ tasks, markdown, planDate, onMarkdownChange, onMarkdownCommit, onTaskDragStart, onPointerDragStart, onSelectTask, onComplete }) {
   const [scrollTop, setScrollTop] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [activeLine, setActiveLine] = useState(null);
+  const editorRef = useRef(null);
   const lines = String(markdown || "").split("\n");
   const taskLineIndices = lines.map((line, index) => ({ line, index })).filter(({ line }) => /^\s*(?:[-*+]|[0-9]+[.)])\s+\[[ xX]\]\s+/.test(line));
   const copyMarkdown = () => navigator.clipboard?.writeText(String(markdown || "")).catch(() => {});
+  const updateActiveLine = (event) => {
+    const value = event.currentTarget.value;
+    const caret = event.currentTarget.selectionStart || 0;
+    setActiveLine(value.slice(0, caret).split("\n").length - 1);
+  };
   return (
     <section className="markdown-editor" aria-label="Markdown daily plan">
       <div className="editor-toolbar"><div className="file-name"><FileText size={18} /> {planDate}.md <span>{markdown ? "Markdown document" : "Blank Markdown document"}</span></div><div className="editor-actions"><span>Markdown</span><ActionMenu label="Document actions" items={[{ label: "Copy Markdown", onSelect: copyMarkdown }]}><DotsThree size={22} /></ActionMenu></div></div>
       <div className="editor-body markdown-source-wrap">
-        <textarea className="markdown-source-editor" aria-label="Markdown editor" value={markdown || ""} spellCheck={false} onChange={(event) => onMarkdownChange(event.target.value)} onBlur={(event) => onMarkdownCommit(event.currentTarget.value)} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} />
-        <div className="markdown-source-overlays" style={{ transform: "translateY(" + (-scrollTop) + "px)" }} aria-hidden="false">
+        <textarea ref={editorRef} className="markdown-source-editor" aria-label="Markdown editor" value={markdown || ""} spellCheck={false} onChange={(event) => { onMarkdownChange(event.target.value); updateActiveLine(event); }} onFocus={updateActiveLine} onClick={updateActiveLine} onKeyUp={updateActiveLine} onSelect={updateActiveLine} onBlur={(event) => { onMarkdownCommit(event.currentTarget.value); setActiveLine(null); }} onScroll={(event) => { setScrollTop(event.currentTarget.scrollTop); setScrollLeft(event.currentTarget.scrollLeft); }} />
+        <div className="markdown-live-preview" style={{ transform: `translate(${-scrollLeft}px, ${-scrollTop}px)` }} aria-hidden="true">
+          {lines.map((line, index) => <MarkdownPreviewLine line={line} index={index} active={activeLine === index} key={index} />)}
+        </div>
+        <div className="markdown-source-overlays" style={{ transform: "translate(" + (-scrollLeft) + "px, " + (-scrollTop) + "px)" }} aria-hidden="false">
           {lines.map((_, index) => <span className="markdown-source-line-number" key={index}>{index + 1}</span>)}
           {taskLineIndices.map(({ index }, taskIndex) => { const task = tasks[taskIndex]; if (!task) return null; return <div className="markdown-source-task-actions" style={{ top: (index * 46) + 18 }} key={task.id}><button type="button" className="drag-handle" draggable onDragStart={(event) => onTaskDragStart(event, task.id)} onPointerDown={(event) => onPointerDragStart(event, task.id)} onClick={() => onSelectTask(task.id)} aria-label={`Drag ${task.title} to calendar`}><DotsSixVertical size={16} /></button><button type="button" className="markdown-check" onClick={() => onComplete(task.id)} aria-label={`Mark ${task.title} ${task.completed ? "incomplete" : "complete"}`}>{task.completed ? <Check size={13} weight="bold" /> : null}</button></div>; })}
         </div>

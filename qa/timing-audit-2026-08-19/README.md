@@ -65,6 +65,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 59. Source record-entry parity — verified the Web Activities build and Sites tests after routing Calendar Events, Completed Reminders, and Phone Calls Record actions through the same prefilled New Time Entry flow used by native Activities.
 60. Activity source affordances — verified the source-panel implementations keep App / Category evidence read-only while exposing explicit Record actions for Calendar, Reminders, and Phone Calls; no source action writes without opening the shared editor first.
 61. Native timeline segment hit targets — verified `swift build` and native smoke tests after making both horizontal and vertical App activity segments respond to the same full-segment double-click Time Entry action already available on activity rows.
+62. Web Markdown hybrid preview — verified the Plan editor renders semantic heading, quote, task, and list previews without raw task markers, reveals the active line as source syntax, keeps one editable textarea, and preserves task handle selection.
 
 ## Findings applied
 
@@ -126,3 +127,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Calendar timeline overlays now follow the native flow: selecting an event opens an editable, prefilled New Time Entry sheet; saving remains an explicit user action.
 - Calendar Events, Completed Reminders, and Phone Calls now expose the native Record affordance and share the same explicit prefilled time-entry workflow in the Web companion.
 - Native Activities now keeps timeline orientation behavior consistent: horizontal and vertical App segments expose a full visual double-click target for creating a Time Entry, while hover and context-menu actions remain available.
+- Web Plan now shares native Markdown presentation semantics: inactive lines preview headings, quotes, lists, tasks, inline emphasis, code, strike, and links; the active line reveals source syntax without changing the persisted Markdown.
