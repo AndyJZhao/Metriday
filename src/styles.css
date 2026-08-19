@@ -232,6 +232,17 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .supporting-header { display: flex; align-items: end; justify-content: space-between; max-width: 1120px; margin: 0 auto 30px; }
 .supporting-header span { color: var(--accent); font-size: 13px; font-weight: 650; }
 .supporting-header h1 { margin: 6px 0 0; font-size: 30px; letter-spacing: -0.04em; }
+.activities-page-header { align-items: center; }
+.activities-page-actions { display: flex; align-items: center; gap: 12px; }
+.activities-page-toolbar { display: flex; align-items: end; gap: 10px; max-width: 1120px; margin: -10px auto 20px; }
+.activity-search { display: flex; align-items: center; flex: 1 1 340px; gap: 8px; min-height: 38px; padding: 0 7px 0 11px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--muted); }
+.activity-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(78, 95, 242, 0.11); }
+.activity-search input { width: 100%; min-width: 0; height: 34px; border: 0; outline: 0; background: transparent; color: #30333b; font-size: 12px; }
+.activity-search .icon-button { width: 28px; height: 28px; flex: 0 0 28px; }
+.activity-filter-control { display: grid; gap: 5px; color: var(--muted); font-size: 10px; font-weight: 650; }
+.activity-filter-control select { min-width: 130px; height: 38px; padding: 0 9px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: #343740; font-size: 12px; }
+.activity-reset { height: 38px; min-height: 38px; }
+.activity-reset:disabled { cursor: default; opacity: 0.45; }
 .review-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; max-width: 1120px; margin: 0 auto 24px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--border); }
 .review-summary > div { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; padding: 24px; background: #fff; }
 .review-summary svg { grid-row: span 3; color: var(--accent); }
