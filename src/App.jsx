@@ -661,7 +661,10 @@ function liveActivityBlocks(activities, projects = []) {
     const previous = blocks[blocks.length - 1];
     const canMerge = previous
       && activity.start <= previous.end + 1
-      && activity.end - previous.start <= 20;
+      && activity.end - previous.start <= 20
+      && activity.kind === previous.kind
+      && activity.categoryColor === previous.categoryColor
+      && activity.categoryLabel === previous.categoryLabel;
 
     if (!canMerge) {
       blocks.push({
