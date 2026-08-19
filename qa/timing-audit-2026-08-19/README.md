@@ -57,6 +57,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 51. Plan Time Block selection — verified a plain click selects a narrow calendar block without opening the schedule dialog or removing its time; only pointer movement beyond the drag threshold starts a reschedule, and selected actions no longer cover the block body.
 52. Plan Time Block accessibility — verified scheduled blocks expose button semantics, readable range labels, selected state, and Enter / Space keyboard selection without opening the schedule dialog.
 53. Stats Category breakdown — verified the seven-day Stats view aggregates active time by Category, shows percentages and durations, uses the custom category color, Focused deep blue, Distracting red, excludes Idle from active totals, and has no horizontal overflow.
+54. Native Stats Category parity — verified `swift build`, packaged-app launch, and native smoke tests after adding the same active Category breakdown to the macOS Stats workspace.
 
 ## Findings applied
 
@@ -111,3 +112,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Plan Time Blocks now distinguish click from drag and place completion/remove actions below the selected block, preserving the full block hit target even in narrow three-day timeline columns.
 - Plan Time Blocks now expose explicit button semantics and keyboard selection, keeping the visual click target and accessibility hit target aligned.
 - Stats now provides a RescueTime-style active-time Category ranking beside weekday, project, and application views; Category remains the color owner, with Focused deep blue and Distracting red.
+- Native Stats now presents the same Category ranking and colors beside Applications, while Project and Time Entry totals remain separate from active App / website / item classification.

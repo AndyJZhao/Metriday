@@ -108,11 +108,14 @@ struct StatsView: View {
                 }
 
                 HStack(alignment: .top, spacing: 16) {
-                    projectChart
+                    categoryPanel
                     applicationsPanel
                 }
 
-                projectsAndEntriesPanel
+                HStack(alignment: .top, spacing: 16) {
+                    projectChart
+                    projectsAndEntriesPanel
+                }
             }
             .padding(28)
         }
@@ -235,6 +238,52 @@ struct StatsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .metridayPanel()
         .accessibilityIdentifier(identifier)
+    }
+
+    private var categoryPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Time by Category")
+                        .font(.system(size: 14, weight: .bold))
+                    Text("Active App, website, and item time")
+                        .font(.system(size: 10))
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
+                Spacer()
+                Image(systemName: "chart.pie")
+                    .foregroundStyle(MetridayTheme.accentDeep)
+            }
+
+            if categoryPoints.isEmpty {
+                Text("No categorized activity in this week yet.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(MetridayTheme.secondary)
+            } else {
+                ForEach(categoryPoints) { point in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(point.color)
+                                .frame(width: 8, height: 8)
+                            Text(point.name)
+                                .font(.system(size: 11, weight: .medium))
+                                .lineLimit(1)
+                            Spacer()
+                            Text("\(point.percentage)% · \(formatSeconds(point.seconds))")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(MetridayTheme.secondary)
+                        }
+                        ProgressView(value: Double(point.seconds), total: Double(categoryPoints.first?.seconds ?? 1))
+                            .tint(point.color)
+                    }
+                }
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .metridayPanel()
+        .accessibilityIdentifier("stats.categories")
     }
 
     private var projectChart: some View {
@@ -453,6 +502,32 @@ struct StatsView: View {
             .map { $0 }
     }
 
+    private var categoryPoints: [StatsCategoryPoint] {
+        var totals: [String: (name: String, seconds: Int, color: Color)] = [:]
+        for segment in weekDates.flatMap(activitySegments(for:)) {
+            let definition = category(for: segment)
+            guard definition.role != .idle else { continue }
+            let key = definition.name + "::" + definition.role.rawValue
+            let current = totals[key] ?? (name: definition.name, seconds: 0, color: categoryColor(for: definition))
+            totals[key] = (
+                name: current.name,
+                seconds: current.seconds + segment.durationSeconds,
+                color: current.color
+            )
+        }
+        let total = totals.values.reduce(0) { $0 + $1.seconds }
+        return totals.map { key, value in
+            StatsCategoryPoint(
+                id: key,
+                name: value.name,
+                seconds: value.seconds,
+                percentage: total > 0 ? Int((Double(value.seconds) / Double(total) * 100).rounded()) : 0,
+                color: value.color
+            )
+        }
+        .sorted { $0.seconds > $1.seconds }
+    }
+
     private var applicationPoints: [StatsApplicationPoint] {
         var totals: [String: (seconds: Int, color: Color)] = [:]
         for segment in weekDates.flatMap(activitySegments(for:)) where segment.relevance != .idle {
@@ -565,6 +640,14 @@ private struct StatsProjectPoint: Identifiable {
         let divisor = unit == .hour ? 1 : 24
         return max(1, Int((Double(seconds) / 60.0 / Double(divisor)).rounded()))
     }
+}
+
+private struct StatsCategoryPoint: Identifiable {
+    let id: String
+    let name: String
+    let seconds: Int
+    let percentage: Int
+    let color: Color
 }
 
 private struct StatsApplicationPoint: Identifiable {
