@@ -263,6 +263,52 @@ final class AppState: ObservableObject {
             return .jsonObject(preferencesAPI())
         }
 
+        if request.method == "GET", path == "/v1/activity-preferences" {
+            return .jsonObject(activityPreferencesAPI())
+        }
+
+        if (request.method == "PATCH" || request.method == "PUT"), path == "/v1/activity-preferences" {
+            guard let body = apiBody(request) else {
+                return .error("Activity preferences body is invalid", statusCode: 400)
+            }
+            if let value = body["include_time_entries"] as? Bool {
+                activitiesPreferences.includeTimeEntries = value
+            }
+            if let value = body["show_window_titles"] as? Bool {
+                activitiesPreferences.showWindowTitles = value
+            }
+            if let value = body["show_resource_paths"] as? Bool {
+                activitiesPreferences.showResourcePaths = value
+            }
+            if let value = body["activity_time_range"] as? String,
+               let range = ActivityTimeRange(rawValue: value) {
+                activitiesPreferences.activityTimeRange = range
+            }
+            if let value = body["activity_display_mode"] as? String {
+                activitiesPreferences.activityDisplayMode = value
+            }
+            if let value = body["group_by_project"] as? Bool {
+                activitiesPreferences.groupByProject = value
+                if value { activitiesPreferences.groupByDevice = false }
+            }
+            if let value = body["group_by_device"] as? Bool {
+                activitiesPreferences.groupByDevice = value
+                if value { activitiesPreferences.groupByProject = false }
+            }
+            if let value = body["include_idle"] as? Bool {
+                activitiesPreferences.includeIdle = value
+            }
+            if let value = body["selected_device"] as? String,
+               !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                activitiesPreferences.selectedDevice = value
+            }
+            if let value = body["timeline_orientation"] as? String,
+               let orientation = ActivityTimelineOrientation(rawValue: value) {
+                activitiesPreferences.timelineOrientation = orientation
+            }
+            return .jsonObject(activityPreferencesAPI())
+        }
+
         if request.method == "GET", path == "/v1/project-rules" {
             return .jsonObject([
                 "data": projectStore.rules.map(apiProjectRule),
@@ -2031,6 +2077,21 @@ final class AppState: ObservableObject {
             "tracking": activityMonitor.isTracking,
             "api_endpoint": localAPIServer.endpoint,
             "api_allows_lan": localAPIServer.allowsLAN,
+        ]
+    }
+
+    private func activityPreferencesAPI() -> [String: Any] {
+        [
+            "include_time_entries": activitiesPreferences.includeTimeEntries,
+            "show_window_titles": activitiesPreferences.showWindowTitles,
+            "show_resource_paths": activitiesPreferences.showResourcePaths,
+            "activity_time_range": activitiesPreferences.activityTimeRange.rawValue,
+            "activity_display_mode": activitiesPreferences.activityDisplayMode,
+            "group_by_project": activitiesPreferences.groupByProject,
+            "group_by_device": activitiesPreferences.groupByDevice,
+            "include_idle": activitiesPreferences.includeIdle,
+            "selected_device": activitiesPreferences.selectedDevice,
+            "timeline_orientation": activitiesPreferences.timelineOrientation.rawValue,
         ]
     }
 
