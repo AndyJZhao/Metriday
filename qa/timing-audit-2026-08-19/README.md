@@ -60,6 +60,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 54. Native Stats Category parity — verified `swift build`, packaged-app launch, and native smoke tests after adding the same active Category breakdown to the macOS Stats workspace.
 55. Native Today timeline hit targets — verified `swift build`, packaged-app launch, and native smoke tests after making Plan, Actual, and recorded time blocks full visual/accessibility hit targets that route to their owning workspaces.
 56. Activities/Plan modal keyboard dismissal — verified the New Time Entry and timeline edit dialogs open from their full button hit targets and close with Escape; Plan's schedule-choice and Entry-O-Matic paths now also register Escape dismissal in code.
+57. Today accessibility labels — verified `swift build` and native smoke tests after fixing the Plan / Actual / recorded-time labels to interpolate their task, activity, and time-range values; the Web Actual block now exposes the same readable button label.
 
 ## Findings applied
 
@@ -117,3 +118,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Native Stats now presents the same Category ranking and colors beside Applications, while Project and Time Entry totals remain separate from active App / website / item classification.
 - Native Today Plan blocks now open Plan and select the task; Actual and recorded time blocks open Activities. Their visible block surfaces, not only text glyphs, carry the interaction and accessibility labels.
 - Activities timeline Time Entry overlays now open an editable dialog instead of only showing a passive status message; the edit form preserves the selected date, project, billing status, and full keyboard dismissal path.
+- Today Plan / Actual hit targets now expose truthful labels containing the visible task or activity and its range on both native and Web surfaces.
