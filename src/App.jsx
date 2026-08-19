@@ -294,8 +294,16 @@ function currentMinuteAndLabel() {
   };
 }
 
+function timelineBlockStyle(start, end, minimumHeight = 34) {
+  return { top: `${((start - DAY_START) / 60) * HOUR_HEIGHT}px`, height: `${Math.max(((end - start) / 60) * HOUR_HEIGHT, minimumHeight)}px` };
+}
+
 function blockStyle(start, end) {
-  return { top: `${((start - DAY_START) / 60) * HOUR_HEIGHT}px`, height: `${Math.max(((end - start) / 60) * HOUR_HEIGHT, 34)}px` };
+  return timelineBlockStyle(start, end);
+}
+
+function actualBlockStyle(block) {
+  return timelineBlockStyle(block.start, block.end, block.end - block.start < 30 ? 4 : 34);
 }
 
 function activityLabel(activity) {
@@ -344,6 +352,7 @@ function activityContext(activity) {
 }
 
 function liveActivityBlocks(activities) {
+  const primaryKind = (totals) => [...totals.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || "other";
   const normalized = activities
     .map((activity) => {
       const start = Math.max(DAY_START, Math.floor(Number(activity.startSecond || 0) / 60));
@@ -378,6 +387,7 @@ function liveActivityBlocks(activities) {
         label: activity.kind === "idle" ? "Idle" : activity.label,
         detail: activity.kind === "idle" ? "No significant activity" : formatRange(activity.start, activity.end),
         kinds: new Set([activity.kind]),
+        categorySeconds: new Map([[activity.kind, Math.max(1, (activity.end - activity.start) * 60)]]),
         rowMap: new Map([[`${activity.kind}|${activity.label}`, {
           icon: activity.icon,
           label: activity.label,
@@ -392,7 +402,11 @@ function liveActivityBlocks(activities) {
 
     previous.end = Math.max(previous.end, activity.end);
     previous.kinds.add(activity.kind);
-    previous.kind = previous.kinds.size === 1 ? activity.kind : "mixed";
+    previous.categorySeconds.set(
+      activity.kind,
+      (previous.categorySeconds.get(activity.kind) || 0) + Math.max(1, (activity.end - activity.start) * 60)
+    );
+    previous.kind = primaryKind(previous.categorySeconds);
     const rowKey = `${activity.kind}|${activity.label}`;
     const row = previous.rowMap.get(rowKey);
     if (row) {
@@ -607,6 +621,7 @@ function PlannedTrack({ tasks, connected }) {
 }
 
 function ActualRows({ block }) {
+  if (block.end - block.start < 30) return <div className="actual-compact" aria-hidden="true" />;
   if (!block.rows) return <div className="actual-simple"><strong>{Math.round(block.end - block.start)}m</strong><span><b>{block.label}</b><small>{block.detail}</small></span></div>;
   return <div className="actual-row-list">{block.rows.map((row, index) => { const Icon = row.icon; return (
     <div key={`${block.id}-${index}`} className={`actual-row ${row.kind || block.kind}`}><strong>{row.minutes || (index === 0 ? block.minutes : "")}</strong><span className="activity-icon">{Icon ? <Icon size={20} weight="duotone" /> : null}</span><b>{row.label}</b><small>{row.time}</small></div>
@@ -618,7 +633,7 @@ function ActualTrack({ activities, connected }) {
   return (
     <section className="today-track actual-track" aria-label="Actual activity timeline">
       <div className="track-heading"><strong>Actual</strong><span>{connected ? "Live from Metriday" : "What actually happened"}</span></div>
-      <div className="track-canvas"><GridLines />{blocks.map((block) => <div key={block.id} className={`actual-block ${block.kind}`} style={blockStyle(block.start, block.end)}><ActualRows block={block} /></div>)}</div>
+      <div className="track-canvas"><GridLines />{blocks.map((block) => <div key={block.id} className={`actual-block ${block.kind}`} style={actualBlockStyle(block)} title={`${block.label} · ${block.detail}`}><ActualRows block={block} /></div>)}</div>
     </section>
   );
 }
