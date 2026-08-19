@@ -689,7 +689,7 @@ final class IntegrationStore: ObservableObject {
             request = URLRequest(url: baseURL)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue(token.hasPrefix("Bearer ") ? token : token, forHTTPHeaderField: "Authorization")
+            request.setValue(token.hasPrefix("Bearer ") ? token : "Bearer \(token)", forHTTPHeaderField: "Authorization")
             let query: String
             if testOnly {
                 query = "query { viewer { id name } }"
@@ -714,7 +714,7 @@ final class IntegrationStore: ObservableObject {
                 url = resolved
             }
             request = URLRequest(url: url)
-            request.setValue("Bearer (token)", forHTTPHeaderField: "Authorization")
+            request.setValue(token.hasPrefix("Bearer ") ? token : "Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.setValue("4.0.7", forHTTPHeaderField: "X-API-VERSION")
         }
         request.setValue("Metriday/1.0", forHTTPHeaderField: "User-Agent")
