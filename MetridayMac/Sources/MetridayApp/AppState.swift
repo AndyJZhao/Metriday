@@ -648,6 +648,15 @@ final class AppState: ObservableObject {
             return .jsonObject(["data": officialTeamMember(member)], statusCode: 201)
         }
 
+        if request.method == "DELETE", path.hasPrefix("/v1/teams/"), !path.hasSuffix("/members") {
+            let rawTeamID = String(path.dropFirst("/v1/teams/".count))
+            guard let teamID = apiTeamID(rawTeamID), let team = teamStore.team(teamID) else {
+                return .error("Team not found", statusCode: 404)
+            }
+            teamStore.archive(team)
+            return .empty()
+        }
+
         if timingWebAPI, request.method == "GET", path == "/v1/projects" {
             return .jsonObject([
                 "data": projectStore.activeProjects.map(officialProject),

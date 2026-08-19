@@ -39,6 +39,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 33. Activities display preferences — verified native-backed Show Idle, Chronological grouping by Project/Device, mutually exclusive grouping, preference persistence, and wrapped toolbar layout in the running Web companion.
 34. Activities Display menu — verified persisted Selected day / Last 7 days range, Show window titles, Show website paths, Include time entries, device selection, date labels for historical rows, and historical detail recording dates.
 35. Historical project assignment — carried the source date through the activity drag payload so assigning a seven-day-range row updates the correct native date.
+36. Native workspace parity — added Web Stats, Reports, and Teams first-level navigation; Reports now owns the report builder, Stats summarizes seven-day evidence, and Teams supports native-backed creation, member addition, and archive.
 
 ## Findings applied
 
@@ -73,3 +74,5 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Activities display preferences now persist through `/v1/activity-preferences`; Show Idle filters the shared timeline/list, Chronological can group by Project or Device, and the toolbar wraps instead of clipping on the desktop viewport.
 - Activities now exposes a native-shaped Display menu; Last 7 days uses the already fetched weekly evidence while the selected-day timeline remains focused on the active date, and historical rows carry their source date through detail recording.
 - Historical activity drag-and-drop now carries its source date into project assignment, matching the detail dialog's date-aware recording behavior.
+- Web navigation now matches the native AppSection set: Stats, Reports, and Teams are first-level workspaces, while Review remains focused on planned-vs-actual and category evidence.
+- Teams uses the native `/v1/teams` and `/v1/teams/:id/members` stores; creating, adding a member, and archiving a temporary QA team were verified against the running packaged app.
