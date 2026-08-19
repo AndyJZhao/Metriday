@@ -1402,7 +1402,7 @@ function markdownListContinuation(line) {
   return null;
 }
 
-function MarkdownEditor({ tasks, markdown, planDate, onMarkdownChange, onMarkdownCommit, onTaskDragStart, onPointerDragStart, onSelectTask, onComplete }) {
+function MarkdownEditor({ tasks, markdown, planDate, onMarkdownChange, onMarkdownCommit, onTaskDragStart, onPointerDragStart, onSelectTask, onComplete, onReload }) {
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [activeLine, setActiveLine] = useState(null);
@@ -1445,7 +1445,7 @@ function MarkdownEditor({ tasks, markdown, planDate, onMarkdownChange, onMarkdow
   };
   return (
     <section className="markdown-editor" aria-label="Markdown daily plan">
-      <div className="editor-toolbar"><div className="file-name"><FileText size={18} /> {planDate}.md <span>{markdown ? "Markdown document" : "Blank Markdown document"}</span></div><div className="editor-actions"><span>Markdown</span><ActionMenu label="Document actions" items={[{ label: "Copy Markdown", onSelect: copyMarkdown }]}><DotsThree size={22} /></ActionMenu></div></div>
+      <div className="editor-toolbar"><div className="file-name"><FileText size={18} /> {planDate}.md <span>{markdown ? "Markdown document" : "Blank Markdown document"}</span></div><div className="editor-actions"><span>Markdown</span><ActionMenu label="Document actions" items={[{ label: "Copy Markdown", onSelect: copyMarkdown }, ...(onReload ? [{ label: "Reload from disk", onSelect: onReload }] : [])]}><DotsThree size={22} /></ActionMenu></div></div>
       <div className="editor-body markdown-source-wrap">
         <textarea ref={editorRef} className="markdown-source-editor" aria-label="Markdown editor" value={markdown || ""} spellCheck={false} onChange={(event) => { onMarkdownChange(event.target.value); updateActiveLine(event); }} onKeyDown={handleEditorKeyDown} onFocus={updateActiveLine} onClick={updateActiveLine} onKeyUp={updateActiveLine} onSelect={updateActiveLine} onBlur={(event) => { onMarkdownCommit(event.currentTarget.value); setActiveLine(null); }} onScroll={(event) => { setScrollTop(event.currentTarget.scrollTop); setScrollLeft(event.currentTarget.scrollLeft); }} />
         <div className="markdown-live-preview" style={{ transform: `translate(${-scrollLeft}px, ${-scrollTop}px)` }} aria-hidden="true">
@@ -1548,6 +1548,20 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [pendingSchedule]);
+  const reloadPlan = async () => {
+    if (!api.connected || typeof api.fetchPlan !== "function") return;
+    try {
+      const loaded = await api.fetchPlan(dateKey);
+      const loadedMarkdown = String(loaded?.markdown || "");
+      markdownRef.current = loadedMarkdown;
+      setMarkdown(loadedMarkdown);
+      setTasks(Array.isArray(loaded?.tasks) ? loaded.tasks.map(planTaskFromAPI) : []);
+      setSelectedTaskId(null);
+      setToast("Markdown reloaded from disk");
+    } catch (error) {
+      setToast(error.message || "Could not reload Markdown");
+    }
+  };
   const persistTasks = (nextTasks, message) => {
     const nextMarkdown = markdownWithTasks(markdownRef.current || api.plan?.markdown || "", nextTasks);
     markdownRef.current = nextMarkdown;
@@ -1635,7 +1649,7 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
   const addTask = (title) => { const nextTasks = [...tasks, { id: "task-" + Date.now(), title, tags: [], start: null, end: null, completed: false, tone: "soft" }]; persistTasks(nextTasks, "Markdown task added"); };
   return (
     <main className="page plan-page"><header className="plan-header"><h1>Plan <span>·</span> {planDateLabel(planDate)}</h1><div className="date-controls"><DatePickerControl dateKey={planDate} onChange={setDateKey} label="Choose Plan date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div></header>
-      <div className="plan-workspace"><MarkdownEditor tasks={tasks} markdown={markdown} planDate={planDate} onMarkdownChange={updateMarkdown} onMarkdownCommit={commitMarkdown} onTaskDragStart={taskDragStart} onPointerDragStart={pointerMoveStart} onSelectTask={setSelectedTaskId} onComplete={completeTask} /><CalendarPanel tasks={tasks} neighborPlans={neighborPlans} selectedTaskId={selectedTaskId} setSelectedTaskId={setSelectedTaskId} onDropTask={dropTask} onMoveStart={pointerMoveStart} onComplete={completeTask} onUnschedule={unscheduleTask} onResizeStart={resizeStart} dateKey={planDate} onSelectDate={setDateKey} connected={api.connected} /></div>
+      <div className="plan-workspace"><MarkdownEditor tasks={tasks} markdown={markdown} planDate={planDate} onMarkdownChange={updateMarkdown} onMarkdownCommit={commitMarkdown} onTaskDragStart={taskDragStart} onPointerDragStart={pointerMoveStart} onSelectTask={setSelectedTaskId} onComplete={completeTask} onReload={reloadPlan} /><CalendarPanel tasks={tasks} neighborPlans={neighborPlans} selectedTaskId={selectedTaskId} setSelectedTaskId={setSelectedTaskId} onDropTask={dropTask} onMoveStart={pointerMoveStart} onComplete={completeTask} onUnschedule={unscheduleTask} onResizeStart={resizeStart} dateKey={planDate} onSelectDate={setDateKey} connected={api.connected} /></div>
       {pendingSchedule ? <div className="schedule-choice-backdrop" role="presentation" onClick={() => setPendingSchedule(null)}><section className="schedule-choice-dialog" role="dialog" aria-modal="true" aria-labelledby="schedule-choice-title" onClick={(event) => event.stopPropagation()}><div><span>Schedule task</span><h2 id="schedule-choice-title">{pendingSchedule.title}</h2><p>{formatRange(pendingSchedule.start, pendingSchedule.end)} · Choose how this drop should be recorded.</p></div><div className="schedule-choice-actions"><button type="button" className="secondary-button" onClick={() => confirmSchedule("event")}>{api.calendarEvents?.authorized ? "Add Event" : "Connect Calendar"} <small>{api.calendarEvents?.authorized ? "Event" : "Permission"}</small></button><button type="button" className="primary-button" onClick={() => confirmSchedule("time-block")}>Time Block</button></div><button type="button" className="schedule-choice-cancel" onClick={() => setPendingSchedule(null)}>Cancel</button></section></div> : null}
       {toast ? <div className="toast" role="status"><CheckCircle size={20} weight="fill" /><span>{toast}</span><IconButton label="Dismiss" onClick={() => setToast("")}><X size={15} /></IconButton></div> : null}
     </main>
