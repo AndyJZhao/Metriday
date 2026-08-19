@@ -1731,6 +1731,28 @@ function projectParentID(project) {
   return resourceID(project?.parent || project?.parent_id || project?.parentID);
 }
 
+const projectColorOptions = [
+  ["blue", "Blue"],
+  ["green", "Green"],
+  ["orange", "Orange"],
+  ["purple", "Purple"],
+  ["red", "Red"],
+  ["graphite", "Graphite"]
+];
+
+function projectColorKey(project) {
+  const raw = String(project?.color || "blue").trim().toLowerCase();
+  if (projectColorOptions.some(([value]) => value === raw)) return raw;
+  return {
+    "#4e5ff2": "blue",
+    "#399a55": "green",
+    "#d77b22": "orange",
+    "#8656d8": "purple",
+    "#d24b4b": "red",
+    "#555b66": "graphite"
+  }[raw] || "blue";
+}
+
 function projectOptionRows(projects, excludedID = "") {
   const excluded = new Set();
   const markDescendants = (parentID) => {
@@ -1766,32 +1788,35 @@ function ProjectPanel({ api, onAssignActivity }) {
   const [currency, setCurrency] = useState("USD");
   const [billingStatus, setBillingStatus] = useState("billable");
   const [parentID, setParentID] = useState("");
+  const [teamID, setTeamID] = useState("");
   const [addDefaultNameRules, setAddDefaultNameRules] = useState(true);
   const [editing, setEditing] = useState(null);
   const [message, setMessage] = useState("");
   const [dropTarget, setDropTarget] = useState(null);
   const projects = [...api.projects].sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
+  const teams = [...(api.teams || [])].sort((left, right) => String(left.name || "").localeCompare(String(right.name || "")));
   const parentOptions = projectOptionRows(api.projects);
   const create = async (event) => {
     event.preventDefault();
     if (!title.trim()) return;
     try {
-      await api.createProject({ title: title.trim(), parent: parentID || null, billing_rate: Number(rate) || 0, currency: currency.trim().toUpperCase() || "USD", default_billing_status: billingStatus, add_default_name_rules: addDefaultNameRules });
+      await api.createProject({ title: title.trim(), parent: parentID || null, team_id: teamID || null, billing_rate: Number(rate) || 0, currency: currency.trim().toUpperCase() || "USD", default_billing_status: billingStatus, add_default_name_rules: addDefaultNameRules });
       setTitle("");
       setRate("0");
       setParentID("");
+      setTeamID("");
       setAddDefaultNameRules(true);
       setMessage("Project saved locally.");
     } catch (error) {
       setMessage(error.message || "Could not save the project.");
     }
   };
-  const beginEdit = (project) => setEditing({ id: project.id, title: project.title || "", parentID: projectParentID(project), rate: String(project.billing_rate || 0), currency: project.currency || "USD", billingStatus: project.default_billing_status || "billable" });
+  const beginEdit = (project) => setEditing({ id: project.id, title: project.title || "", parentID: projectParentID(project), teamID: resourceID(project.team_id) || "", color: projectColorKey(project), productivity: String(Math.round(Number(project.productivity ?? (Number(project.productivity_score || 0) * 100)) || 0)), notes: project.notes || "", rate: String(project.billing_rate || 0), currency: project.currency || "USD", billingStatus: project.default_billing_status || "billable" });
   const saveEdit = async (event) => {
     event.preventDefault();
     if (!editing?.title.trim()) return;
     try {
-      await api.updateProject(editing.id, { title: editing.title.trim(), parent: editing.parentID || null, billing_rate: Number(editing.rate) || 0, currency: editing.currency.trim().toUpperCase() || "USD", default_billing_status: editing.billingStatus });
+      await api.updateProject(editing.id, { title: editing.title.trim(), parent: editing.parentID || null, team_id: editing.teamID || null, color: editing.color, productivity: Math.max(-100, Math.min(100, Number(editing.productivity) || 0)), notes: editing.notes, billing_rate: Number(editing.rate) || 0, currency: editing.currency.trim().toUpperCase() || "USD", default_billing_status: editing.billingStatus });
       setEditing(null);
       setMessage("Project updated locally.");
     } catch (error) {
@@ -1825,6 +1850,7 @@ function ProjectPanel({ api, onAssignActivity }) {
     <form className="project-create-form" onSubmit={create}>
       <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Project or client name" aria-label="Project name" />
       <select value={parentID} onChange={(event) => setParentID(event.target.value)} aria-label="Project parent"><option value="">Top level</option>{parentOptions.map(({ project, depth }) => <option value={resourceID(project.id)} key={project.id}>{"— ".repeat(depth)}{project.title}</option>)}</select>
+      <select value={teamID} onChange={(event) => setTeamID(event.target.value)} aria-label="Project team"><option value="">Personal project</option>{teams.map((team) => <option value={resourceID(team.id)} key={team.id}>{team.name}</option>)}</select>
       <input type="number" min="0" step="0.01" value={rate} onChange={(event) => setRate(event.target.value)} placeholder="Rate" aria-label="Project billing rate" />
       <input value={currency} onChange={(event) => setCurrency(event.target.value)} maxLength={3} aria-label="Project currency" />
       <select value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)} aria-label="Project default billing status"><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option></select>
@@ -1832,14 +1858,20 @@ function ProjectPanel({ api, onAssignActivity }) {
     </form>
     <label className="project-auto-rules-toggle"><input type="checkbox" checked={addDefaultNameRules} onChange={(event) => setAddDefaultNameRules(event.target.checked)} /><span>Automatically match this project&apos;s title and path</span><small>Adds title and URL/path rules for future activity.</small></label>
     {message ? <p className="entry-message" role="status">{message}</p> : null}
-    {projects.length > 0 ? <div className="project-table">{projects.map((project) => editing?.id === project.id ? <form className="project-row project-edit-row" key={project.id} onSubmit={saveEdit}>
-      <input value={editing.title} onChange={(event) => setEditing((value) => ({ ...value, title: event.target.value }))} aria-label={`Edit ${project.title} name`} />
-      <select value={editing.parentID} onChange={(event) => setEditing((value) => ({ ...value, parentID: event.target.value }))} aria-label={`Edit ${project.title} parent`}><option value="">Top level</option>{projectOptionRows(api.projects, resourceID(project.id)).map(({ project: option, depth }) => <option value={resourceID(option.id)} key={option.id}>{"— ".repeat(depth)}{option.title}</option>)}</select>
-      <input type="number" min="0" step="0.01" value={editing.rate} onChange={(event) => setEditing((value) => ({ ...value, rate: event.target.value }))} aria-label={`Edit ${project.title} rate`} />
-      <input value={editing.currency} onChange={(event) => setEditing((value) => ({ ...value, currency: event.target.value }))} maxLength={3} aria-label={`Edit ${project.title} currency`} />
-      <select value={editing.billingStatus} onChange={(event) => setEditing((value) => ({ ...value, billingStatus: event.target.value }))} aria-label={`Edit ${project.title} billing status`}><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option></select>
-      <span className="project-actions"><button type="submit" aria-label="Save project"><Check size={16} /></button><IconButton label="Cancel project edit" onClick={() => setEditing(null)}><X size={15} /></IconButton></span>
-    </form> : <div className={`project-row ${dropTarget === project.id ? "drop-target" : ""}`} key={project.id} onDragOver={(event) => { event.preventDefault(); setDropTarget(project.id); }} onDragLeave={() => setDropTarget(null)} onDrop={(event) => dropOnProject(event, project)}><span className="project-dot" /><strong>{project.title}</strong><span>{projectParentID(project) ? `↳ ${projectTitleFor(projects, projectParentID(project))}` : "Top level"}</span><span>{project.currency || "USD"} {Number(project.billing_rate || 0).toFixed(2)}/h</span><small>{billingLabel(project.default_billing_status)}</small><span className="project-actions"><IconButton label={`Edit ${project.title}`} onClick={() => beginEdit(project)}><NotePencil size={15} /></IconButton><IconButton label={`Archive ${project.title}`} onClick={() => remove(project)}><Trash size={15} /></IconButton></span></div>)}</div> : <div className="entries-empty"><FolderSimple size={24} /><span>{api.connected ? "Create a project to organize time and billing." : "Connect the native app to manage projects."}</span></div>}
+    {projects.length > 0 ? <div className="project-table">{projects.map((project) => editing?.id === project.id ? <form className="project-edit-card" key={project.id} onSubmit={saveEdit}>
+      <div className="project-edit-fields">
+        <label>Project name<input value={editing.title} onChange={(event) => setEditing((value) => ({ ...value, title: event.target.value }))} aria-label={`Edit ${project.title} name`} /></label>
+        <label>Parent project<select value={editing.parentID} onChange={(event) => setEditing((value) => ({ ...value, parentID: event.target.value }))} aria-label={`Edit ${project.title} parent`}><option value="">Top level</option>{projectOptionRows(api.projects, resourceID(project.id)).map(({ project: option, depth }) => <option value={resourceID(option.id)} key={option.id}>{"— ".repeat(depth)}{option.title}</option>)}</select></label>
+        <label>Team<select value={editing.teamID} onChange={(event) => setEditing((value) => ({ ...value, teamID: event.target.value }))} aria-label={`Edit ${project.title} team`}><option value="">Personal project</option>{teams.map((team) => <option value={resourceID(team.id)} key={team.id}>{team.name}</option>)}</select></label>
+        <label>Color<select value={editing.color} onChange={(event) => setEditing((value) => ({ ...value, color: event.target.value }))} aria-label={`Edit ${project.title} color`}>{projectColorOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+        <label>Productivity<input type="number" min="-100" max="100" step="1" value={editing.productivity} onChange={(event) => setEditing((value) => ({ ...value, productivity: event.target.value }))} aria-label={`Edit ${project.title} productivity`} /></label>
+        <label>Billing status<select value={editing.billingStatus} onChange={(event) => setEditing((value) => ({ ...value, billingStatus: event.target.value }))} aria-label={`Edit ${project.title} billing status`}><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option></select></label>
+        <label>Hourly rate<input type="number" min="0" step="0.01" value={editing.rate} onChange={(event) => setEditing((value) => ({ ...value, rate: event.target.value }))} aria-label={`Edit ${project.title} rate`} /></label>
+        <label>Currency<input value={editing.currency} onChange={(event) => setEditing((value) => ({ ...value, currency: event.target.value }))} maxLength={3} aria-label={`Edit ${project.title} currency`} /></label>
+        <label className="project-edit-notes">Notes<textarea value={editing.notes} onChange={(event) => setEditing((value) => ({ ...value, notes: event.target.value }))} rows={2} aria-label={`Edit ${project.title} notes`} /></label>
+      </div>
+      <div className="project-edit-card-actions"><button type="submit" aria-label="Save project"><Check size={16} />Save</button><button type="button" className="secondary-button" onClick={() => setEditing(null)}>Cancel</button></div>
+    </form> : <div className={`project-row ${dropTarget === project.id ? "drop-target" : ""}`} key={project.id} onDragOver={(event) => { event.preventDefault(); setDropTarget(project.id); }} onDragLeave={() => setDropTarget(null)} onDrop={(event) => dropOnProject(event, project)}><span className="project-dot" style={{ background: project.color || "var(--accent)" }} /><strong>{project.title}</strong><span>{projectParentID(project) ? `↳ ${projectTitleFor(projects, projectParentID(project))}` : "Top level"}</span><span>{project.currency || "USD"} {Number(project.billing_rate || 0).toFixed(2)}/h</span><small>{billingLabel(project.default_billing_status)}</small><span className="project-actions"><IconButton label={`Edit ${project.title}`} onClick={() => beginEdit(project)}><NotePencil size={15} /></IconButton><IconButton label={`Archive ${project.title}`} onClick={() => remove(project)}><Trash size={15} /></IconButton></span></div>)}</div> : <div className="entries-empty"><FolderSimple size={24} /><span>{api.connected ? "Create a project to organize time and billing." : "Connect the native app to manage projects."}</span></div>}
   </section>;
 }
 

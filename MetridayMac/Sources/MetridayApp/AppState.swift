@@ -740,6 +740,7 @@ final class AppState: ObservableObject {
                 return .error("Project needs a title", statusCode: 400)
             }
             if let notes = body["notes"] as? String { project.notes = notes }
+            if let color = body["color"] as? String, let value = projectColor(from: color) { project.color = value }
             if let productivity = body["productivity"] as? Int { project.productivity = productivity }
             if let productivityScore = body["productivity_score"] as? Double {
                 project.productivity = Int((productivityScore * 100).rounded())
@@ -776,6 +777,7 @@ final class AppState: ObservableObject {
                 var updated = project
                 if let title = body["title"] as? String { updated.name = title }
                 if let notes = body["notes"] as? String { updated.notes = notes }
+                if let color = body["color"] as? String, let value = projectColor(from: color) { updated.color = value }
                 if let productivity = body["productivity"] as? Int { updated.productivity = productivity }
                 if let productivityScore = body["productivity_score"] as? Double {
                     updated.productivity = Int((productivityScore * 100).rounded())
@@ -2474,6 +2476,20 @@ final class AppState: ObservableObject {
         case .purple: return "#8656D8"
         case .red: return "#D24B4B"
         case .graphite: return "#555B66"
+        }
+    }
+
+    private func projectColor(from rawValue: String) -> ProjectColor? {
+        let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if let direct = ProjectColor(rawValue: normalized) { return direct }
+        switch normalized {
+        case "#4e5ff2": return .blue
+        case "#399a55": return .green
+        case "#d77b22": return .orange
+        case "#8656d8": return .purple
+        case "#d24b4b": return .red
+        case "#555b66": return .graphite
+        default: return nil
         }
     }
 

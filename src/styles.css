@@ -343,7 +343,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activities-workspace-main .web-filter-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .activities-workspace-main .web-category-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .activities-workspace-main .activity-table-head, .activities-workspace-main .activity-table-row { grid-template-columns: minmax(150px, 1.2fr) 100px 110px minmax(100px, 0.8fr); gap: 8px; }
-.activities-workspace-main .project-create-form { grid-template-columns: minmax(0, 1fr) minmax(120px, 1fr) 90px 68px 110px auto; }
+.activities-workspace-main .project-create-form { grid-template-columns: minmax(0, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) 90px 68px 110px auto; }
 .activities-workspace-main .manual-entry-form { grid-template-columns: minmax(120px, 1fr) 80px 80px minmax(90px, 1fr) 90px auto; }
 .activities-workspace-main > .web-activity-timeline, .activities-workspace-main > .web-source-panel, .activities-workspace-main > .activities-list, .activities-workspace-main > .projects-panel, .activities-workspace-main > .time-entries-panel { max-width: none; margin: 0; }
 .activity-project-sidebar { position: sticky; top: 12px; display: flex; flex-direction: column; max-height: calc(100vh - 160px); overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #fbfbfc; }
@@ -812,7 +812,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .entry-dialog textarea { resize: vertical; }
 .entry-dialog-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .dialog-actions { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 9px; margin-top: 20px; }
-.project-create-form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(130px, 1fr) 100px 70px 130px auto; align-items: center; gap: 9px; margin-top: 20px; }
+.project-create-form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(130px, 1fr) minmax(130px, 1fr) 100px 70px 130px auto; align-items: center; gap: 9px; margin-top: 20px; }
 .project-create-form input, .project-create-form select { height: 38px; min-width: 0; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #2d3038; font-size: 12px; }
 .project-create-form button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px; padding: 0 12px; border: 0; border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font-size: 12px; font-weight: 650; }
 .project-create-form button:disabled { cursor: not-allowed; opacity: 0.55; }
@@ -821,12 +821,19 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .project-auto-rules-toggle small { flex-basis: 100%; margin-left: 20px; color: var(--muted); font-size: 10px; }
 .project-table { margin-top: 18px; border-top: 1px solid var(--border); }
 .project-row { display: grid; grid-template-columns: 10px minmax(150px, 1fr) minmax(120px, 1fr) 110px 70px 130px; align-items: center; gap: 10px; min-height: 48px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
-.project-edit-row { grid-template-columns: minmax(150px, 1fr) minmax(120px, 1fr) 90px 68px 110px 110px; }
+.project-edit-card { padding: 16px 0; border-bottom: 1px solid #eceef1; }
+.project-edit-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.project-edit-fields > label { display: grid; gap: 5px; color: #555b66; font-size: 10px; font-weight: 650; }
+.project-edit-fields input, .project-edit-fields select, .project-edit-fields textarea { width: 100%; min-width: 0; min-height: 34px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #2d3038; font-size: 12px; font-weight: 400; }
+.project-edit-fields textarea { resize: vertical; }
+.project-edit-notes { grid-column: span 2; }
+.project-edit-card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.project-edit-card-actions > button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 11px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; font-size: 11px; font-weight: 650; }
+.project-edit-card-actions > button.secondary-button { border-color: var(--border); background: #fff; color: #555b66; }
 .project-row.drop-target { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .project-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
 .project-row small { color: var(--muted); }
 .project-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-.project-edit-row { grid-template-columns: minmax(170px, 1fr) 100px 70px 130px 70px; }
 .rules-layout { display: grid; grid-template-columns: minmax(250px, 0.82fr) minmax(360px, 1.25fr); gap: 20px; max-width: 1120px; margin: 0 auto; }
 .rule-overview { grid-row: span 2; margin: 0; }
 .rule-overview > svg { margin-bottom: 24px; }

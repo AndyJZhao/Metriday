@@ -183,6 +183,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - The Web shell now keeps native running-Timer controls visible across every section, including estimate selection, remaining time, and ±15-minute start adjustments.
 - Web Projects now preserves the native hierarchy contract: parent selection is available when creating or editing a project, invalid descendants are excluded from the parent picker, and the Activities sidebar renders recursive project disclosure rows.
 - Web project creation now matches native’s default automation offer: the title/path matching option is enabled by default, can be disabled, and enabled creation adds both title-contains and resource/path-contains rules through the native project-rule store.
+- Web project metadata now follows native editing semantics: team assignment, project color, productivity score, notes, billing status, rate, currency, and parent hierarchy are editable together and serialized through the official project API.
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
 78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
@@ -216,3 +217,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 106. Web global Timer controls — verified Web build, Sites tests, and diff checks after wiring the existing native-shaped estimate/remaining-time/start-adjustment controls into the persistent Web shell header.
 107. Web project hierarchy — verified Web build, Sites tests, Swift debug build, native smoke tests, and diff checks after adding parent/child project creation and editing, safe parent clearing, recursive sidebar disclosure, and responsive project form columns.
 108. Web project default automation — verified Web build, Sites tests, Swift debug build, native smoke tests, packaged-app output, and diff checks after adding the native-compatible default title/path rule toggle to project creation.
+109. Web project metadata — verified Web build, Sites tests, Swift debug build, native smoke tests, and diff checks after adding native-compatible project team, color, productivity, notes, billing, and hierarchy editing controls plus hex/name color decoding.
