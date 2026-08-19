@@ -378,6 +378,17 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-filter-form button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 11px; border: 1px solid var(--accent); border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font-size: 11px; font-weight: 650; }
 .web-filter-form button:disabled { cursor: not-allowed; opacity: 0.5; }
 .web-filter-row { grid-template-columns: 30px minmax(0, 1fr) 90px 32px; }
+.web-category-form { display: grid; grid-template-columns: minmax(120px, 1fr) 110px 110px 140px 120px minmax(130px, 1fr) auto; gap: 8px; margin-top: 16px; }
+.web-category-form input, .web-category-form select { min-height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #353941; font-size: 11px; }
+.web-category-form button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 11px; border: 1px solid var(--accent); border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font-size: 11px; font-weight: 650; }
+.web-category-form button:disabled { cursor: not-allowed; opacity: 0.5; }
+.web-category-list { margin-top: 16px; border-top: 1px solid var(--border); }
+.web-category-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) 78px 32px; align-items: center; gap: 10px; min-height: 48px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
+.web-category-row > div { display: flex; flex-direction: column; min-width: 0; gap: 3px; }
+.web-category-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
+.web-category-row small { color: var(--muted); }
+.web-category-swatch { width: 9px; height: 9px; border-radius: 50%; }
+.web-category-system { color: var(--muted); font-size: 10px; }
 .activities-list { max-width: 1120px; margin: 0 auto; padding: 26px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
 .activities-list-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .activities-list-heading h2 { margin: 0; font-size: 18px; }

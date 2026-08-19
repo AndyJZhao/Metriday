@@ -296,6 +296,50 @@ final class AppState: ObservableObject {
             }
         }
 
+        if request.method == "GET", path == "/v1/categories" {
+            return .jsonObject([
+                "data": categoryStore.activeCategories.map(apiActivityCategory),
+                "status": categoryStore.statusMessage
+            ])
+        }
+
+        if request.method == "POST", path == "/v1/categories" {
+            guard let body = apiBody(request),
+                  let draft = activityCategory(from: body),
+                  !draft.isSystem,
+                  let categoryID = categoryStore.createCategory(
+                    name: draft.name,
+                    role: draft.role,
+                    color: draft.color,
+                    matchMode: draft.matchMode,
+                    rules: draft.rules
+                  ),
+                  let created = categoryStore.categories.first(where: { $0.id == categoryID }) else {
+                return .error("Category needs a name and at least one valid rule", statusCode: 400)
+            }
+            return .jsonObject(["data": apiActivityCategory(created)], statusCode: 201)
+        }
+
+        if path.hasPrefix("/v1/categories/") {
+            let rawID = String(path.dropFirst("/v1/categories/".count))
+            guard let categoryID = UUID(uuidString: rawID),
+                  let existing = categoryStore.categories.first(where: { $0.id == categoryID }) else {
+                return .error("Category not found", statusCode: 404)
+            }
+            if request.method == "PATCH" || request.method == "PUT" {
+                guard let body = apiBody(request), let updated = activityCategory(from: body, existing: existing) else {
+                    return .error("Category body is invalid", statusCode: 400)
+                }
+                categoryStore.save(updated)
+                let current = categoryStore.categories.first(where: { $0.id == categoryID }) ?? existing
+                return .jsonObject(["data": apiActivityCategory(current)])
+            }
+            if request.method == "DELETE" {
+                categoryStore.archive(existing)
+                return .empty()
+            }
+        }
+
         if request.method == "GET", path == "/v1/exclusions" {
             return .jsonObject([
                 "data": exclusionStore.rules.map(apiActivityExclusion),
@@ -1247,6 +1291,10 @@ final class AppState: ObservableObject {
                     "GET /v1/projects/hierarchy",
                     "GET /v1/filters",
                     "POST /v1/filters",
+                    "GET /v1/categories",
+                    "POST /v1/categories",
+                    "PATCH /v1/categories/{id}",
+                    "DELETE /v1/categories/{id}",
                     "GET /v1/exclusions",
                     "POST /v1/exclusions",
                     "GET /v1/teams",
@@ -2015,6 +2063,14 @@ final class AppState: ObservableObject {
         ]
     }
 
+    private func apiActivityCategory(_ category: ActivityCategoryDefinition) -> [String: Any] {
+        var payload = apiActivityFilter(category.filterDefinition)
+        payload["role"] = category.role.rawValue
+        payload["is_system"] = category.isSystem
+        payload["is_archived"] = category.isArchived
+        return payload
+    }
+
     private func apiActivityExclusion(_ rule: ActivityExclusionRule) -> [String: Any] {
         [
             "id": rule.id.uuidString,
@@ -2065,6 +2121,24 @@ final class AppState: ObservableObject {
             color: color,
             matchMode: matchMode,
             rules: rules,
+            isArchived: body["is_archived"] as? Bool ?? existing?.isArchived ?? false
+        )
+    }
+
+    private func activityCategory(
+        from body: [String: Any],
+        existing: ActivityCategoryDefinition? = nil
+    ) -> ActivityCategoryDefinition? {
+        guard let filter = activityFilter(from: body, existing: existing?.filterDefinition) else { return nil }
+        let role = (body["role"] as? String).flatMap(ActivityCategoryRole.init(rawValue:)) ?? existing?.role ?? .other
+        return ActivityCategoryDefinition(
+            id: existing?.id ?? filter.id,
+            name: filter.name,
+            role: role,
+            color: filter.color,
+            matchMode: filter.matchMode,
+            rules: filter.rules,
+            isSystem: existing?.isSystem ?? false,
             isArchived: body["is_archived"] as? Bool ?? existing?.isArchived ?? false
         )
     }
