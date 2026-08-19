@@ -6,6 +6,49 @@ private enum ActivityDeviceFilter {
     static let local = "This Mac"
 }
 
+/// RescueTime-style activity categories. The palette is intentionally owned by
+/// the category rather than the application: the same app can be focused in
+/// one context and distracting in another.
+private enum ActivityCategoryKind: String, CaseIterable, Hashable, Identifiable {
+    case focused
+    case distracting
+    case other
+    case idle
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .focused: return "Focused"
+        case .distracting: return "Distracting"
+        case .other: return "Other"
+        case .idle: return "Idle"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .focused:
+            return MetridayTheme.accentDeep
+        case .distracting:
+            return MetridayTheme.danger
+        case .other:
+            return MetridayTheme.secondary
+        case .idle:
+            return MetridayTheme.line
+        }
+    }
+
+    init(relevance: ActivityRelevance) {
+        switch relevance {
+        case .related: self = .focused
+        case .distracted: self = .distracting
+        case .other: self = .other
+        case .idle: self = .idle
+        }
+    }
+}
+
 private final class LockedArray<Element>: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [Element] = []
@@ -106,6 +149,7 @@ struct ActivitiesView: View {
                             selectedDate: selectedDate,
                             project: { projectStore.project($0) },
                             orientation: timelineOrientation,
+                            activityColor: { category(for: $0).color },
                             onToggleOrientation: {
                                 timelineOrientation = timelineOrientation == .horizontal ? .vertical : .horizontal
                             },
@@ -1043,6 +1087,10 @@ struct ActivitiesView: View {
 
             Divider()
 
+            if activityMode != .byCategory {
+                activityColumnHeader
+            }
+
             if filteredSegments.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "waveform.path")
@@ -1240,6 +1288,29 @@ struct ActivitiesView: View {
         }
     }
 
+    private var activityColumnHeader: some View {
+        HStack(spacing: 12) {
+            Text("App")
+                .frame(width: 220, alignment: .leading)
+            Text("Category")
+                .frame(width: 112, alignment: .leading)
+            Spacer()
+            Text("Time")
+                .frame(width: 52, alignment: .trailing)
+            Text("Project")
+                .frame(width: 122, alignment: .leading)
+            Image(systemName: "ellipsis")
+                .frame(width: 20)
+        }
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(MetridayTheme.secondary)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 7)
+        .background(MetridayTheme.canvas.opacity(0.65))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Activity columns: App, Category, Time, Project")
+    }
+
     private var unifiedActivityList: some View {
         LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(activityGroups) { projectGroup in
@@ -1289,11 +1360,16 @@ struct ActivitiesView: View {
                                     .font(.system(size: 8, weight: .bold))
                                     .frame(width: 10)
                                 Image(systemName: icon(for: appGroup.segments[0]))
-                                    .foregroundStyle(color(for: appGroup.segments[0].relevance))
-                                    .frame(width: 18)
+                                    .foregroundStyle(MetridayTheme.graphite)
+                                    .frame(width: 20, height: 20)
+                                    .background(MetridayTheme.sidebar)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                                 Text(appGroup.name)
                                     .font(.system(size: 11, weight: .semibold))
                                     .lineLimit(1)
+                                Text(category(for: appGroup.segments[0]).label)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(category(for: appGroup.segments[0]).color)
                                 Spacer()
                                 Text(formatMinutes(appGroup.seconds))
                                     .font(.system(size: 10, weight: .semibold))
@@ -1428,7 +1504,7 @@ struct ActivitiesView: View {
                 ForEach((rows ?? categoryRows(segments)).prefix(6)) { row in
                     HStack(spacing: 7) {
                         Circle()
-                            .fill(row.isDistracted ? MetridayTheme.danger : MetridayTheme.accent)
+                            .fill(row.isDistracted ? ActivityCategoryKind.distracting.color : ActivityCategoryKind.focused.color)
                             .frame(width: 6, height: 6)
                         Text(row.name)
                             .font(.system(size: 11))
@@ -1451,31 +1527,43 @@ struct ActivitiesView: View {
     }
 
     private func activityRow(_ segment: ActivitySegment) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon(for: segment))
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(color(for: segment.relevance))
-                .frame(width: 28, height: 28)
-                .background(color(for: segment.relevance).opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        let category = category(for: segment)
+        return HStack(spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: icon(for: segment))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(MetridayTheme.graphite)
+                    .frame(width: 30, height: 30)
+                    .background(MetridayTheme.sidebar)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(displayTitle(for: segment))
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                HStack(spacing: 8) {
-                    Text(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))
-                    if segment.deviceName != ActivityDeviceFilter.local {
-                        Text(segment.deviceName)
-                    }
-                    if preferences.showResourcePaths, !segment.resource.isEmpty {
-                        Text(resourceLabel(segment.resource))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(appName(for: segment))
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                    if let context = appContext(for: segment) {
+                        Text(context)
+                            .font(.system(size: 10))
+                            .foregroundStyle(MetridayTheme.secondary)
                             .lineLimit(1)
                     }
                 }
-                .font(.system(size: 10))
-                .foregroundStyle(MetridayTheme.secondary)
             }
+            .frame(width: 220, alignment: .leading)
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(category.color)
+                    .frame(width: 7, height: 7)
+                Text(category.label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(category.color)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 8)
+            .frame(width: 112, height: 24, alignment: .leading)
+            .background(category.color.opacity(0.10))
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
             Spacer(minLength: 10)
 
@@ -1533,6 +1621,29 @@ struct ActivitiesView: View {
             }
         }
         .help("Double-click or right-click to create a time entry")
+    }
+
+    private func category(for segment: ActivitySegment) -> ActivityCategoryKind {
+        ActivityCategoryKind(relevance: segment.relevance)
+    }
+
+    private func appName(for segment: ActivitySegment) -> String {
+        let name = segment.appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "Unknown App" : name
+    }
+
+    private func appContext(for segment: ActivitySegment) -> String? {
+        if preferences.showWindowTitles {
+            let title = segment.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !title.isEmpty { return title }
+        }
+        if preferences.showResourcePaths, !segment.resource.isEmpty {
+            return resourceLabel(segment.resource)
+        }
+        if segment.deviceName != ActivityDeviceFilter.local {
+            return segment.deviceName
+        }
+        return nil
     }
 
     private func filterButton(
@@ -2329,16 +2440,7 @@ struct ActivitiesView: View {
     }
 
     private func color(for relevance: ActivityRelevance) -> Color {
-        switch relevance {
-        case .related:
-            return MetridayTheme.success
-        case .distracted:
-            return MetridayTheme.danger
-        case .other:
-            return MetridayTheme.secondary
-        case .idle:
-            return MetridayTheme.secondary
-        }
+        ActivityCategoryKind(relevance: relevance).color
     }
 
     private func color(for projectColor: ProjectColor) -> Color {
@@ -3722,9 +3824,9 @@ private struct TimelineLegend: View {
     var body: some View {
         HStack(spacing: 10) {
             item("App usage", color: MetridayTheme.warning)
-            item("Related", color: MetridayTheme.success)
-            item("Distracted", color: MetridayTheme.danger)
-            item("Other / idle", color: MetridayTheme.secondary)
+            item("Focused", color: ActivityCategoryKind.focused.color)
+            item("Distracting", color: ActivityCategoryKind.distracting.color)
+            item("Other / idle", color: ActivityCategoryKind.other.color)
             item("Time entry", color: MetridayTheme.warning, outlined: true)
             item("Calendar", color: MetridayTheme.accent, outlined: true)
         }
@@ -3759,6 +3861,7 @@ private struct ActivityTimelinePanel: View {
     let selectedDate: Date
     let project: (UUID?) -> TrackingProject?
     let orientation: ActivityTimelineOrientation
+    let activityColor: (ActivitySegment) -> Color
     let onToggleOrientation: () -> Void
     @Binding var selectionStart: Int?
     @Binding var selectionEnd: Int?
@@ -3832,7 +3935,7 @@ private struct ActivityTimelinePanel: View {
                         )
                         ZStack(alignment: .trailing) {
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .fill(color(for: segment.relevance).opacity(0.82))
+                                .fill(activityColor(segment).opacity(0.82))
                             if hoveredSegmentID == segment.id {
                                 Button {
                                     let start = max(0, segment.startMinute)
@@ -4031,7 +4134,7 @@ private struct ActivityTimelinePanel: View {
                         let left = chartWidth * CGFloat(segment.startSecond) / 86_400
                         let width = max(2, chartWidth * CGFloat(segment.durationSeconds) / 86_400)
                         RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .fill(color(for: segment.relevance).opacity(0.72))
+                            .fill(activityColor(segment).opacity(0.72))
                             .frame(width: width, height: 16)
                             .offset(x: left)
                             .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
@@ -4200,7 +4303,7 @@ private struct ActivityTimelinePanel: View {
             return TimelineHoverDetail(
                 id: "activity-\(segment.id.uuidString)",
                 sourceLabel: "App",
-                sourceColor: MetridayTheme.warning,
+                sourceColor: activityColor(segment),
                 title: segment.displayTitle,
                 timeRange: secondRange(start: segment.startSecond, end: segment.endSecond),
                 duration: durationLabel(segment.durationSeconds),
@@ -4305,14 +4408,7 @@ private struct ActivityTimelinePanel: View {
     }
 
     private func color(for relevance: ActivityRelevance) -> Color {
-        switch relevance {
-        case .related:
-            return MetridayTheme.success
-        case .distracted:
-            return MetridayTheme.danger
-        case .other, .idle:
-            return MetridayTheme.secondary
-        }
+        ActivityCategoryKind(relevance: relevance).color
     }
 
     private func color(for projectColor: ProjectColor?) -> Color {
