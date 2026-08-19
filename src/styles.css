@@ -481,6 +481,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-activity-timeline-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .web-activity-timeline-heading h2 { margin: 0; font-size: 18px; }
 .web-activity-timeline-heading p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.web-activity-timeline-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; color: var(--muted); font-size: 10px; }
+.web-activity-timeline-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.web-activity-timeline-legend i { display: inline-block; width: 12px; height: 7px; border-radius: 2px; background: #6f7480; }
+.web-activity-timeline-legend i.focused { background: #384ae0; }
+.web-activity-timeline-legend i.distracting { background: #d24b4b; }
+.web-activity-timeline-legend i.other { background: #6f7480; }
+.web-activity-timeline-legend i.idle { border: 1px solid #6f7480; background: #f0f1f4; }
 .web-activity-timeline-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; min-height: 30px; color: var(--muted); font-size: 11px; }
 .web-activity-timeline-actions button { min-height: 30px; padding: 0 10px; border: 1px solid var(--accent); border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font-size: 11px; font-weight: 650; }
 .web-activity-timeline-actions button:disabled { cursor: not-allowed; opacity: 0.5; }
