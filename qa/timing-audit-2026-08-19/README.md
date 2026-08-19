@@ -50,6 +50,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 44. Activities timeline sources — verified App usage blocks remain category-colored, Time Entry overlays use orange solid outlines, Calendar overlays use blue dashed outlines, Calendar click-to-record remains API-backed, and vertical mode still renders 625 live activity blocks without overflow.
 45. Today timeline hit targets — verified Plan blocks are full buttons that enter Plan, live Actual blocks are full keyboard-accessible buttons that open Activity details, and the existing hover-card Record time action remains separate from parent selection.
 46. Plan daily Markdown files — verified native `swift build` and smoke tests after adding a no-context-switch ensure-file path for `/v1/plans?date=...`; missing selected dates now materialize their blank `Calendar/YYYY-MM-DD.md` template without replacing the currently loaded editor document.
+47. Plan month navigation — verified all 42 month cells remain actionable, Next / Previous month no longer snap back to the selected date, December 31 selection switches the editor to `2026-12-31.md`, and a missing day renders a blank editable task list.
 
 ## Findings applied
 
@@ -97,3 +98,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Activities now overlays local Time Entries and read-only Calendar Events on the same full-day timeline; source styling stays distinct from the Category color used by App / website activity.
 - Today now makes its full Plan / Actual timeline blocks actionable: Plan navigates to the Markdown planner and Actual opens the shared Activity details surface, with visible focus affordances.
 - Plan date reads now preserve Markdown-first behavior for missing days: the API creates the blank daily file while neighboring-day reads do not mutate the active editor document.
+- Plan month navigation now keeps the visible month independent from the selected date until a day is chosen, so every calendar cell can be reached and selected.

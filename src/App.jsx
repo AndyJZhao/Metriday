@@ -1194,7 +1194,7 @@ function CalendarPanel({ tasks, neighborPlans, selectedTaskId, setSelectedTaskId
     if (!Number.isNaN(selectedMonth.getTime()) && (selectedMonth.getMonth() !== visibleMonth.getMonth() || selectedMonth.getFullYear() !== visibleMonth.getFullYear())) {
       setVisibleMonth(selectedMonth);
     }
-  }, [dateKey, visibleMonth]);
+  }, [dateKey]);
   const drop = (event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/task-id") || selectedTaskId; if (!id || !timelineRef.current) return; const rect = timelineRef.current.getBoundingClientRect(); onDropTask(id, event.clientY - rect.top, { metaKey: event.metaKey, altKey: event.altKey }); };
   const calendarItems = [
     { label: "Today", onSelect: () => onSelectDate(localDateKey()) },
