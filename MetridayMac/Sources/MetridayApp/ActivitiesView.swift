@@ -3719,6 +3719,9 @@ private struct ActivityTimelinePanel: View {
                     hoveredCalendarEventID = nil
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Vertical activity timeline")
+            .accessibilityIdentifier("activities.vertical-timeline")
         }
         .frame(height: 156)
         .padding(.horizontal, 16)
@@ -3745,6 +3748,8 @@ private struct ActivityTimelinePanel: View {
                 content()
             }
             .frame(width: chartWidth, height: 18, alignment: .topLeading)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(label)
         }
     }
 
