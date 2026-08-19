@@ -419,6 +419,7 @@ function liveActivityBlocks(activities) {
         endSecond: rawEndSecond,
         kind: category.key,
         categoryColor: category.color,
+        categoryLabel: category.label,
         label: category.key === "idle" ? "Idle" : activityLabel(activity),
         icon: category.key === "idle" ? null : activityIcon(activity),
       };
@@ -442,11 +443,13 @@ function liveActivityBlocks(activities) {
         endSecond: activity.endSecond,
         kind: activity.kind,
         categoryColor: activity.categoryColor,
+        categoryLabel: activity.categoryLabel,
         label: activity.kind === "idle" ? "Idle" : activity.label,
         detail: activity.kind === "idle" ? "No significant activity" : formatRange(activity.start, activity.end),
         kinds: new Set([activity.kind]),
         categorySeconds: new Map([[activity.kind, Math.max(1, activity.endSecond - activity.startSecond)]]),
         categoryColors: new Map([[activity.kind, activity.categoryColor]]),
+        categoryLabels: new Map([[activity.kind, activity.categoryLabel]]),
         rowMap: new Map([[`${activity.kind}|${activity.label}`, {
           icon: activity.icon,
           label: activity.label,
@@ -468,8 +471,10 @@ function liveActivityBlocks(activities) {
       (previous.categorySeconds.get(activity.kind) || 0) + Math.max(1, activity.endSecond - activity.startSecond)
     );
     previous.categoryColors.set(activity.kind, activity.categoryColor);
+    previous.categoryLabels.set(activity.kind, activity.categoryLabel);
     previous.kind = primaryKind(previous.categorySeconds);
     previous.categoryColor = previous.categoryColors.get(previous.kind) || previous.categoryColor;
+    previous.categoryLabel = previous.categoryLabels.get(previous.kind) || previous.categoryLabel;
     const rowKey = `${activity.kind}|${activity.label}`;
     const row = previous.rowMap.get(rowKey);
     if (row) {
@@ -495,6 +500,7 @@ function liveActivityBlocks(activities) {
     endSecond: block.endSecond,
     kind: block.kind,
     categoryColor: block.categoryColor,
+    categoryLabel: block.categoryLabel,
     label: block.label,
     detail: block.kind === "idle" ? block.detail : formatRange(block.start, block.end),
     rows: block.kinds.size === 1 && block.kinds.has("idle") ? null : [...block.rowMap.values()]
@@ -697,7 +703,8 @@ function ActualRows({ block }) {
 function ActualHoverCard({ block, onRecord }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const categoryLabel = block.kind === "focused" ? "Focused" : block.kind === "distracting" ? "Distracting" : block.kind === "idle" ? "Idle" : "Other";
+  const categoryLabel = block.categoryLabel || (block.kind === "focused" ? "Focused" : block.kind === "distracting" ? "Distracting" : block.kind === "idle" ? "Idle" : "Other");
+  const categoryStyle = activityCategoryStyle({ color: block.categoryColor || categoryRoleColor(block.kind) });
   const appLabel = block.rows?.[0]?.label || block.label;
   const startSecond = Number.isFinite(block.startSecond) ? block.startSecond : block.start * 60;
   const endSecond = Number.isFinite(block.endSecond) ? block.endSecond : block.end * 60;
@@ -718,7 +725,7 @@ function ActualHoverCard({ block, onRecord }) {
     <strong className="actual-hover-time">{preciseClock(startSecond)}</strong>
     <span className="actual-hover-duration">({preciseDuration(endSecond - startSecond)})</span>
     <div className="actual-hover-meta"><span>App:</span><b>{appLabel}</b></div>
-    <div className="actual-hover-meta"><span>Category:</span><i className={`hover-category-dot ${block.kind}`} /><b>{categoryLabel}</b></div>
+    <div className="actual-hover-meta"><span>Category:</span><i className={`hover-category-dot ${block.kind}`} style={{ background: categoryStyle.color }} /><b>{categoryLabel}</b></div>
     <div className="actual-hover-meta"><span>Project:</span><i className="hover-project-dot" /><b>None</b><small>From the app usage</small></div>
     {onRecord ? <div className="actual-hover-actions"><button type="button" className="actual-record-button" onClick={record} disabled={busy}>{message || (busy ? "Recording…" : "Record time")}</button></div> : null}
   </div>;
