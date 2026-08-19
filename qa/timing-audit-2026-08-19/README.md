@@ -13,6 +13,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 7. `07-review-category-pulse.png` — Review after adding a RescueTime-style category breakdown sourced from the same activity evidence.
 8. `08-review-evidence-grid.png` — Review after placing Planned vs. Actual beside Category pulse so category colors remain visible in the first viewport.
 9. `09-plan-month-calendar.png` — Plan after replacing the Day / Week branch with a compact, actionable month calendar above the selected-day timeline.
+10. `10-plan-continuous-timeline.png` — Plan after extending the right rail into a three-day continuous timeline with the selected day as the writable drop target.
 
 ## Findings applied
 
@@ -21,3 +22,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Today only shows a scheduled current block when the native API provides one; otherwise it presents an explicit empty state and a generic Start timer action.
 - Review keeps planned/actual evidence and Focused/Distracting/Other category colors in the same first-viewport evidence grid.
 - Plan exposes 42 actionable month cells and keeps the selected date's draggable timeline directly below the calendar.
+- Plan's right rail now keeps adjacent days visible in one continuous timeline; only the selected day accepts Markdown scheduling writes.

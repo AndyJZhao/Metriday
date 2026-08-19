@@ -211,10 +211,24 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .segmented-control button.active { background: var(--accent); color: #fff; font-weight: 650; }
 .calendar-panel > h2 { display: flex; align-items: center; justify-content: center; margin: 0; color: var(--accent); font-size: 15px; }
 .all-day-row { display: flex; align-items: center; padding: 0 18px; border-bottom: 1px solid var(--border); color: #9a9ea7; font-size: 11px; }
-.plan-calendar-canvas { position: relative; min-height: 0; margin-left: 58px; overflow-y: auto; scrollbar-width: thin; }
+.continuous-timeline { display: grid; grid-template-rows: 32px minmax(0, 1fr); min-height: 0; }
+.continuous-timeline-head { display: grid; grid-template-columns: 58px minmax(0, 1fr); border-bottom: 1px solid #eceef2; }
+.continuous-day-labels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.continuous-day-labels button { display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; border: 0; border-right: 1px solid #eceef2; background: #fff; color: #6f7480; cursor: pointer; font-size: 10px; }
+.continuous-day-labels button strong { color: #343740; font-size: 11px; }
+.continuous-day-labels button.selected { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+.continuous-day-labels button.selected strong { color: var(--accent); }
+.continuous-timeline-body { display: grid; grid-template-columns: 58px repeat(3, minmax(0, 1fr)); min-height: 0; overflow: auto; scrollbar-width: thin; }
+.continuous-hour-axis { position: relative; height: calc(12 * var(--hour-height)); border-right: 1px solid #eef0f3; }
+.continuous-hour-axis .hour-labels { right: 0; width: 58px; }
+.continuous-hour-axis .hour-labels span { right: 10px; }
+.plan-calendar-canvas, .continuous-day-canvas { position: relative; min-width: 0; height: calc(12 * var(--hour-height)); min-height: calc(12 * var(--hour-height)); overflow: visible; border-right: 1px solid #eef0f3; }
 .plan-calendar-canvas.ready-to-schedule { background: #fbfbff; }
-.plan-calendar-canvas .hour-labels { right: auto; left: -58px; width: 58px; }
-.plan-calendar-canvas .hour-labels span { right: 10px; }
+.continuous-day-canvas.adjacent { cursor: pointer; background: #fcfcfd; }
+.continuous-day-canvas.adjacent:hover { background: #f8f8fb; }
+.continuous-neighbor-block { position: absolute; right: 7px; left: 7px; z-index: 2; min-height: 28px; padding: 6px 7px; overflow: hidden; border: 1px solid #dfe2ff; border-radius: 5px; background: #f0f1ff; color: #3c4381; font-size: 9px; pointer-events: none; }
+.continuous-neighbor-block strong, .continuous-neighbor-block span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.continuous-neighbor-block span { margin-top: 2px; color: #777c99; font-size: 8px; }
 .static-calendar-block, .calendar-task-block { position: absolute; right: 18px; left: 13px; z-index: 3; display: flex; flex-direction: column; min-height: 32px; padding: 9px 11px; overflow: hidden; border: 1px solid #e1e3e8; border-radius: 7px; background: #f8f8f9; color: #30333b; font-size: 12px; }
 .static-calendar-block strong, .calendar-task-block strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .static-calendar-block span, .calendar-task-block span { margin-top: 3px; color: #777c89; font-size: 11px; }
