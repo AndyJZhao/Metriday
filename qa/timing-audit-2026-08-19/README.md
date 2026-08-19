@@ -180,6 +180,7 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 - Web Reports now exposes native advanced options for duration format, short App usage inclusion, covered App usage absorption, and individual-entry rounding; local preview applies the range/coverage rules and native exports receive the matching query parameters.
 - Web Reports now keeps the native Report Builder column vocabulary and selection semantics across local CSV/JSON/HTML exports and native XLSX/PDF exports; App identity remains metadata while the selected report fields are explicit.
 - Web Plan now shares native Calendar Event drop semantics: plain drops offer Time Block/Event, `⌘` creates a Markdown Time Block, and `⌥` creates an external Calendar Event after permission; writable Calendar events can also be edited or deleted from the Web Activities source panel.
+- The Web shell now keeps native running-Timer controls visible across every section, including estimate selection, remaining time, and ±15-minute start adjustments.
 
 77. Web Activity detail project preservation — verified that recording an activity from its detail dialog passes the activity’s assigned Project through to the new Time Entry, matching the native detail workflow.
 78. Plan adjacent-day timeline hit targets — verified that clicking an adjacent native timeline column selects that date, while the Web column supports click, Enter, and Space without changing the selected-day scheduling path.
@@ -210,3 +211,4 @@ Captured from the running Web companion at `http://127.0.0.1:4173/` after the na
 103. Web Reports advanced options — verified Web build, Sites tests, and diff checks after adding duration format, short-entry, covered-usage, and individual-rounding controls plus local/native export semantics.
 104. Web Reports column selection — verified Web build, Sites tests, Swift debug/release builds, native smoke tests, and packaged-app output after adding the shared ReportColumn query contract and applying selected fields plus duration formatting to local CSV/JSON/HTML and native XLSX/PDF exports.
 105. Web Plan Calendar Event parity — verified Web build, Sites tests, Swift debug build, native smoke tests, and diff checks after adding local Calendar Event create/update/delete API routes, Web Plan modifier handling, and writable-event editing controls.
+106. Web global Timer controls — verified Web build, Sites tests, and diff checks after wiring the existing native-shaped estimate/remaining-time/start-adjustment controls into the persistent Web shell header.
