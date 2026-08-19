@@ -296,7 +296,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .api-badge.online { border-color: #cbe7d2; background: #f2faf4; color: #287a3d; }
 .activity-table { margin-top: 22px; border-top: 1px solid var(--border); }
 .activity-table-head, .activity-table-row { display: grid; grid-template-columns: minmax(220px, 1.4fr) 132px 125px 170px; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
-.activity-table-row { width: 100%; padding: 0; border-right: 0; border-left: 0; background: #fff; text-align: left; cursor: pointer; }
+.activity-table-row { width: 100%; padding: 0; border-top: 0; border-right: 0; border-bottom: 1px solid #eceef1; border-left: 0; border-radius: 0; appearance: none; background: #fff; text-align: left; cursor: pointer; }
 .activity-table-row:hover { background: #fafbff; }
 .activity-table-row:focus-visible { position: relative; z-index: 1; outline-offset: -2px; }
 .activity-table-head { min-height: 34px; color: var(--muted); font-size: 11px; font-weight: 650; }
