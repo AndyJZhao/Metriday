@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowsClockwise, BookOpen, Browsers, CalendarBlank, CaretLeft, CaretRight,
+  ArrowsClockwise, BookOpen, Browsers, CalendarBlank, CaretDown, CaretLeft, CaretRight,
   ChartBar, Check, CheckCircle, Clock, Code, DotsSixVertical, DotsThree,
   FileText, Flask, FolderSimple, GearSix, GlobeSimple, Laptop, LinkSimple,
   LockSimple, NotePencil, Pause, Play, Plus, ShieldCheck, Sparkle, TerminalWindow,
@@ -1349,26 +1349,52 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect }) {
   return <section className="web-activity-timeline" aria-label="Activities timeline"><div className="web-activity-timeline-heading"><div><h2>Timeline</h2><p>Hover for exact activity; drag across a gap to select time for a manual entry.</p></div><div className="web-activity-timeline-actions">{selection ? <><span>{formatRange(selection.start, selection.end)}</span><button type="button" onClick={recordSelection} disabled={!api.connected}>Record time</button><button type="button" className="timeline-clear" onClick={() => setSelection(null)}>Clear</button></> : <span>00:00–24:00</span>}{message ? <small role="status">{message}</small> : null}</div></div><div className="web-activity-timeline-track" ref={trackRef} onPointerDown={startSelection}>{[0, 6, 12, 18, 24].map((hour) => <span className="web-activity-timeline-label" key={hour} style={{ left: `${(hour / 24) * 100}%` }}>{String(hour).padStart(2, "0")}:00</span>)}<div className="web-activity-timeline-grid" aria-hidden="true">{[0, 6, 12, 18, 24].map((hour) => <i key={hour} style={{ left: `${(hour / 24) * 100}%` }} />)}</div>{activities.map((activity) => { const startSecond = Math.max(0, Number(activity.startSecond || 0)); const endSecond = Math.min(totalSeconds, Number(activity.endSecond || 0)); if (endSecond <= startSecond) return null; const category = activityCategory(activity); const categoryStyle = activityCategoryStyle(category); return <button type="button" key={activity.id} className={`web-activity-timeline-block ${category.key}`} style={{ left: `${(startSecond / totalSeconds) * 100}%`, width: `${Math.max((endSecond - startSecond) / totalSeconds * 100, 0.18)}%`, borderColor: categoryStyle.color }} title={`${activityLabel(activity)} · ${category.label} · ${preciseClock(startSecond)}–${preciseClock(endSecond)}`} onPointerDown={(event) => event.stopPropagation()} onClick={() => onSelect(activity)}><span style={{ color: categoryStyle.color }} /></button>; })}{selection ? <div className="web-activity-timeline-selection" style={{ left: `${(selection.start / (24 * 60)) * 100}%`, width: `${((selection.end - selection.start) / (24 * 60)) * 100}%` }} aria-label={`Selected ${formatRange(selection.start, selection.end)}`} /> : null}</div></section>;
 }
 
-function ActivityTable({ activities, onSelect }) {
+function ActivityTable({ activities, onSelect, viewMode = "unified" }) {
+  const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
+  const rows = [...activities].sort((left, right) => Number(left.startSecond || 0) - Number(right.startSecond || 0));
+  const activityRow = (activity) => {
+    const category = activityCategory(activity);
+    const Icon = activityIcon(activity);
+    const app = activity.appName || activity.deviceName || "Unknown App";
+    const context = activityContext(activity);
+    const start = Math.floor(Number(activity.startSecond || 0) / 60);
+    const end = Math.ceil(Number(activity.endSecond || 0) / 60);
+    const duration = Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
+    return <button className="activity-table-row" key={activity.id} type="button" draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-metriday-activity", activity.id); }} onClick={() => onSelect(activity)} aria-label={`Open details for ${app} ${formatRange(start, end)}`} title="Drag this activity to a project to assign it">
+      <div className="activity-app-cell">
+        <span className="activity-table-icon"><Icon size={19} weight="duotone" /></span>
+        <span className="activity-app-copy"><strong>{app}</strong>{context ? <small>{context}</small> : null}</span>
+      </div>
+      <span className={`activity-category ${category.key}`} style={activityCategoryStyle(category)}><i />{category.label}</span>
+      <span>{formatRange(start, end)}</span>
+      <small>{formatDurationSeconds(duration)} · {activity.deviceName || "This Mac"}</small>
+    </button>;
+  };
+  if (viewMode === "chronological") {
+    return <div className="activity-table">
+      <div className="activity-table-head" aria-hidden="true"><span>App</span><span>Category</span><span>Time</span><span>Device</span></div>
+      {rows.map(activityRow)}
+    </div>;
+  }
+  const grouped = [...rows.reduce((groups, activity) => {
+    const category = activityCategory(activity);
+    const key = viewMode === "category" ? `${category.key}:${category.label}` : activity.appName || activity.deviceName || "Unknown App";
+    const existing = groups.get(key) || { key, label: viewMode === "category" ? category.label : activity.appName || activity.deviceName || "Unknown App", category, activities: [], seconds: 0 };
+    existing.activities.push(activity);
+    existing.seconds += Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
+    groups.set(key, existing);
+    return groups;
+  }, new Map()).values()].sort((left, right) => right.seconds - left.seconds || left.label.localeCompare(right.label));
   return <div className="activity-table">
-    <div className="activity-table-head" aria-hidden="true"><span>App</span><span>Category</span><span>Time</span><span>Device</span></div>
-    {activities.map((activity) => {
-      const category = activityCategory(activity);
-      const Icon = activityIcon(activity);
-      const app = activity.appName || activity.deviceName || "Unknown App";
-      const context = activityContext(activity);
-      const start = Math.floor(Number(activity.startSecond || 0) / 60);
-      const end = Math.ceil(Number(activity.endSecond || 0) / 60);
-      const duration = Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
-      return <button className="activity-table-row" key={activity.id} type="button" draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-metriday-activity", activity.id); }} onClick={() => onSelect(activity)} aria-label={`Open details for ${app} ${formatRange(start, end)}`} title="Drag this activity to a project to assign it">
-        <div className="activity-app-cell">
-          <span className="activity-table-icon"><Icon size={19} weight="duotone" /></span>
-          <span className="activity-app-copy"><strong>{app}</strong>{context ? <small>{context}</small> : null}</span>
-        </div>
-        <span className={`activity-category ${category.key}`} style={activityCategoryStyle(category)}><i />{category.label}</span>
-        <span>{formatRange(start, end)}</span>
-        <small>{formatDurationSeconds(duration)} · {activity.deviceName || "This Mac"}</small>
-      </button>;
+    {grouped.map((group) => {
+      const collapsed = collapsedGroups.has(group.key);
+      return <section className="activity-group" key={group.key}>
+        <button type="button" className="activity-group-heading" onClick={() => setCollapsedGroups((current) => { const next = new Set(current); if (next.has(group.key)) next.delete(group.key); else next.add(group.key); return next; })} aria-expanded={!collapsed}>
+          <span className="activity-group-title">{viewMode === "category" ? <span className={`activity-category ${group.category.key}`} style={activityCategoryStyle(group.category)}><i />{group.label}</span> : <strong>{group.label}</strong>}</span>
+          <span className="activity-group-meta">{formatDurationSeconds(group.seconds)} · {group.activities.length} segment{group.activities.length === 1 ? "" : "s"}<CaretDown size={15} className={collapsed ? "collapsed" : ""} /></span>
+        </button>
+        {!collapsed ? <div className="activity-group-rows">{group.activities.map(activityRow)}</div> : null}
+      </section>;
     })}
   </div>;
 }
@@ -1419,6 +1445,7 @@ function ActivitiesPage({ api, dateKey, setDateKey }) {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [deviceFilter, setDeviceFilter] = useState("all");
+  const [activityView, setActivityView] = useState("unified");
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [timerBusy, setTimerBusy] = useState(false);
   const [timerMessage, setTimerMessage] = useState("");
@@ -1453,7 +1480,7 @@ function ActivitiesPage({ api, dateKey, setDateKey }) {
     }
   };
   useEffect(() => setSelectedActivity(null), [dateKey]);
-  return <main className="page supporting-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Activities date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button type="button" className={`status-pill activities-timer ${timerRunning ? "active" : ""}`} onClick={toggleTimer} disabled={timerBusy || !api.connected}><Timer size={16} weight={timerRunning ? "fill" : "regular"} />{timerBusy ? "Updating…" : timerRunning ? "Stop timer" : "Start timer"}</button><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="activities-page-toolbar"><label className="activity-search"><Waveform size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search app, website, window title…" aria-label="Search activities" />{query ? <IconButton label="Clear activity search" onClick={() => setQuery("")}><X size={15} /></IconButton> : null}</label><label className="activity-filter-control">Category<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Activity category filter"><option value="all">All categories</option><option value="focused">Focused</option><option value="distracting">Distracting</option><option value="other">Other</option><option value="idle">Idle</option></select></label><label className="activity-filter-control">Device<select value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)} aria-label="Activity device filter"><option value="all">All devices</option>{devices.map((device) => <option key={device} value={device}>{device}</option>)}</select></label><button type="button" className="quiet-pill activity-reset" onClick={resetFilters} disabled={!hasFilters}>Reset</button></div>{timerMessage ? <p className="entry-message activities-timer-message" role="status">{timerMessage}</p> : null}<WebActivityTimeline activities={activities} dateKey={dateKey} api={api} onSelect={setSelectedActivity} /><section className="activities-list"><div className="activities-list-heading"><div><h2>Today’s activity</h2><p>{api.connected ? hasFilters ? `${activities.length} of ${allActivities.length} locally recorded segments` : `${activities.length} locally recorded segments` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? allActivities.length > 0 ? "No activity matches these filters" : "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || (hasFilters ? "Clear the filters to see all local activity." : "The hosted view keeps working with preview data until the loopback API is available.")}</span></div> : <ActivityTable activities={activities} onSelect={setSelectedActivity} />}</section><ProjectPanel api={api} onAssignActivity={(id, projectID) => api.assignActivity(id, projectID, dateKey)} /><TimeEntriesPanel api={api} dateKey={dateKey} />{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} onClose={() => setSelectedActivity(null)} /> : null}</main>;
+  return <main className="page supporting-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Activities date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button type="button" className={`status-pill activities-timer ${timerRunning ? "active" : ""}`} onClick={toggleTimer} disabled={timerBusy || !api.connected}><Timer size={16} weight={timerRunning ? "fill" : "regular"} />{timerBusy ? "Updating…" : timerRunning ? "Stop timer" : "Start timer"}</button><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="activities-page-toolbar"><div className="activity-view-switcher" role="group" aria-label="Activity view"><button type="button" className={activityView === "unified" ? "active" : ""} onClick={() => setActivityView("unified")}>Unified</button><button type="button" className={activityView === "category" ? "active" : ""} onClick={() => setActivityView("category")}>By Category</button><button type="button" className={activityView === "chronological" ? "active" : ""} onClick={() => setActivityView("chronological")}>Chronological</button></div><label className="activity-search"><Waveform size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search app, website, window title…" aria-label="Search activities" />{query ? <IconButton label="Clear activity search" onClick={() => setQuery("")}><X size={15} /></IconButton> : null}</label><label className="activity-filter-control">Category<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Activity category filter"><option value="all">All categories</option><option value="focused">Focused</option><option value="distracting">Distracting</option><option value="other">Other</option><option value="idle">Idle</option></select></label><label className="activity-filter-control">Device<select value={deviceFilter} onChange={(event) => setDeviceFilter(event.target.value)} aria-label="Activity device filter"><option value="all">All devices</option>{devices.map((device) => <option key={device} value={device}>{device}</option>)}</select></label><button type="button" className="quiet-pill activity-reset" onClick={resetFilters} disabled={!hasFilters}>Reset</button></div>{timerMessage ? <p className="entry-message activities-timer-message" role="status">{timerMessage}</p> : null}<WebActivityTimeline activities={activities} dateKey={dateKey} api={api} onSelect={setSelectedActivity} /><section className="activities-list"><div className="activities-list-heading"><div><h2>Today’s activity</h2><p>{api.connected ? hasFilters ? `${activities.length} of ${allActivities.length} locally recorded segments` : `${activities.length} locally recorded segments` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? allActivities.length > 0 ? "No activity matches these filters" : "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || (hasFilters ? "Clear the filters to see all local activity." : "The hosted view keeps working with preview data until the loopback API is available.")}</span></div> : <ActivityTable activities={activities} viewMode={activityView} onSelect={setSelectedActivity} />}</section><ProjectPanel api={api} onAssignActivity={(id, projectID) => api.assignActivity(id, projectID, dateKey)} /><TimeEntriesPanel api={api} dateKey={dateKey} />{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} onClose={() => setSelectedActivity(null)} /> : null}</main>;
 }
 
 function RulesPage() {
