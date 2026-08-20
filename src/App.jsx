@@ -3157,8 +3157,13 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
    timelineMessageInteracted.current = true;
    setMessage(value);
  };
- const openActivityDetails = (activity) => {
-   if (activityClickTimer.current) window.clearTimeout(activityClickTimer.current);
+  const openActivityDetails = (activity) => {
+   if (activityClickTimer.current) {
+     window.clearTimeout(activityClickTimer.current);
+     activityClickTimer.current = null;
+     onCreateTimeEntry?.(activity);
+     return;
+   }
    activityClickTimer.current = window.setTimeout(() => {
      onSelect?.(activity);
      activityClickTimer.current = null;
