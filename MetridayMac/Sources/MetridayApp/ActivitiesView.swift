@@ -2180,12 +2180,19 @@ struct ActivitiesView: View {
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
                 ScrollView(.vertical) {
-                    LazyVStack(spacing: 0) {
-                        ForEach(rows ?? categoryRows(segments, nameFor: nameFor)) { row in
+                        LazyVStack(spacing: 0) {
+                            ForEach(rows ?? categoryRows(segments, nameFor: nameFor)) { row in
+                            let firstActivity = row.segments.first
+                            let firstSymbol = firstActivity.map { self.icon(for: $0) }
                             HStack(spacing: 7) {
                                 Circle()
                                     .fill(categoryColor(for: row.category))
                                     .frame(width: 6, height: 6)
+                                AppIdentityIcon(
+                                    symbol: firstSymbol,
+                                    bundleIdentifier: firstActivity?.bundleIdentifier,
+                                    size: 22
+                                )
                                 Text(row.name)
                                     .font(.system(size: 11))
                                     .lineLimit(1)
