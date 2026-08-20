@@ -2814,13 +2814,15 @@ function WebReportPanel({ api, dateKey }) {
       const end = new Date(entry.end_date || entry.end);
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start || end <= startBound || start >= endBound) return;
       if (!includesProject(entry.project)) return;
-      if (billingFilter !== "all" && entry.billing_status !== billingFilter) return;
+      const entryBillingStatus = normalizedBillingStatus(entry.billing_status);
+      if (billingFilter !== "all" && entryBillingStatus !== billingFilter) return;
       const clippedStart = start < startBound ? startBound : start;
       const clippedEnd = end > endBound ? endBound : end;
       const rawSeconds = Math.max(0, (clippedEnd - clippedStart) / 1000);
       const seconds = roundIndividualEntries ? reportRoundSeconds(rawSeconds, rounding, Number(roundingInterval)) : rawSeconds;
       const details = projectDetails(entry.project);
-      rows.push({ kind: "Time entry", type: entry.is_manual ? "Time Entry" : "Timer", title: entry.title || "Untitled", project: projectFor(entry.project), group: "", application: "", device: localDeviceName, resource: entry.notes || "", billing: billingLabel(entry.billing_status), currency: details.currency, start: clippedStart, end: clippedEnd, seconds, amount: seconds / 3600 * details.rate, notes: entry.notes || "" });
+      const hourlyRate = entryBillingStatus === "not_billable" ? 0 : details.rate;
+      rows.push({ kind: "Time entry", type: entry.is_manual ? "Time Entry" : "Timer", title: entry.title || "Untitled", project: projectFor(entry.project), group: "", application: "", device: localDeviceName, resource: entry.notes || "", billing: billingLabel(entryBillingStatus), currency: details.currency, start: clippedStart, end: clippedEnd, seconds, amount: seconds / 3600 * hourlyRate, notes: entry.notes || "" });
     });
     if (includeMode !== "time") {
       dataset.activities.forEach((activity) => {
