@@ -366,6 +366,26 @@ final class TimeEntryStore: ObservableObject {
     }
 
     @discardableResult
+    func renameEntries(_ ids: Set<UUID>, to rawTitle: String) -> Int {
+        let title = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ids.isEmpty, !title.isEmpty else { return 0 }
+
+        var updatedCount = 0
+        for index in entries.indices where ids.contains(entries[index].id) {
+            guard entries[index].title != title else { continue }
+            entries[index].title = title
+            updatedCount += 1
+        }
+        guard updatedCount > 0 else {
+            statusMessage = "Time entry titles already match"
+            return 0
+        }
+        persist()
+        statusMessage = "Renamed \(updatedCount) time entries"
+        return updatedCount
+    }
+
+    @discardableResult
     func updateBillingStatus(for ids: Set<UUID>, to status: BillingStatus) -> Int {
         guard !ids.isEmpty else { return 0 }
         var updatedCount = 0

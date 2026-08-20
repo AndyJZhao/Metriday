@@ -123,6 +123,7 @@ struct ActivitiesView: View {
     @State private var newEntryEnd = Date()
     @State private var editingProject: TrackingProject?
     @State private var editingEntry: TimeEntry?
+    @State private var editingTitleGroup: TimeEntry?
     @State private var selectedTimeEntryIDs: Set<UUID> = []
     @State private var selectedActivity: ActivitySegment?
     @State private var editingFilter: ActivityFilterDefinition?
@@ -317,6 +318,13 @@ struct ActivitiesView: View {
                 timeEntryStore.update(updatedEntry)
                 editingEntry = nil
             }
+        }
+        .sheet(item: $editingTitleGroup) { entry in
+            TimeEntryTitleGroupSheet(
+                entry: entry,
+                occurrences: sameTitleEntries(for: entry),
+                timeEntryStore: timeEntryStore
+            )
         }
         .sheet(item: $selectedActivity) { activity in
             ActivityDetailSheet(
@@ -1387,6 +1395,17 @@ struct ActivitiesView: View {
                                 : Color.clear)
                             .help("Edit time entry")
                             .accessibilityIdentifier("time-entry.\(entry.id.uuidString)")
+                            if sameTitleEntries(for: entry).count > 1 {
+                                Button("Edit all") {
+                                    editingTitleGroup = entry
+                                }
+                                .buttonStyle(.borderless)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(MetridayTheme.accent)
+                                .help("Edit the title for all same-title entries on the selected day")
+                                .accessibilityLabel("Edit title for all occurrences of \(entry.title)")
+                                .accessibilityIdentifier("time-entry.edit-all.\(entry.id.uuidString)")
+                            }
                             Button {
                                 editingEntry = entry
                             } label: {
@@ -1406,6 +1425,20 @@ struct ActivitiesView: View {
                         .background(selectedTimeEntryIDs.contains(entry.id)
                             ? MetridayTheme.accentSoft.opacity(0.42)
                             : Color.clear)
+                        .contextMenu {
+                            Button("Edit Time Entry") {
+                                editingEntry = entry
+                            }
+                            if sameTitleEntries(for: entry).count > 1 {
+                                Button("Edit Title for All Occurrences") {
+                                    editingTitleGroup = entry
+                                }
+                            }
+                            Divider()
+                            Button("Delete Time Entry", role: .destructive) {
+                                timeEntryStore.delete(entry)
+                            }
+                        }
                         if entry.id != timeEntriesForSelectedDate.last?.id {
                             Divider().padding(.leading, 54)
                         }
@@ -1434,6 +1467,14 @@ struct ActivitiesView: View {
         guard !selected.isEmpty else { return }
         _ = timeEntryStore.updateBillingStatus(for: selected, to: status)
         selectedTimeEntryIDs.removeAll()
+    }
+
+    private func sameTitleEntries(for entry: TimeEntry) -> [TimeEntry] {
+        let normalizedTitle = entry.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedTitle.isEmpty else { return [] }
+        return timeEntriesForSelectedDate.filter {
+            $0.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedTitle
+        }
     }
 
     private var categoryCards: some View {
@@ -5735,6 +5776,55 @@ private struct TimeEntryEditorSheet: View {
         onSave(updated, replacing ? overlappingEntries : [])
         overlappingEntries = []
         showingOverlapConfirmation = false
+        dismiss()
+    }
+}
+
+private struct TimeEntryTitleGroupSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let entry: TimeEntry
+    let occurrences: [TimeEntry]
+    @ObservedObject var timeEntryStore: TimeEntryStore
+
+    @State private var title: String
+
+    init(entry: TimeEntry, occurrences: [TimeEntry], timeEntryStore: TimeEntryStore) {
+        self.entry = entry
+        self.occurrences = occurrences
+        self.timeEntryStore = timeEntryStore
+        _title = State(initialValue: entry.title)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Edit Title for All Occurrences")
+                .font(.system(size: 18, weight: .bold))
+
+            Text("Update the title for \(occurrences.count) entries named \"\(entry.title)\" on the selected day.")
+                .font(.system(size: 12))
+                .foregroundStyle(MetridayTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            TextField("Time entry title", text: $title)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(save)
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Save", action: save)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 420)
+    }
+
+    private func save() {
+        let ids = Set(occurrences.map(\.id))
+        guard timeEntryStore.renameEntries(ids, to: title) > 0 else { return }
         dismiss()
     }
 }

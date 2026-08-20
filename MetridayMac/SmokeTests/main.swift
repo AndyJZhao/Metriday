@@ -307,6 +307,42 @@ Task { @MainActor in
         reloadedTimeEntryStore.entries.allSatisfy { $0.billingStatus == .billed },
         "Bulk billing status update should persist to the local archive"
     )
+    let renamedEntryID = timeEntryStore.addEntry(
+        title: "Repeated title",
+        projectID: nil,
+        start: date.addingTimeInterval(11 * 60 * 60),
+        end: date.addingTimeInterval(11 * 60 * 60 + 15 * 60)
+    )
+    let secondRenamedEntryID = timeEntryStore.addEntry(
+        title: "repeated title",
+        projectID: nil,
+        start: date.addingTimeInterval(12 * 60 * 60),
+        end: date.addingTimeInterval(12 * 60 * 60 + 15 * 60)
+    )
+    let untouchedEntryID = timeEntryStore.addEntry(
+        title: "Keep this title",
+        projectID: nil,
+        start: date.addingTimeInterval(13 * 60 * 60),
+        end: date.addingTimeInterval(13 * 60 * 60 + 15 * 60)
+    )
+    guard let renamedEntryID, let secondRenamedEntryID, let untouchedEntryID else {
+        expect(false, "Batch title smoke data should be created")
+        return
+    }
+    expect(
+        timeEntryStore.renameEntries(Set([renamedEntryID, secondRenamedEntryID]), to: "Renamed group") == 2,
+        "Batch title update should rename every selected occurrence"
+    )
+    expect(
+        timeEntryStore.entries.first(where: { $0.id == untouchedEntryID })?.title == "Keep this title",
+        "Batch title update should leave unselected entries unchanged"
+    )
+    let reloadedRenamedStore = TimeEntryStore(rootDirectory: tempRoot.appendingPathComponent("BulkTimeEntries", isDirectory: true))
+    expect(
+        reloadedRenamedStore.entries.filter { $0.id == renamedEntryID || $0.id == secondRenamedEntryID }
+            .allSatisfy { $0.title == "Renamed group" },
+        "Batch title update should persist to the local archive"
+    )
     let undoCreatedEntry = timeEntryStore.entries[0]
     let undoReplacedEntry = TimeEntry(
         id: UUID(),
