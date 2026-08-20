@@ -612,6 +612,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .report-table-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
 .report-table-row small { color: var(--muted); }
 .status-pill { display: inline-flex; align-items: center; gap: 7px; }
+.status-pill:disabled { cursor: not-allowed; opacity: .55; }
 .status-pill.active { border-color: #cbe7d2; background: #f2faf4; color: #287a3d; }
 .web-activity-timeline { max-width: 1120px; margin: 0 auto 20px; padding: 22px 26px 28px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
 .web-activity-timeline-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }

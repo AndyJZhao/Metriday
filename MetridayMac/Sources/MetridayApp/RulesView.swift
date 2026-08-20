@@ -33,6 +33,8 @@ struct RulesView: View {
                             set: { appState.focusIsActive = $0 }
                         ))
                         .toggleStyle(.switch)
+                        .disabled(appState.currentTask == nil)
+                        .help(appState.currentTask == nil ? "Schedule a current block to start Focus" : "Toggle Research Focus for the current block")
                     }
                     .padding(18)
                     .frame(maxWidth: .infinity)
