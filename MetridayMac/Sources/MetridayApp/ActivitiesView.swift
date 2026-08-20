@@ -260,6 +260,7 @@ struct ActivitiesView: View {
                             timeEntries: preferences.includeTimeEntries ? [] : timelineTimeEntries,
                             suggestions: timelineSuggestions,
                             selectedDate: selectedDate,
+                            deviceName: appState.syncStore.deviceName,
                             wrapAtMinute: appState.preferences.wrapDaysAtMinute,
                             project: { projectStore.project($0) },
                             orientation: timelineOrientation,
@@ -5466,6 +5467,7 @@ private struct ActivityTimelinePanel: View {
     let timeEntries: [TimeEntry]
     let suggestions: [ActivityTimelineSuggestion]
     let selectedDate: Date
+    let deviceName: String
     let wrapAtMinute: Int
     let project: (UUID?) -> TrackingProject?
     let orientation: ActivityTimelineOrientation
@@ -5874,7 +5876,7 @@ private struct ActivityTimelinePanel: View {
             let labelWidth: CGFloat = 64
             let chartWidth = max(1, proxy.size.width - labelWidth - 16)
             VStack(alignment: .leading, spacing: 5) {
-                verticalLane(label: "MACOS", chartWidth: chartWidth) {
+                verticalLane(label: deviceName.uppercased(), chartWidth: chartWidth) {
                     ForEach(Array(timelineGaps.enumerated()), id: \.offset) { _, gap in
                         Button {
                             onCreateTimeEntry(gap.start, gap.end)
