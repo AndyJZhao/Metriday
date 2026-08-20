@@ -877,7 +877,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-category-card-heading strong { font-size: 13px; }
 .activity-category-card-heading small { color: var(--muted); font-size: 10px; font-weight: 650; }
 .activity-category-card-rows { display: grid; gap: 1px; max-height: 184px; overflow-y: auto; padding-right: 2px; }
-.activity-category-card-row { display: grid; grid-template-columns: 7px 22px 22px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 30px; padding: 3px 4px; border-radius: 5px; color: #343841; cursor: pointer; }
+.activity-category-card-row { display: grid; grid-template-columns: 22px 7px 22px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 30px; padding: 3px 4px; border-radius: 5px; color: #343841; cursor: pointer; }
 .activity-category-card-row:hover, .activity-category-card-row:focus-visible { background: #fff; outline: none; }
 .activity-category-card-row.selected { background: var(--accent-soft); outline: none; }
 .activity-category-card-row strong { overflow: hidden; font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }

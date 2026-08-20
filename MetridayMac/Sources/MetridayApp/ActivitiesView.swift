@@ -2185,14 +2185,14 @@ struct ActivitiesView: View {
                             let firstActivity = row.segments.first
                             let firstSymbol = firstActivity.map { self.icon(for: $0) }
                             HStack(spacing: 7) {
-                                Circle()
-                                    .fill(categoryColor(for: row.category))
-                                    .frame(width: 6, height: 6)
                                 AppIdentityIcon(
                                     symbol: firstSymbol,
                                     bundleIdentifier: firstActivity?.bundleIdentifier,
                                     size: 22
                                 )
+                                Circle()
+                                    .fill(categoryColor(for: row.category))
+                                    .frame(width: 6, height: 6)
                                 Text(row.name)
                                     .font(.system(size: 11))
                                     .lineLimit(1)
