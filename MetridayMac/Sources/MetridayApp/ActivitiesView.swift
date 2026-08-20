@@ -355,7 +355,8 @@ struct ActivitiesView: View {
                 projects: projectStore.activeProjects,
                 initialProjectID: selectedProjectID,
                 recentEntries: timeEntryStore.recentTimerEntries(),
-                recentCalendarEvents: calendarStore.events
+                recentCalendarEvents: calendarStore.events,
+                suggestedProjectID: { event in appState.suggestedProjectID(for: event) }
             ) { title, projectID, notes, billingStatus, estimatedDurationSeconds in
                 timeEntryStore.startTimer(
                     title: title,
@@ -3371,6 +3372,37 @@ struct ActivitiesView: View {
                 }
             }
 
+            if !calendarStore.events.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recent calendar events")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(MetridayTheme.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(calendarStore.events.prefix(5)) { event in
+                                Button {
+                                    applyCalendarSuggestion(event)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(event.title)
+                                            .lineLimit(1)
+                                        Text("\(event.start.formatted(date: .omitted, time: .shortened)) · \(event.calendarTitle)")
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(MetridayTheme.secondary)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                                    .background(MetridayTheme.canvas)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                                .help("Use calendar event as a time-entry suggestion")
+                            }
+                        }
+                    }
+                }
+            }
+
             Picker("Project", selection: $newEntryProjectID) {
                 Text("Unassigned").tag(nil as UUID?)
                 ForEach(projectStore.activeProjects) { project in
@@ -3528,6 +3560,17 @@ struct ActivitiesView: View {
         newEntryBillingStatus = projectStore.resolvedBillingStatus(for: selectedProjectID)
         newEntryEnd = reminder.completedAt
         newEntryStart = reminder.completedAt.addingTimeInterval(-30 * 60)
+    }
+
+    private func applyCalendarSuggestion(_ event: CalendarEventItem) {
+        newEntryTitle = event.title
+        newEntryNotes = [event.calendarTitle, event.location, event.notes]
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: " · ")
+        if selectedProjectID == nil {
+            newEntryProjectID = suggestedProjectID(for: event)
+        }
+        newEntryBillingStatus = projectStore.resolvedBillingStatus(for: newEntryProjectID)
     }
 
     private func prepareNewEntry(for call: PhoneCallItem) {
@@ -5225,6 +5268,7 @@ private struct TimerStartSheet: View {
     let projects: [TrackingProject]
     let recentEntries: [TimeEntry]
     let recentCalendarEvents: [CalendarEventItem]
+    let suggestedProjectID: ((CalendarEventItem) -> UUID?)?
     let onStart: (String, UUID?, String, BillingStatus, Int?) -> Void
 
     @State private var title: String
@@ -5238,11 +5282,13 @@ private struct TimerStartSheet: View {
         initialProjectID: UUID? = nil,
         recentEntries: [TimeEntry] = [],
         recentCalendarEvents: [CalendarEventItem] = [],
+        suggestedProjectID: ((CalendarEventItem) -> UUID?)? = nil,
         onStart: @escaping (String, UUID?, String, BillingStatus, Int?) -> Void
     ) {
         self.projects = projects
         self.recentEntries = recentEntries
         self.recentCalendarEvents = recentCalendarEvents
+        self.suggestedProjectID = suggestedProjectID
         self.onStart = onStart
         let resolvedProjectID = initialProjectID ?? projects.first?.id
         _projectID = State(initialValue: resolvedProjectID)
@@ -5311,9 +5357,13 @@ private struct TimerStartSheet: View {
                     ForEach(Array(recentCalendarEvents.prefix(5))) { event in
                         Button {
                             title = event.title
-                            notes = [event.calendarTitle, event.location]
+                            if let suggested = suggestedProjectID?(event) {
+                                projectID = suggested
+                            }
+                            notes = [event.calendarTitle, event.location, event.notes]
                                 .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
                                 .joined(separator: " · ")
+                            billingStatus = resolvedProjectBillingStatus(for: projectID, in: projects)
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "calendar.badge.clock")
