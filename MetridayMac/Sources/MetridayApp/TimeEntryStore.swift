@@ -313,6 +313,24 @@ final class TimeEntryStore: ObservableObject {
         statusMessage = "Time entry updated"
     }
 
+    @discardableResult
+    func updateBillingStatus(for ids: Set<UUID>, to status: BillingStatus) -> Int {
+        guard !ids.isEmpty else { return 0 }
+        var updatedCount = 0
+        for index in entries.indices where ids.contains(entries[index].id) {
+            guard entries[index].billingStatus != status else { continue }
+            entries[index].billingStatus = status
+            updatedCount += 1
+        }
+        guard updatedCount > 0 else {
+            statusMessage = "Billing status already \(status.label.lowercased())"
+            return 0
+        }
+        persist()
+        statusMessage = "Updated billing status for \(updatedCount) time entries"
+        return updatedCount
+    }
+
     func delete(_ entry: TimeEntry) {
         entries.removeAll { $0.id == entry.id }
         persist()

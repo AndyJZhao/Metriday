@@ -487,6 +487,16 @@ function useMetridayAPI(dateKey, apiBase) {
       await request(`/api/v1/time-entries/${resourceID(id)}`, { method: "PATCH", body: JSON.stringify(entry) });
       await refresh();
     },
+    batchUpdateTimeEntries: async (ids, billingStatus) => {
+      await request("/api/v1/time-entries/batch-update", {
+        method: "PATCH",
+        body: JSON.stringify({
+          time_entries: ids.map((id) => resourceID(id)),
+          data: { billing_status: billingStatus },
+        }),
+      });
+      await refresh();
+    },
     deleteTimeEntry: async (id) => {
       await request(`/api/v1/time-entries/${resourceID(id)}`, { method: "DELETE" });
       await refresh();
@@ -2183,12 +2193,40 @@ function TimeEntryEditRow({ entry, api, dateKey, projects, onCancel, dialog = fa
 function TimeEntriesPanel({ api, dateKey, onNewEntry = () => window.dispatchEvent(new CustomEvent("metriday:open-new-time-entry")) }) {
   const [message, setMessage] = useState("");
   const [editingEntryID, setEditingEntryID] = useState(null);
+  const [selectedEntryIDs, setSelectedEntryIDs] = useState(() => new Set());
   const entries = [...api.entries].sort((left, right) => new Date(left.start_date || left.start) - new Date(right.start_date || right.start));
   const projects = [...api.projects].sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
-  return <section className="time-entries-panel"><div className="activities-list-heading"><div><h2>Time entries</h2><p>Manual entries and focus sessions for {planDateLabel(dateKey)}.</p></div><div className="activities-list-heading-actions"><button type="button" className="quiet-pill" onClick={onNewEntry} disabled={!api.connected}><Plus size={16} />New time entry</button><span className="api-badge online">{entries.length} saved</span></div></div>{message ? <p className="entry-message" role="status">{message}</p> : null}{entries.length > 0 ? <div className="entry-table">{entries.map((entry) => editingEntryID === entry.id ? <TimeEntryEditRow key={entry.id} entry={entry} api={api} dateKey={dateKey} projects={projects} onCancel={() => setEditingEntryID(null)} /> : <WebTimeEntryRow key={entry.id} entry={entry} projects={projects} onEdit={() => setEditingEntryID(entry.id)} onDelete={() => api.deleteTimeEntry(entryID(entry)).catch((error) => setMessage(error.message || "Could not delete the time entry."))} />)}</div> : <div className="entries-empty"><Clock size={24} /><span>{api.connected ? "No manual entries for this date." : "Connect the native app to edit time entries."}</span></div>}</section>;
+  const selectableEntries = entries.filter((entry) => !entry.is_running);
+  const selectedEntries = selectableEntries.filter((entry) => selectedEntryIDs.has(entryID(entry)));
+  const allSelectableEntriesSelected = selectableEntries.length > 0 && selectedEntries.length === selectableEntries.length;
+  useEffect(() => {
+    setSelectedEntryIDs(new Set());
+  }, [dateKey]);
+  const toggleSelected = (entry) => {
+    const id = entryID(entry);
+    setSelectedEntryIDs((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleAll = () => {
+    setSelectedEntryIDs(allSelectableEntriesSelected ? new Set() : new Set(selectableEntries.map(entryID)));
+  };
+  const applyBillingStatus = async (billingStatus) => {
+    if (selectedEntries.length === 0) return;
+    try {
+      await api.batchUpdateTimeEntries(selectedEntries.map(entryID), billingStatus);
+      setMessage(`Updated billing status for ${selectedEntries.length} time ${selectedEntries.length === 1 ? "entry" : "entries"}.`);
+      setSelectedEntryIDs(new Set());
+    } catch (error) {
+      setMessage(error.message || "Could not update billing status.");
+    }
+  };
+  return <section className="time-entries-panel"><div className="activities-list-heading"><div><h2>Time entries</h2><p>{selectedEntries.length > 0 ? `${selectedEntries.length} selected · choose a billing status to update them together.` : `Manual entries and focus sessions for ${planDateLabel(dateKey)}.`}</p></div><div className="activities-list-heading-actions">{selectableEntries.length > 0 ? <><button type="button" className="quiet-pill" onClick={toggleAll}>{allSelectableEntriesSelected ? "Clear selection" : "Select all"}</button>{selectedEntries.length > 0 ? <select className="entry-bulk-status" value="" onChange={(event) => { if (event.target.value) applyBillingStatus(event.target.value); }} aria-label="Set billing status for selected time entries"><option value="">Set billing status…</option><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select> : null}</> : null}<button type="button" className="quiet-pill" onClick={onNewEntry} disabled={!api.connected}><Plus size={16} />New time entry</button><span className="api-badge online">{entries.length} saved</span></div></div>{message ? <p className="entry-message" role="status">{message}</p> : null}{entries.length > 0 ? <div className="entry-table">{entries.map((entry) => editingEntryID === entry.id ? <TimeEntryEditRow key={entry.id} entry={entry} api={api} dateKey={dateKey} projects={projects} onCancel={() => setEditingEntryID(null)} /> : <WebTimeEntryRow key={entry.id} entry={entry} projects={projects} selected={selectedEntryIDs.has(entryID(entry))} onToggleSelect={() => toggleSelected(entry)} onEdit={() => setEditingEntryID(entry.id)} onDelete={() => api.deleteTimeEntry(entryID(entry)).catch((error) => setMessage(error.message || "Could not delete the time entry."))} />)}</div> : <div className="entries-empty"><Clock size={24} /><span>{api.connected ? "No manual entries for this date." : "Connect the native app to edit time entries."}</span></div>}</section>;
 }
 
-function WebTimeEntryRow({ entry, projects, onEdit, onDelete }) {
+function WebTimeEntryRow({ entry, projects, selected = false, onToggleSelect = () => {}, onEdit, onDelete }) {
   const title = entry.title || "Untitled";
   const interactive = !entry.is_running;
   const open = () => { if (interactive) onEdit(); };
@@ -2197,7 +2235,7 @@ function WebTimeEntryRow({ entry, projects, onEdit, onDelete }) {
     event.preventDefault();
     open();
   };
-  return <div className={`entry-table-row ${interactive ? "interactive" : ""}`} role={interactive ? "button" : undefined} tabIndex={interactive ? 0 : undefined} aria-label={interactive ? `Edit time entry ${title}` : undefined} onClick={open} onKeyDown={handleKeyDown}><Clock size={17} /><strong>{title}</strong><span>{projectTitleFor(projects, entry.project)}</span><span>{entryRange(entry)}</span><small>{billingLabel(entry.billing_status)} · {formatDurationSeconds(entry.duration)}</small>{entry.is_running ? <span className="entry-running">Running</span> : <span className="project-actions"><IconButton label={`Edit ${title}`} onClick={(event) => { event.stopPropagation(); onEdit(); }}><NotePencil size={15} /></IconButton><IconButton label={`Delete ${title}`} onClick={(event) => { event.stopPropagation(); onDelete(); }}><Trash size={15} /></IconButton></span>}</div>;
+  return <div className={`entry-table-row ${interactive ? "interactive" : ""} ${selected ? "selected" : ""}`} role={interactive ? "button" : undefined} tabIndex={interactive ? 0 : undefined} aria-label={interactive ? `Edit time entry ${title}` : undefined} onClick={open} onKeyDown={handleKeyDown}>{interactive ? <button type="button" className="entry-select" aria-label={selected ? `Deselect ${title}` : `Select ${title}`} aria-pressed={selected} onClick={(event) => { event.stopPropagation(); onToggleSelect(); }}><CheckCircle weight={selected ? "fill" : "regular"} /></button> : <span className="entry-select-placeholder" aria-hidden="true" />}<Clock size={17} /><strong>{title}</strong><span>{projectTitleFor(projects, entry.project)}</span><span>{entryRange(entry)}</span><small>{billingLabel(entry.billing_status)} · {formatDurationSeconds(entry.duration)}</small>{entry.is_running ? <span className="entry-running">Running</span> : <span className="project-actions"><IconButton label={`Edit ${title}`} onClick={(event) => { event.stopPropagation(); onEdit(); }}><NotePencil size={15} /></IconButton><IconButton label={`Delete ${title}`} onClick={(event) => { event.stopPropagation(); onDelete(); }}><Trash size={15} /></IconButton></span>}</div>;
 }
 
 function ReviewPage({ api, dateKey, setDateKey, setPage }) {

@@ -122,6 +122,7 @@ struct ActivitiesView: View {
     @State private var newEntryEnd = Date()
     @State private var editingProject: TrackingProject?
     @State private var editingEntry: TimeEntry?
+    @State private var selectedTimeEntryIDs: Set<UUID> = []
     @State private var selectedActivity: ActivitySegment?
     @State private var editingFilter: ActivityFilterDefinition?
     @State private var showingFilterEditor = false
@@ -351,6 +352,9 @@ struct ActivitiesView: View {
         .onChange(of: timelineOrientation) { _, orientation in
             guard displayPreferencesRestored else { return }
             preferences.timelineOrientation = orientation
+        }
+        .onChange(of: selectedDate) { _, _ in
+            selectedTimeEntryIDs.removeAll()
         }
     }
 
@@ -1216,11 +1220,43 @@ struct ActivitiesView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Time Entries")
                         .font(.system(size: 16, weight: .bold))
-                    Text("\(timeEntriesForSelectedDate.count) manual or timer entries")
+                    Text(selectedTimeEntryIDs.isEmpty
+                        ? "\(timeEntriesForSelectedDate.count) manual or timer entries"
+                        : "\(selectedTimeEntryIDs.count) selected")
                         .font(.system(size: 11))
                         .foregroundStyle(MetridayTheme.secondary)
                 }
                 Spacer()
+                if !timeEntriesForSelectedDate.isEmpty {
+                    if selectedTimeEntryIDs.isEmpty {
+                        Button("Select all") {
+                            selectedTimeEntryIDs = Set(timeEntriesForSelectedDate.map(\.id))
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.system(size: 11, weight: .medium))
+                        .help("Select all time entries")
+                    } else {
+                        Menu {
+                            ForEach(BillingStatus.allCases) { status in
+                                Button {
+                                    applyBulkBillingStatus(status)
+                                } label: {
+                                    Label(status.label, systemImage: status == .billable ? "checkmark.seal" : "tag")
+                                }
+                            }
+                        } label: {
+                            Label("Set billing status", systemImage: "tag")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .help("Set billing status for selected time entries")
+                        Button("Clear") {
+                            selectedTimeEntryIDs.removeAll()
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.system(size: 11, weight: .medium))
+                        .help("Clear time entry selection")
+                    }
+                }
                 if let runningTimer = timeEntryStore.runningTimer {
                     RunningTimerStatus(
                         store: timeEntryStore,
@@ -1241,6 +1277,23 @@ struct ActivitiesView: View {
                 VStack(spacing: 0) {
                     ForEach(timeEntriesForSelectedDate) { entry in
                         HStack(spacing: 12) {
+                            Button {
+                                toggleTimeEntrySelection(entry.id)
+                            } label: {
+                                Image(systemName: selectedTimeEntryIDs.contains(entry.id)
+                                    ? "checkmark.circle.fill"
+                                    : "circle")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(selectedTimeEntryIDs.contains(entry.id)
+                                        ? MetridayTheme.accent
+                                        : MetridayTheme.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Select time entry")
+                            .accessibilityLabel(selectedTimeEntryIDs.contains(entry.id)
+                                ? "Deselect time entry"
+                                : "Select time entry")
+                            .accessibilityValue(entry.title)
                             Button {
                                 editingEntry = entry
                             } label: {
@@ -1270,6 +1323,9 @@ struct ActivitiesView: View {
                             .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
+                            .background(selectedTimeEntryIDs.contains(entry.id)
+                                ? MetridayTheme.accentSoft
+                                : Color.clear)
                             .help("Edit time entry")
                             .accessibilityIdentifier("time-entry.\(entry.id.uuidString)")
                             Button {
@@ -1288,6 +1344,9 @@ struct ActivitiesView: View {
                         }
                         .padding(.horizontal, 18)
                         .padding(.vertical, 11)
+                        .background(selectedTimeEntryIDs.contains(entry.id)
+                            ? MetridayTheme.accentSoft.opacity(0.42)
+                            : Color.clear)
                         if entry.id != timeEntriesForSelectedDate.last?.id {
                             Divider().padding(.leading, 54)
                         }
@@ -1301,6 +1360,21 @@ struct ActivitiesView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(MetridayTheme.line, lineWidth: 1)
         )
+    }
+
+    private func toggleTimeEntrySelection(_ id: UUID) {
+        if selectedTimeEntryIDs.contains(id) {
+            selectedTimeEntryIDs.remove(id)
+        } else {
+            selectedTimeEntryIDs.insert(id)
+        }
+    }
+
+    private func applyBulkBillingStatus(_ status: BillingStatus) {
+        let selected = selectedTimeEntryIDs
+        guard !selected.isEmpty else { return }
+        _ = timeEntryStore.updateBillingStatus(for: selected, to: status)
+        selectedTimeEntryIDs.removeAll()
     }
 
     private var categoryCards: some View {

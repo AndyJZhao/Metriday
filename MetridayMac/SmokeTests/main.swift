@@ -221,6 +221,35 @@ try? FileManager.default.removeItem(at: activityRoot)
 
 Task { @MainActor in
     let tempRoot = FileManager.default.temporaryDirectory.appendingPathComponent("MetridaySmoke-\(UUID().uuidString)")
+    let timeEntryStore = TimeEntryStore(rootDirectory: tempRoot.appendingPathComponent("BulkTimeEntries", isDirectory: true))
+    let firstBulkEntryID = timeEntryStore.addEntry(
+        title: "Bulk status one",
+        projectID: nil,
+        start: date.addingTimeInterval(8 * 60 * 60),
+        end: date.addingTimeInterval(8 * 60 * 60 + 30 * 60)
+    )
+    let secondBulkEntryID = timeEntryStore.addEntry(
+        title: "Bulk status two",
+        projectID: nil,
+        start: date.addingTimeInterval(9 * 60 * 60),
+        end: date.addingTimeInterval(9 * 60 * 60 + 45 * 60)
+    )
+    guard let firstBulkEntryID, let secondBulkEntryID else {
+        expect(false, "Time entry smoke data should be created")
+        return
+    }
+    expect(
+        timeEntryStore.updateBillingStatus(
+            for: Set([firstBulkEntryID, secondBulkEntryID]),
+            to: .billed
+        ) == 2,
+        "Bulk billing status update should change every selected time entry"
+    )
+    let reloadedTimeEntryStore = TimeEntryStore(rootDirectory: tempRoot.appendingPathComponent("BulkTimeEntries", isDirectory: true))
+    expect(
+        reloadedTimeEntryStore.entries.allSatisfy { $0.billingStatus == .billed },
+        "Bulk billing status update should persist to the local archive"
+    )
     let categoryFilterStore = ActivityFilterStore(rootDirectory: tempRoot.appendingPathComponent("CategoryFilters", isDirectory: true))
     let categoryStore = ActivityCategoryStore(rootDirectory: tempRoot.appendingPathComponent("Categories", isDirectory: true))
     _ = categoryStore.createCategory(
