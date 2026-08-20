@@ -997,6 +997,11 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .time-entry-recent button b, .time-entry-recent button small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .time-entry-recent button b { color: inherit; font-size: 11px; }
 .time-entry-recent button small { color: var(--muted); font-size: 10px; }
+.time-entry-suggestions { display: grid; gap: 6px; }
+.time-entry-suggestions > strong { color: var(--muted); font-size: 11px; }
+.time-entry-suggestions > div { display: flex; gap: 6px; flex-wrap: wrap; }
+.time-entry-suggestions button { min-height: 26px; padding: 5px 8px; border: 0; border-radius: 6px; background: var(--canvas); color: var(--graphite); cursor: pointer; font-size: 10px; text-align: left; }
+.time-entry-suggestions button:hover { background: var(--accent-soft); color: var(--accent); }
 .entry-omatic-preview { display: grid; gap: 8px; margin-top: 18px; padding: 13px; border: 1px solid #dfe2ff; border-radius: 9px; background: var(--accent-soft); color: #4f567d; }
 .entry-omatic-preview > div { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
 .entry-omatic-preview strong { display: inline-flex; align-items: center; gap: 6px; color: #343b76; font-size: 12px; }
