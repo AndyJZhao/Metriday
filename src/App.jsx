@@ -3886,6 +3886,7 @@ function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onS
     onSelect?.(activity);
   };
   const createTimeEntry = (event, activity) => {
+    if (event.target.closest(".activity-row-action")) return;
     event.preventDefault();
     event.stopPropagation();
     onCreateTimeEntry?.(activity);
