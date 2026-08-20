@@ -199,6 +199,23 @@ struct ReportsView: View {
         return "\(formatter.string(from: first))–\(formatter.string(from: last))"
     }
 
+    private var reportStart: Date {
+        Calendar.current.startOfDay(for: weekDates.first ?? selectedDate)
+    }
+
+    private var reportEnd: Date {
+        let calendar = Calendar.current
+        let lastDay = calendar.startOfDay(for: weekDates.last ?? selectedDate)
+        return calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay
+    }
+
+    private func secondsInReportRange(for entry: TimeEntry) -> Int {
+        let start = max(entry.start, reportStart)
+        let end = min(entry.end, reportEnd)
+        guard end > start else { return 0 }
+        return max(1, Int(end.timeIntervalSince(start).rounded()))
+    }
+
     private var activityDays: [[ActivitySegment]] {
         weekDates.map { date in
             categoryStore.applyingCategories(
@@ -221,13 +238,8 @@ struct ReportsView: View {
     }
 
     private var entrySeconds: Int {
-        guard let first = weekDates.first, let last = weekDates.last else { return 0 }
-        let calendar = Calendar.current
-        let start = calendar.startOfDay(for: first)
-        let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: last)) ?? start
         return timeEntryStore.materializedEntries()
-            .filter { $0.start < end && $0.end > start }
-            .reduce(0) { $0 + $1.durationSeconds }
+            .reduce(0) { $0 + secondsInReportRange(for: $1) }
     }
 
     private var projectTotals: [ReportProjectTotal] {
@@ -236,7 +248,10 @@ struct ReportsView: View {
             totals[segment.projectID, default: 0] += segment.durationSeconds
         }
         for entry in timeEntryStore.materializedEntries() {
-            totals[entry.projectID, default: 0] += entry.durationSeconds
+            let seconds = secondsInReportRange(for: entry)
+            if seconds > 0 {
+                totals[entry.projectID, default: 0] += seconds
+            }
         }
         return totals
             .filter { $0.value > 0 }

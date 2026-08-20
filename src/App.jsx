@@ -2874,7 +2874,8 @@ function WebReportPanel({ api, dateKey }) {
       const date = new Date(`${dateKey}T12:00:00`);
       date.setDate(1);
       setRangeStart(localDateKey(date));
-      setRangeEnd(dateKey);
+      date.setMonth(date.getMonth() + 1, 0);
+      setRangeEnd(localDateKey(date));
     } else if (preset === "week") {
       const weekStart = weekStartDateKey(dateKey);
       setRangeStart(weekStart);
