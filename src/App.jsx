@@ -3205,7 +3205,7 @@ function collapseShortActivities(activities, thresholdSeconds) {
   return [...longActivities, ...summaries].sort((left, right) => String(left.date || "").localeCompare(String(right.date || "")) || Number(left.startSecond || 0) - Number(right.startSecond || 0));
 }
 
-function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode = "none", projects = [], displayPreferences = null, dateKey = "", api = null, onCreateTimeEntry }) {
+function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode = "none", unifiedGroupMode = "project", projects = [], displayPreferences = null, dateKey = "", api = null, onCreateTimeEntry }) {
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
   const [contextMenu, setContextMenu] = useState(null);
   const rowClickTimer = useRef(null);
@@ -3214,6 +3214,11 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     ? activities
     : collapseShortActivities(activities, displayPreferences?.collapse_activities_shorter_than_seconds);
   const rows = [...displayActivities].sort((left, right) => String(left.date || dateKey).localeCompare(String(right.date || dateKey)) || Number(left.startSecond || 0) - Number(right.startSecond || 0));
+  const resolvedUnifiedGroupMode = displayPreferences?.group_by_device
+    ? "device"
+    : displayPreferences?.group_by_project === false
+    ? "none"
+    : unifiedGroupMode;
   const activityRow = (activity) => {
     if (activity.is_collapsed_summary) {
       const count = Array.isArray(activity.collapsed_activity_ids) ? activity.collapsed_activity_ids.length : 0;
@@ -3357,16 +3362,28 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     </section>;
   };
   if (grouping === "application") {
-    const projectGroups = groupedFor(rows, "project", "project:");
+    const unifiedGroups = resolvedUnifiedGroupMode === "project"
+      ? groupedFor(rows, "project", "project:")
+      : resolvedUnifiedGroupMode === "device"
+      ? groupedFor(rows, "device", "device:")
+      : [{
+        key: "all:activities",
+        label: "All Activities",
+        category: activityCategory(rows[0] || {}),
+        categories: new Map(),
+        activities: rows,
+        seconds: rows.reduce((total, activity) => total + activityDurationSeconds(activity), 0),
+      }];
+    const showUnifiedHeader = resolvedUnifiedGroupMode !== "none";
     return <div className="activity-table activity-table-unified">
-      {projectGroups.map((projectGroup) => {
+      {unifiedGroups.map((projectGroup) => {
         const projectCollapsed = collapsedGroups.has(projectGroup.key);
         const appGroups = groupedFor(projectGroup.activities, "application", `${projectGroup.key}::application:`);
         return <section className="activity-group activity-group-project" key={projectGroup.key}>
-          <button type="button" className="activity-group-heading activity-group-project-heading" onClick={() => toggleGroup(projectGroup.key)} aria-expanded={!projectCollapsed}>
-            <span className="activity-group-title"><FolderSimple size={16} /><strong>{projectGroup.label}</strong></span>
+          {showUnifiedHeader ? <button type="button" className="activity-group-heading activity-group-project-heading" onClick={() => toggleGroup(projectGroup.key)} aria-expanded={!projectCollapsed}>
+            <span className="activity-group-title">{resolvedUnifiedGroupMode === "device" ? <Laptop size={16} /> : <FolderSimple size={16} />}<strong>{projectGroup.label}</strong></span>
             {renderGroupMeta(projectGroup, projectCollapsed)}
-          </button>
+          </button> : null}
           {!projectCollapsed ? <div className="activity-group-nested">
             {appGroups.map((appGroup) => {
               const appCollapsed = collapsedGroups.has(appGroup.key);
@@ -4075,6 +4092,15 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     else if (preferences.activity_display_mode === "chronological") setActivityView("chronological");
     else setActivityView("unified");
   }, [api.activityPreferences]);
+  useEffect(() => {
+    // The compact toolbar JSX predates Unified grouping controls and still
+    // emits the old disabled attribute. Keep the rendered controls aligned
+    // with the native/API state until that toolbar is split into components.
+    const toggles = document.querySelectorAll(".activities-page-toolbar .activity-display-toggle input");
+    const disabled = activityView === "category";
+    toggles[1]?.toggleAttribute("disabled", disabled);
+    toggles[2]?.toggleAttribute("disabled", disabled);
+  });
   const activityTimeRange = api.activityPreferences?.activity_time_range || "selectedDay";
   const activityBounds = activityRangeBounds(dateKey, activityTimeRange);
   const [activityRangeData, setActivityRangeData] = useState(null);

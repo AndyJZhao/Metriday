@@ -162,6 +162,20 @@ struct ActivitiesView: View {
         }
     }
 
+    private enum UnifiedGroupHeaderKind {
+        case project
+        case device
+        case none
+
+        var key: String {
+            switch self {
+            case .project: return "project"
+            case .device: return "device"
+            case .none: return "all"
+            }
+        }
+    }
+
     @EnvironmentObject private var appState: AppState
     @ObservedObject var monitor: AppActivityMonitor
     @ObservedObject var projectStore: ProjectStore
@@ -1304,13 +1318,13 @@ struct ActivitiesView: View {
                         .toggleStyle(.checkbox)
                         .controlSize(.small)
                         .font(.system(size: 10))
-                        .disabled(activityMode != .chronological)
+                        .disabled(activityMode == .byCategory)
 
                     Toggle("Group by device", isOn: groupByDeviceBinding)
                         .toggleStyle(.checkbox)
                         .controlSize(.small)
                         .font(.system(size: 10))
-                        .disabled(activityMode != .chronological)
+                        .disabled(activityMode == .byCategory)
 
                     Picker("Activity view", selection: $activityMode) {
                         ForEach(ActivityDisplayMode.allCases) { mode in
@@ -1790,104 +1804,144 @@ struct ActivitiesView: View {
     }
 
     private var unifiedActivityList: some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
-            ForEach(activityGroups) { projectGroup in
-                let projectCollapsed = collapsedProjectGroups.contains(projectGroup.id)
+        let groups: [ActivityGroup]
+        let headerKind: UnifiedGroupHeaderKind
+        if groupActivitiesByDevice {
+            groups = deviceActivityGroups
+            headerKind = .device
+        } else if groupActivitiesByProject {
+            groups = activityGroups
+            headerKind = .project
+        } else {
+            groups = [ActivityGroup(
+                name: "All Activities",
+                segments: activityListSegments,
+                seconds: activityListSegments.reduce(0) { $0 + $1.durationSeconds }
+            )]
+            headerKind = .none
+        }
+
+        return LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                unifiedActivityGroup(group, headerKind: headerKind)
+                if index < groups.count - 1 {
+                    Divider()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func unifiedActivityGroup(
+        _ group: ActivityGroup,
+        headerKind: UnifiedGroupHeaderKind
+    ) -> some View {
+        let isCollapsed: Bool = {
+            switch headerKind {
+            case .project: return collapsedProjectGroups.contains(group.id)
+            case .device: return collapsedDeviceGroups.contains(group.id)
+            case .none: return false
+            }
+        }()
+        if headerKind != .none {
+            Button {
+                switch headerKind {
+                case .project:
+                    if isCollapsed { collapsedProjectGroups.remove(group.id) }
+                    else { collapsedProjectGroups.insert(group.id) }
+                case .device:
+                    if isCollapsed { collapsedDeviceGroups.remove(group.id) }
+                    else { collapsedDeviceGroups.insert(group.id) }
+                case .none:
+                    break
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .frame(width: 10)
+                    Label(
+                        group.name,
+                        systemImage: headerKind == .device
+                            ? "laptopcomputer.and.iphone"
+                            : group.name == "Unassigned" ? "tray" : "folder"
+                    )
+                    .font(.system(size: 12, weight: .bold))
+                    Spacer()
+                    Text(formatMinutes(group.seconds))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(MetridayTheme.canvas)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("\(headerKind == .device ? "Device" : "Project") \(group.name) \(isCollapsed ? "Expand" : "Collapse")"))
+            .accessibilityIdentifier("activities.unified.\(headerKind.key).\(group.id)")
+        }
+
+        if !isCollapsed {
+            ForEach(unifiedAppGroups(for: group)) { appGroup in
+                let groupKey = "\(headerKind.key)::\(group.id)::\(appGroup.id)"
+                let appCollapsed = collapsedUnifiedAppGroups.contains(groupKey)
                 Button {
-                    if projectCollapsed {
-                        collapsedProjectGroups.remove(projectGroup.id)
-                    } else {
-                        collapsedProjectGroups.insert(projectGroup.id)
-                    }
+                    if appCollapsed { collapsedUnifiedAppGroups.remove(groupKey) }
+                    else { collapsedUnifiedAppGroups.insert(groupKey) }
                 } label: {
+                    let appCategories = categories(for: appGroup.segments)
                     HStack(spacing: 8) {
-                        Image(systemName: projectCollapsed ? "chevron.right" : "chevron.down")
-                            .font(.system(size: 9, weight: .bold))
+                        Image(systemName: appCollapsed ? "chevron.right" : "chevron.down")
+                            .font(.system(size: 8, weight: .bold))
                             .frame(width: 10)
-                        Label(projectGroup.name, systemImage: projectGroup.name == "Unassigned" ? "tray" : "folder")
-                            .font(.system(size: 12, weight: .bold))
+                        AppIdentityIcon(
+                            symbol: icon(for: appGroup.segments[0]),
+                            bundleIdentifier: appGroup.segments[0].bundleIdentifier
+                        )
+                        Text(appGroup.name)
+                            .font(.system(size: 11, weight: .semibold))
+                            .lineLimit(1)
+                        HStack(spacing: 4) {
+                            ForEach(appCategories) { definition in
+                                Circle()
+                                    .fill(categoryColor(for: definition))
+                                    .frame(width: 6, height: 6)
+                            }
+                            Text(appCategories.count == 1 ? appCategories[0].name : "Multiple categories")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(
+                                    appCategories.count == 1
+                                        ? categoryColor(for: appCategories[0])
+                                        : MetridayTheme.secondary
+                                )
+                                .lineLimit(1)
+                        }
                         Spacer()
-                        Text(formatMinutes(projectGroup.seconds))
+                        Text(formatMinutes(appGroup.seconds))
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(MetridayTheme.secondary)
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
+                    .padding(.leading, headerKind == .none ? 18 : 42)
+                    .padding(.trailing, 18)
+                    .padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .background(MetridayTheme.canvas)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text("Project \(projectGroup.name) \(projectCollapsed ? "Expand" : "Collapse")"))
-                .accessibilityIdentifier("activities.unified.project.\(projectGroup.id)")
+                .accessibilityLabel(Text("Application \(appGroup.name) \(appCollapsed ? "Expand" : "Collapse")"))
+                .accessibilityIdentifier("activities.unified.application.\(groupKey)")
 
-                if !projectCollapsed {
-                    ForEach(unifiedAppGroups(for: projectGroup)) { appGroup in
-                        let groupKey = "\(projectGroup.id)::\(appGroup.id)"
-                        let appCollapsed = collapsedUnifiedAppGroups.contains(groupKey)
-                        Button {
-                            if appCollapsed {
-                                collapsedUnifiedAppGroups.remove(groupKey)
-                            } else {
-                                collapsedUnifiedAppGroups.insert(groupKey)
-                            }
-                        } label: {
-                            let appCategories = categories(for: appGroup.segments)
-                            HStack(spacing: 8) {
-                                Image(systemName: appCollapsed ? "chevron.right" : "chevron.down")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .frame(width: 10)
-                                AppIdentityIcon(
-                                    symbol: icon(for: appGroup.segments[0]),
-                                    bundleIdentifier: appGroup.segments[0].bundleIdentifier
-                                )
-                                Text(appGroup.name)
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .lineLimit(1)
-                                HStack(spacing: 4) {
-                                    ForEach(appCategories) { definition in
-                                        Circle()
-                                            .fill(categoryColor(for: definition))
-                                            .frame(width: 6, height: 6)
-                                    }
-                                    Text(appCategories.count == 1 ? appCategories[0].name : "Multiple categories")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(
-                                            appCategories.count == 1
-                                                ? categoryColor(for: appCategories[0])
-                                                : MetridayTheme.secondary
-                                        )
-                                        .lineLimit(1)
-                                }
-                                Spacer()
-                                Text(formatMinutes(appGroup.seconds))
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(MetridayTheme.secondary)
-                            }
-                            .padding(.leading, 42)
-                            .padding(.trailing, 18)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(Text("Application \(appGroup.name) \(appCollapsed ? "Expand" : "Collapse")"))
-                        .accessibilityIdentifier("activities.unified.application.\(groupKey)")
-
-                        if !appCollapsed {
-                            ForEach(appGroup.segments) { segment in
-                                activityRow(segment)
-                                if segment.id != appGroup.segments.last?.id {
-                                    Divider().padding(.leading, 88)
-                                }
-                            }
+                if !appCollapsed {
+                    ForEach(appGroup.segments) { segment in
+                        activityRow(segment)
+                        if segment.id != appGroup.segments.last?.id {
+                            Divider().padding(.leading, headerKind == .none ? 64 : 88)
                         }
                     }
-                }
-                if projectGroup.id != activityGroups.last?.id {
-                    Divider()
                 }
             }
         }
@@ -1931,8 +1985,8 @@ struct ActivitiesView: View {
         ]
     }
 
-    private var groupedActivityListByDevice: some View {
-        let groups = Dictionary(grouping: activityListSegments) { $0.deviceName }
+    private var deviceActivityGroups: [ActivityGroup] {
+        Dictionary(grouping: activityListSegments) { $0.deviceName }
             .map { name, segments in
                 ActivityGroup(
                     name: name,
@@ -1944,6 +1998,10 @@ struct ActivitiesView: View {
                 if first.seconds == second.seconds { return first.name < second.name }
                 return first.seconds > second.seconds
             }
+    }
+
+    private var groupedActivityListByDevice: some View {
+        let groups = deviceActivityGroups
 
         return LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(groups) { group in
