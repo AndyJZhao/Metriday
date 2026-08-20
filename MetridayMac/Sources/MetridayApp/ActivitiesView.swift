@@ -266,6 +266,7 @@ struct ActivitiesView: View {
                             orientation: timelineOrientation,
                             timelineWindow: activityTimelineWindow,
                             activityColor: { categoryColor(for: category(for: $0)) },
+                            categoryName: { category(for: $0).name },
                             selectedActivityIDs: $selectedActivityIDs,
                             onToggleOrientation: {
                                 timelineOrientation = timelineOrientation == .horizontal ? .vertical : .horizontal
@@ -5416,13 +5417,15 @@ private struct RunningTimerStatus: View {
 private struct TimelineHoverDetail {
     let id: String
     let sourceLabel: String
-    let sourceColor: Color
+    let sourceColor: Color?
     let title: String
     let timeRange: String
     let duration: String
     let projectName: String
     let projectColor: Color
     let projectQualifier: String?
+    let categoryLabel: String?
+    let categoryColor: Color?
 }
 
 private struct TimelineHoverBanner: View {
@@ -5441,6 +5444,14 @@ private struct TimelineHoverBanner: View {
                 value: detail.title,
                 suffix: detail.duration
             )
+            if let categoryLabel = detail.categoryLabel {
+                detailRow(
+                    label: "Category",
+                    color: detail.categoryColor,
+                    value: categoryLabel,
+                    suffix: ""
+                )
+            }
             detailRow(
                 label: "Project",
                 color: detail.projectColor,
@@ -5465,7 +5476,7 @@ private struct TimelineHoverBanner: View {
 
     private func detailRow(
         label: String,
-        color: Color,
+        color: Color?,
         value: String,
         suffix: String
     ) -> some View {
@@ -5474,9 +5485,11 @@ private struct TimelineHoverBanner: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(MetridayTheme.secondary)
                 .frame(width: 55, alignment: .trailing)
-            Circle()
-                .fill(color)
-                .frame(width: 9, height: 9)
+            if let color {
+                Circle()
+                    .fill(color)
+                    .frame(width: 9, height: 9)
+            }
             Text(value)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(MetridayTheme.graphite)
@@ -5494,7 +5507,6 @@ private struct TimelineHoverBanner: View {
 private struct TimelineLegend: View {
     var body: some View {
         HStack(spacing: 10) {
-            item("App usage", color: MetridayTheme.warning)
             item("Focused", color: ActivityCategoryKind.focused.color)
             item("Distracting", color: ActivityCategoryKind.distracting.color)
             item("Other / idle", color: ActivityCategoryKind.other.color)
@@ -5538,6 +5550,7 @@ private struct ActivityTimelinePanel: View {
     let orientation: ActivityTimelineOrientation
     let timelineWindow: ActivityTimelineWindow
     let activityColor: (ActivitySegment) -> Color
+    let categoryName: (ActivitySegment) -> String
     @Binding var selectedActivityIDs: Set<UUID>
     let onToggleOrientation: () -> Void
     @Binding var selectionStart: Int?
@@ -6358,13 +6371,15 @@ private struct ActivityTimelinePanel: View {
             return TimelineHoverDetail(
                 id: "activity-\(segment.id.uuidString)",
                 sourceLabel: "App",
-                sourceColor: activityColor(segment),
+                sourceColor: nil,
                 title: segment.displayTitle,
                 timeRange: secondRange(start: segment.startSecond, end: segment.endSecond),
                 duration: durationLabel(segment.durationSeconds),
                 projectName: project?.name ?? "None",
                 projectColor: color(for: project?.color),
-                projectQualifier: project == nil ? "From the app usage" : nil
+                projectQualifier: project == nil ? "From the app usage" : nil,
+                categoryLabel: categoryName(segment),
+                categoryColor: activityColor(segment)
             )
         }
 
@@ -6380,7 +6395,9 @@ private struct ActivityTimelinePanel: View {
                 duration: durationLabel(suggestion.endSecond - suggestion.startSecond),
                 projectName: project?.name ?? "None",
                 projectColor: color(for: project?.color),
-                projectQualifier: "⌥-click to create immediately"
+                projectQualifier: "⌥-click to create immediately",
+                categoryLabel: nil,
+                categoryColor: nil
             )
         }
 
@@ -6397,7 +6414,9 @@ private struct ActivityTimelinePanel: View {
                 duration: durationLabel(range.end - range.start),
                 projectName: project?.name ?? "None",
                 projectColor: color(for: project?.color),
-                projectQualifier: project == nil ? "Manual time entry" : nil
+                projectQualifier: project == nil ? "Manual time entry" : nil,
+                categoryLabel: nil,
+                categoryColor: nil
             )
         }
 
@@ -6425,7 +6444,9 @@ private struct ActivityTimelinePanel: View {
                 duration: durationLabel(event.durationSeconds),
                 projectName: "None",
                 projectColor: color(for: nil),
-                projectQualifier: "Offline calendar event"
+                projectQualifier: "Offline calendar event",
+                categoryLabel: nil,
+                categoryColor: nil
             )
         }
 
