@@ -490,6 +490,64 @@ Task { @MainActor in
         matchMode: .any,
         rules: [ActivityFilterRule(field: .domain, pattern: "github.com")]
     )
+    _ = categoryStore.createCategory(
+        name: "Two-rule all",
+        role: .other,
+        color: .purple,
+        matchMode: .all,
+        rules: [
+            ActivityFilterRule(field: .application, pattern: "MultiRule App"),
+            ActivityFilterRule(field: .domain, pattern: "example.com")
+        ]
+    )
+    _ = categoryStore.createCategory(
+        name: "Two-rule any",
+        role: .focused,
+        color: .orange,
+        matchMode: .any,
+        rules: [
+            ActivityFilterRule(field: .application, pattern: "AnyRule App"),
+            ActivityFilterRule(field: .domain, pattern: "any.example")
+        ]
+    )
+    let allRulesActivity = ActivitySegment(
+        appName: "MultiRule App",
+        windowTitle: "Example",
+        resource: "https://example.com/work",
+        startMinute: 630,
+        endMinute: 642,
+        relevance: .other
+    )
+    let partialRulesActivity = ActivitySegment(
+        appName: "MultiRule App",
+        windowTitle: "Other",
+        resource: "https://other.example/work",
+        startMinute: 642,
+        endMinute: 654,
+        relevance: .other
+    )
+    let anyRulesActivity = ActivitySegment(
+        appName: "AnyRule App",
+        windowTitle: "Any",
+        resource: "https://unrelated.example/work",
+        startMinute: 654,
+        endMinute: 666,
+        relevance: .other
+    )
+    let allRulesCategory = categoryStore.category(for: allRulesActivity, filterStore: categoryFilterStore, date: date)
+    let partialRulesCategory = categoryStore.category(for: partialRulesActivity, filterStore: categoryFilterStore, date: date)
+    let anyRulesCategory = categoryStore.category(for: anyRulesActivity, filterStore: categoryFilterStore, date: date)
+    expect(
+        categoryStore.categories.first(where: { $0.name == "Two-rule all" })?.rules.count == 2
+            && categoryStore.categories.first(where: { $0.name == "Two-rule any" })?.rules.count == 2,
+        "Category creation should preserve every matching rule"
+    )
+    expect(
+        allRulesCategory.name == "Two-rule all"
+            && partialRulesCategory.name != "Two-rule all"
+            && anyRulesCategory.name == "Two-rule any",
+        "Category Any and All matching should evaluate every rule"
+    )
     let focusedCategory = categoryStore.category(for: trackedActivities[0], filterStore: categoryFilterStore, date: date)
     let youtubeActivity = ActivitySegment(
         appName: "Google Chrome",
@@ -538,7 +596,7 @@ Task { @MainActor in
         rootDirectory: tempRoot.appendingPathComponent("ImportedCategories", isDirectory: true)
     )
     let importedCategoryCount = try! importedCategoryStore.importArchiveData(categoryArchive)
-    expect(importedCategoryCount == 3, "Category sync should import custom definitions without duplicating system categories")
+    expect(importedCategoryCount == 5, "Category sync should import custom definitions without duplicating system categories")
     expect(
         importedCategoryStore.categories.contains { $0.name == "Focused coding" && $0.color == .blue }
             && importedCategoryStore.categories.contains { $0.name == "Distracting video" && $0.color == .red },

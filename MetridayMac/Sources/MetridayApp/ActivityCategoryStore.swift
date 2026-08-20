@@ -284,7 +284,7 @@ final class ActivityCategoryStore: ObservableObject {
         return rules.filter { rule in
             let pattern = rule.pattern.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !pattern.isEmpty else { return false }
-            let key = "(rule.field.rawValue)|(rule.comparison.rawValue)|(rule.isCaseSensitive)|(pattern.lowercased())"
+            let key = "\(rule.field.rawValue)|\(rule.comparison.rawValue)|\(rule.isCaseSensitive)|\(pattern.lowercased())"
             guard seen.insert(key).inserted else { return false }
             return true
         }.map { rule in
