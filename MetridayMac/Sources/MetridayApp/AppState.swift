@@ -160,6 +160,10 @@ final class AppState: ObservableObject {
             ?? currentTask?.title
             ?? projectID.flatMap { projectStore.project($0)?.name }
             ?? "Manual timer"
+        if let recent {
+            timeEntryStore.startTimer(reusing: recent)
+            return
+        }
         timeEntryStore.startTimer(
             title: title,
             projectID: projectID,
@@ -169,6 +173,11 @@ final class AppState: ObservableObject {
                 ?? .billable,
             customFields: recent?.customFields ?? [:]
         )
+    }
+
+    func startTimer(reusing entry: TimeEntry) {
+        guard timeEntryStore.runningTimer == nil else { return }
+        timeEntryStore.startTimer(reusing: entry)
     }
 
     private func handle(localAPI request: LocalAPIRequest) -> LocalAPIResponse {

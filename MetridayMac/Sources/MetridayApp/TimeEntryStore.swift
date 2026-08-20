@@ -461,6 +461,18 @@ final class TimeEntryStore: ObservableObject {
         statusMessage = "Timer started · \(title)"
     }
 
+    /// Reuses the title, project, notes, billing status, and custom fields of
+    /// a previous timer for Timing's quick-resume menus.
+    func startTimer(reusing entry: TimeEntry) {
+        startTimer(
+            title: entry.title,
+            projectID: entry.projectID,
+            notes: entry.notes,
+            billingStatus: entry.billingStatus,
+            customFields: entry.customFields
+        )
+    }
+
     /// Moves a running timer's start without changing its title or project.
     /// Timing uses this for the small retroactive corrections people make
     /// after starting a timer a few minutes late.

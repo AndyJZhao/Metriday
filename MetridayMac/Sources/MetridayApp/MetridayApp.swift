@@ -62,6 +62,19 @@ struct MetridayApp: App {
                     appState.quickStartTimer()
                 }
                 .keyboardShortcut("t", modifiers: [.control, .option, .command])
+                let recentTimers = appState.timeEntryStore.recentTimerEntries(limit: 5)
+                if !recentTimers.isEmpty {
+                    Menu("Resume Recent Timer") {
+                        ForEach(recentTimers) { entry in
+                            Button {
+                                appState.startTimer(reusing: entry)
+                            } label: {
+                                Text(entry.title)
+                            }
+                            .disabled(appState.timeEntryStore.runningTimer != nil)
+                        }
+                    }
+                }
             }
         }
 
@@ -78,6 +91,7 @@ private struct MenuBarStatusView: View {
     let appState: AppState
 
     var body: some View {
+        let recentTimers = appState.timeEntryStore.recentTimerEntries(limit: 5)
         VStack(alignment: .leading, spacing: 10) {
             Text("Metriday 日衡")
                 .font(.headline)
@@ -86,6 +100,21 @@ private struct MenuBarStatusView: View {
                 .foregroundStyle(.secondary)
             Button("Start / Stop Timer") {
                 appState.quickStartTimer()
+            }
+            if appState.timeEntryStore.runningTimer == nil, !recentTimers.isEmpty {
+                Menu("Resume Recent Timer") {
+                    ForEach(recentTimers) { entry in
+                        Button {
+                            appState.startTimer(reusing: entry)
+                        } label: {
+                            VStack(alignment: .leading) {
+                                Text(entry.title)
+                                Text("\(projectLabel(for: entry.projectID)) · \(durationLabel(entry.durationSeconds))")
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                }
             }
             HStack(spacing: 8) {
                 Button("−5m") {
@@ -109,5 +138,18 @@ private struct MenuBarStatusView: View {
             }
         }
         .padding(8)
+    }
+
+    private func projectLabel(for projectID: UUID?) -> String {
+        guard let projectID else { return "Unassigned" }
+        return appState.projectStore.name(for: projectID)
+    }
+
+    private func durationLabel(_ seconds: Int) -> String {
+        let minutes = max(1, Int((Double(seconds) / 60).rounded()))
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        if hours > 0 { return "\(hours)h \(remainder)m" }
+        return "\(minutes)m"
     }
 }

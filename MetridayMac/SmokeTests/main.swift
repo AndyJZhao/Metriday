@@ -343,6 +343,28 @@ Task { @MainActor in
             .allSatisfy { $0.title == "Renamed group" },
         "Batch title update should persist to the local archive"
     )
+    let reusableTimerEntry = TimeEntry(
+        projectID: suggestionProjectID,
+        title: "Resume this timer",
+        notes: "Timer context",
+        start: date.addingTimeInterval(14 * 60 * 60),
+        end: date.addingTimeInterval(14 * 60 * 60 + 25 * 60),
+        billingStatus: .pending,
+        customFields: ["source": "smoke"]
+    )
+    timeEntryStore.startTimer(reusing: reusableTimerEntry)
+    expect(
+        timeEntryStore.runningTimer?.title == reusableTimerEntry.title
+            && timeEntryStore.runningTimer?.projectID == reusableTimerEntry.projectID
+            && timeEntryStore.runningTimer?.billingStatus == .pending
+            && timeEntryStore.runningTimer?.customFields["source"] == "smoke",
+        "Quick-resume timer should preserve the previous timer context"
+    )
+    _ = timeEntryStore.stopTimer(at: date.addingTimeInterval(14 * 60 * 60 + 30 * 60))
+    expect(
+        timeEntryStore.recentTimerEntries(limit: 1).first?.title == reusableTimerEntry.title,
+        "Stopped timers should remain available in recent timer suggestions"
+    )
     let undoCreatedEntry = timeEntryStore.entries[0]
     let undoReplacedEntry = TimeEntry(
         id: UUID(),
