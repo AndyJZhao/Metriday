@@ -18,6 +18,9 @@ final class PreferencesStore: ObservableObject {
     @Published var workingHoursEndMinute: Int {
         didSet { persist() }
     }
+    @Published var automaticallyZoomTimelineToWorkingHours: Bool {
+        didSet { persist() }
+    }
     @Published var startTrackingWhenAppOpens: Bool {
         didSet { persist() }
     }
@@ -41,6 +44,7 @@ final class PreferencesStore: ObservableObject {
             self.trackOnlyDuringWorkingHours = payload.trackOnlyDuringWorkingHours
             self.workingHoursStartMinute = payload.workingHoursStartMinute
             self.workingHoursEndMinute = payload.workingHoursEndMinute
+            self.automaticallyZoomTimelineToWorkingHours = payload.automaticallyZoomTimelineToWorkingHours
             self.startTrackingWhenAppOpens = payload.startTrackingWhenAppOpens
             self.autoStopTimerOnSleep = payload.autoStopTimerOnSleep
             self.allowLocalNetworkAPI = payload.allowLocalNetworkAPI
@@ -50,6 +54,7 @@ final class PreferencesStore: ObservableObject {
             self.trackOnlyDuringWorkingHours = false
             self.workingHoursStartMinute = 9 * 60
             self.workingHoursEndMinute = 18 * 60
+            self.automaticallyZoomTimelineToWorkingHours = false
             self.startTrackingWhenAppOpens = true
             self.autoStopTimerOnSleep = true
             self.allowLocalNetworkAPI = false
@@ -90,6 +95,7 @@ final class PreferencesStore: ObservableObject {
                 trackOnlyDuringWorkingHours: trackOnlyDuringWorkingHours,
                 workingHoursStartMinute: workingHoursStartMinute,
                 workingHoursEndMinute: workingHoursEndMinute,
+                automaticallyZoomTimelineToWorkingHours: automaticallyZoomTimelineToWorkingHours,
                 startTrackingWhenAppOpens: startTrackingWhenAppOpens,
                 autoStopTimerOnSleep: autoStopTimerOnSleep,
                 allowLocalNetworkAPI: allowLocalNetworkAPI
@@ -116,6 +122,7 @@ final class PreferencesStore: ObservableObject {
         let trackOnlyDuringWorkingHours: Bool
         let workingHoursStartMinute: Int
         let workingHoursEndMinute: Int
+        let automaticallyZoomTimelineToWorkingHours: Bool
         let startTrackingWhenAppOpens: Bool
         let autoStopTimerOnSleep: Bool
         let allowLocalNetworkAPI: Bool
@@ -126,6 +133,7 @@ final class PreferencesStore: ObservableObject {
             trackOnlyDuringWorkingHours: Bool,
             workingHoursStartMinute: Int,
             workingHoursEndMinute: Int,
+            automaticallyZoomTimelineToWorkingHours: Bool,
             startTrackingWhenAppOpens: Bool,
             autoStopTimerOnSleep: Bool,
             allowLocalNetworkAPI: Bool
@@ -135,6 +143,7 @@ final class PreferencesStore: ObservableObject {
             self.trackOnlyDuringWorkingHours = trackOnlyDuringWorkingHours
             self.workingHoursStartMinute = workingHoursStartMinute
             self.workingHoursEndMinute = workingHoursEndMinute
+            self.automaticallyZoomTimelineToWorkingHours = automaticallyZoomTimelineToWorkingHours
             self.startTrackingWhenAppOpens = startTrackingWhenAppOpens
             self.autoStopTimerOnSleep = autoStopTimerOnSleep
             self.allowLocalNetworkAPI = allowLocalNetworkAPI
@@ -147,6 +156,7 @@ final class PreferencesStore: ObservableObject {
             trackOnlyDuringWorkingHours = try container.decode(Bool.self, forKey: .trackOnlyDuringWorkingHours)
             workingHoursStartMinute = try container.decode(Int.self, forKey: .workingHoursStartMinute)
             workingHoursEndMinute = try container.decode(Int.self, forKey: .workingHoursEndMinute)
+            automaticallyZoomTimelineToWorkingHours = try container.decodeIfPresent(Bool.self, forKey: .automaticallyZoomTimelineToWorkingHours) ?? false
             startTrackingWhenAppOpens = try container.decode(Bool.self, forKey: .startTrackingWhenAppOpens)
             autoStopTimerOnSleep = try container.decodeIfPresent(Bool.self, forKey: .autoStopTimerOnSleep) ?? true
             allowLocalNetworkAPI = try container.decodeIfPresent(Bool.self, forKey: .allowLocalNetworkAPI) ?? false

@@ -512,6 +512,7 @@ Task { @MainActor in
     preferences.trackOnlyDuringWorkingHours = true
     preferences.workingHoursStartMinute = 9 * 60
     preferences.workingHoursEndMinute = 18 * 60
+    preferences.automaticallyZoomTimelineToWorkingHours = true
     let calendar = Calendar.current
     let weekdayWorkTime = calendar.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 10))!
     let weekdayEvening = calendar.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 20))!
@@ -527,6 +528,7 @@ Task { @MainActor in
     expect(!preferences.shouldTrack(at: overnightBreakTime), "Working-hour preferences should exclude overnight gaps")
     let reloadedPreferences = PreferencesStore(rootDirectory: preferencesRoot)
     expect(reloadedPreferences.trackWeekends == false, "Preferences should round-trip through local JSON")
+    expect(reloadedPreferences.automaticallyZoomTimelineToWorkingHours, "Timeline zoom preference should round-trip through local JSON")
     expect(reloadedPreferences.autoStopTimerOnSleep, "Preferences should default to stopping timers on sleep")
 
     let reminderPreferencesRoot = tempRoot.appendingPathComponent("ReminderPreferences", isDirectory: true)

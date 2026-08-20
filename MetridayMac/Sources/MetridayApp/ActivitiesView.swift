@@ -50,6 +50,70 @@ private enum ActivityCategoryKind: String, CaseIterable, Hashable, Identifiable 
     }
 }
 
+/// The timeline normally spans the whole day. When the Timing-style working
+/// hours zoom is enabled, this window keeps the configured interval in view,
+/// including overnight windows such as 22:00–06:00.
+private struct ActivityTimelineWindow: Equatable {
+    let startMinute: Int
+    let endMinute: Int
+
+    init(zoomed: Bool, workingHoursStartMinute: Int, workingHoursEndMinute: Int) {
+        guard zoomed else {
+            startMinute = 0
+            endMinute = 1_440
+            return
+        }
+        let start = min(1_439, max(0, workingHoursStartMinute))
+        var end = min(1_439, max(0, workingHoursEndMinute))
+        if end <= start { end += 1_440 }
+        startMinute = start
+        endMinute = max(start + 15, end)
+    }
+
+    var spanMinutes: Int { max(15, endMinute - startMinute) }
+
+    var tickMinutes: [Int] {
+        let step = spanMinutes <= 12 * 60 ? 60 : 120
+        var ticks = Array(stride(from: startMinute, through: endMinute, by: step))
+        if ticks.last != endMinute { ticks.append(endMinute) }
+        return ticks
+    }
+
+    func absoluteMinute(for second: Int, roundingUp: Bool = false) -> Int {
+        let clampedSecond = max(0, min(86_400, second))
+        if clampedSecond == 86_400 { return 1_440 }
+        let raw = roundingUp
+            ? Int(ceil(Double(clampedSecond) / 60.0))
+            : clampedSecond / 60
+        if endMinute > 1_440, raw < startMinute {
+            return raw + 1_440
+        }
+        return raw
+    }
+
+    func clippedRange(startSecond: Int, endSecond: Int) -> (start: Int, end: Int)? {
+        let start = max(startMinute, absoluteMinute(for: startSecond))
+        let end = min(endMinute, absoluteMinute(for: endSecond, roundingUp: true))
+        guard end > start else { return nil }
+        return (start, end)
+    }
+
+    func x(for minute: Int, width: CGFloat) -> CGFloat {
+        width * CGFloat(minute - startMinute) / CGFloat(spanMinutes)
+    }
+
+    func minute(at x: CGFloat, width: CGFloat) -> Int {
+        let normalized = min(1, max(0, x / max(1, width)))
+        let absolute = startMinute + Int((normalized * CGFloat(spanMinutes)).rounded())
+        // Selection and entry APIs use minutes within the selected calendar day.
+        return min(1_440, max(0, (absolute / 15) * 15))
+    }
+
+    func label(for minute: Int) -> String {
+        String(format: "%02d", (minute % 1_440) / 60)
+    }
+}
+
 private final class LockedArray<Element>: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [Element] = []
@@ -170,6 +234,7 @@ struct ActivitiesView: View {
                             selectedDate: selectedDate,
                             project: { projectStore.project($0) },
                             orientation: timelineOrientation,
+                            timelineWindow: activityTimelineWindow,
                             activityColor: { categoryColor(for: category(for: $0)) },
                             onToggleOrientation: {
                                 timelineOrientation = timelineOrientation == .horizontal ? .vertical : .horizontal
@@ -2453,6 +2518,14 @@ struct ActivitiesView: View {
                 if $0.startSecond == $1.startSecond { return $0.endSecond < $1.endSecond }
                 return $0.startSecond < $1.startSecond
             }
+    }
+
+    private var activityTimelineWindow: ActivityTimelineWindow {
+        ActivityTimelineWindow(
+            zoomed: appState.preferences.automaticallyZoomTimelineToWorkingHours,
+            workingHoursStartMinute: appState.preferences.workingHoursStartMinute,
+            workingHoursEndMinute: appState.preferences.workingHoursEndMinute
+        )
     }
 
     private var segmentsForSelectedRange: [ActivitySegment] {
@@ -4955,6 +5028,7 @@ private struct ActivityTimelinePanel: View {
     let selectedDate: Date
     let project: (UUID?) -> TrackingProject?
     let orientation: ActivityTimelineOrientation
+    let timelineWindow: ActivityTimelineWindow
     let activityColor: (ActivitySegment) -> Color
     let onToggleOrientation: () -> Void
     @Binding var selectionStart: Int?
@@ -5015,19 +5089,22 @@ private struct ActivityTimelinePanel: View {
             if orientation == .horizontal {
             GeometryReader { proxy in
                 ZStack(alignment: .topLeading) {
-                    ForEach(0...24, id: \.self) { hour in
+                    ForEach(timelineWindow.tickMinutes, id: \.self) { minute in
                         Rectangle()
-                            .fill(MetridayTheme.line.opacity(hour % 6 == 0 ? 0.9 : 0.45))
+                            .fill(MetridayTheme.line.opacity(minute % 360 == 0 ? 0.9 : 0.45))
                             .frame(width: 1, height: 106)
                             .position(
-                                x: proxy.size.width * CGFloat(hour) / 24,
+                                x: timelineWindow.x(for: minute, width: proxy.size.width),
                                 y: 53
                             )
                     }
 
                     TimelineView(.periodic(from: .now, by: 30)) { context in
                         if let second = currentTimeSecond(at: context.date) {
-                            let x = proxy.size.width * CGFloat(second) / 86_400
+                            let x = timelineWindow.x(
+                                for: timelineWindow.absoluteMinute(for: second),
+                                width: proxy.size.width
+                            )
                             VStack(spacing: 0) {
                                 Circle()
                                     .fill(MetridayTheme.accentDeep)
@@ -5044,11 +5121,9 @@ private struct ActivityTimelinePanel: View {
                     }
 
                     ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
-                        let left = proxy.size.width * CGFloat(segment.startSecond) / 86_400
-                        let width = max(
-                            3,
-                            proxy.size.width * CGFloat(segment.durationSeconds) / 86_400
-                        )
+                        if let range = timelineWindow.clippedRange(startSecond: segment.startSecond, endSecond: segment.endSecond) {
+                        let left = timelineWindow.x(for: range.start, width: proxy.size.width)
+                        let width = max(3, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
                         let hitWidth = max(12, width)
                         ZStack(alignment: .trailing) {
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
@@ -5118,15 +5193,14 @@ private struct ActivityTimelinePanel: View {
                                 y: 24 + CGFloat(index % 4) * 22
                             )
                     }
+                        }
 
                     ForEach(calendarEvents) { event in
                         let startSecond = max(0, min(86_400, second(of: event.start)))
                         let endSecond = max(startSecond + 900, min(86_400, second(of: event.end)))
-                        let left = proxy.size.width * CGFloat(startSecond) / 86_400
-                        let width = max(
-                            4,
-                            proxy.size.width * CGFloat(endSecond - startSecond) / 86_400
-                        )
+                        if let range = timelineWindow.clippedRange(startSecond: startSecond, endSecond: endSecond) {
+                        let left = timelineWindow.x(for: range.start, width: proxy.size.width)
+                        let width = max(4, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
                         let hitWidth = max(12, width)
                         ZStack {
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
@@ -5165,14 +5239,13 @@ private struct ActivityTimelinePanel: View {
                             }
                             .help("Click to record offline time · ⌥-click to record immediately")
                     }
+                        }
 
                     ForEach(timeEntries) { entry in
-                        if let range = clippedRange(for: entry) {
-                            let left = proxy.size.width * CGFloat(range.start) / 86_400
-                            let width = max(
-                                4,
-                                proxy.size.width * CGFloat(range.end - range.start) / 86_400
-                            )
+                        if let entryRange = clippedRange(for: entry),
+                           let range = timelineWindow.clippedRange(startSecond: entryRange.start, endSecond: entryRange.end) {
+                            let left = timelineWindow.x(for: range.start, width: proxy.size.width)
+                            let width = max(4, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
                             let hitWidth = max(12, width)
                             ZStack {
                                 RoundedRectangle(cornerRadius: 3, style: .continuous)
@@ -5214,8 +5287,8 @@ private struct ActivityTimelinePanel: View {
                     }
 
                     if let start = selectionStart, let end = selectionEnd {
-                        let left = proxy.size.width * CGFloat(start) / 1_440
-                        let width = max(2, proxy.size.width * CGFloat(end - start) / 1_440)
+                        let left = timelineWindow.x(for: start, width: proxy.size.width)
+                        let width = max(2, timelineWindow.x(for: end, width: proxy.size.width) - left)
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(MetridayTheme.accent.opacity(0.14))
                             .overlay(
@@ -5227,8 +5300,8 @@ private struct ActivityTimelinePanel: View {
                     }
 
                     HStack(spacing: 0) {
-                        ForEach(0..<24, id: \.self) { hour in
-                            Text(String(format: "%02d", hour))
+                        ForEach(timelineWindow.tickMinutes, id: \.self) { minute in
+                            Text(timelineWindow.label(for: minute))
                                 .font(.system(size: 9, design: .monospaced))
                                 .foregroundStyle(MetridayTheme.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -5247,7 +5320,7 @@ private struct ActivityTimelinePanel: View {
                 .gesture(
                     DragGesture(minimumDistance: 4)
                         .onChanged { value in
-                            let minute = minute(at: value.location.x, width: proxy.size.width)
+                            let minute = timelineWindow.minute(at: value.location.x, width: proxy.size.width)
                             if dragAnchorMinute == nil {
                                 dragAnchorMinute = minute
                             }
@@ -5291,8 +5364,9 @@ private struct ActivityTimelinePanel: View {
             VStack(alignment: .leading, spacing: 5) {
                 verticalLane(label: "MACOS", chartWidth: chartWidth) {
                     ForEach(segments) { segment in
-                        let left = chartWidth * CGFloat(segment.startSecond) / 86_400
-                        let width = max(2, chartWidth * CGFloat(segment.durationSeconds) / 86_400)
+                        if let range = timelineWindow.clippedRange(startSecond: segment.startSecond, endSecond: segment.endSecond) {
+                        let left = timelineWindow.x(for: range.start, width: chartWidth)
+                        let width = max(2, timelineWindow.x(for: range.end, width: chartWidth) - left)
                         let hitWidth = max(12, width)
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -5321,28 +5395,29 @@ private struct ActivityTimelinePanel: View {
                             )
                             .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
                     }
+                        }
                 }
 
                 verticalLane(label: "PROJECT", chartWidth: chartWidth) {
                     ForEach(segments) { segment in
-                        let left = chartWidth * CGFloat(segment.startSecond) / 86_400
-                        let width = max(2, chartWidth * CGFloat(segment.durationSeconds) / 86_400)
+                        if let range = timelineWindow.clippedRange(startSecond: segment.startSecond, endSecond: segment.endSecond) {
+                        let left = timelineWindow.x(for: range.start, width: chartWidth)
+                        let width = max(2, timelineWindow.x(for: range.end, width: chartWidth) - left)
                         RoundedRectangle(cornerRadius: 2, style: .continuous)
                             .fill(color(for: project(segment.projectID)?.color).opacity(0.62))
                             .frame(width: width, height: 16)
                             .offset(x: left)
                             .help("Project: \(project(segment.projectID)?.name ?? "None")")
                     }
+                        }
                 }
 
                 if !suggestions.isEmpty {
                     verticalLane(label: "SUMMARY", chartWidth: chartWidth) {
                         ForEach(suggestions) { suggestion in
-                            let left = chartWidth * CGFloat(suggestion.startSecond) / 86_400
-                            let width = max(
-                                2,
-                                chartWidth * CGFloat(suggestion.endSecond - suggestion.startSecond) / 86_400
-                            )
+                            if let range = timelineWindow.clippedRange(startSecond: suggestion.startSecond, endSecond: suggestion.endSecond) {
+                            let left = timelineWindow.x(for: range.start, width: chartWidth)
+                            let width = max(2, timelineWindow.x(for: range.end, width: chartWidth) - left)
                             let hitWidth = max(12, width)
                             ZStack(alignment: .topTrailing) {
                                 RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -5387,14 +5462,16 @@ private struct ActivityTimelinePanel: View {
                                 "\(suggestion.title) · \(TimeFormat.range(start: suggestion.startMinute, end: suggestion.endMinute)) · ⌥-click to create immediately"
                             )
                         }
+                            }
                     }
                 }
 
                 verticalLane(label: "TIME ENTRIES", chartWidth: chartWidth) {
                     ForEach(timeEntries) { entry in
-                        if let range = clippedRange(for: entry) {
-                            let left = chartWidth * CGFloat(range.start) / 86_400
-                        let width = max(2, chartWidth * CGFloat(range.end - range.start) / 86_400)
+                        if let entryRange = clippedRange(for: entry),
+                           let range = timelineWindow.clippedRange(startSecond: entryRange.start, endSecond: entryRange.end) {
+                            let left = timelineWindow.x(for: range.start, width: chartWidth)
+                        let width = max(2, timelineWindow.x(for: range.end, width: chartWidth) - left)
                         let hitWidth = max(12, width)
                         ZStack {
                                 RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -5427,8 +5504,9 @@ private struct ActivityTimelinePanel: View {
                     ForEach(calendarEvents) { event in
                         let start = max(0, min(86_400, second(of: event.start)))
                         let end = max(start + 900, min(86_400, second(of: event.end)))
-                        let left = chartWidth * CGFloat(start) / 86_400
-                        let width = max(2, chartWidth * CGFloat(end - start) / 86_400)
+                        if let clipped = timelineWindow.clippedRange(startSecond: start, endSecond: end) {
+                        let left = timelineWindow.x(for: clipped.start, width: chartWidth)
+                        let width = max(2, timelineWindow.x(for: clipped.end, width: chartWidth) - left)
                         let hitWidth = max(12, width)
                         ZStack {
                             RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -5454,12 +5532,13 @@ private struct ActivityTimelinePanel: View {
                             }
                             .help("Calendar event · \(event.title)")
                         }
+                        }
                     }
 
                 HStack(spacing: 0) {
                     Color.clear.frame(width: labelWidth)
-                    ForEach(0..<24, id: \.self) { hour in
-                        Text(String(format: "%02d", hour))
+                    ForEach(timelineWindow.tickMinutes, id: \.self) { minute in
+                        Text(timelineWindow.label(for: minute))
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundStyle(MetridayTheme.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -5474,7 +5553,7 @@ private struct ActivityTimelinePanel: View {
             .gesture(
                 DragGesture(minimumDistance: 4)
                     .onChanged { value in
-                        let minute = minute(
+                        let minute = timelineWindow.minute(
                             at: value.location.x - labelWidth - 16,
                             width: chartWidth
                         )
@@ -5503,7 +5582,10 @@ private struct ActivityTimelinePanel: View {
             .overlay(alignment: .topLeading) {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     if let second = currentTimeSecond(at: context.date) {
-                        let x = 16 + labelWidth + 6 + chartWidth * CGFloat(second) / 86_400
+                        let x = 16 + labelWidth + 6 + timelineWindow.x(
+                            for: timelineWindow.absoluteMinute(for: second),
+                            width: chartWidth
+                        )
                         VStack(spacing: 0) {
                             Circle()
                                 .fill(MetridayTheme.accentDeep)
@@ -5544,11 +5626,11 @@ private struct ActivityTimelinePanel: View {
                 .foregroundStyle(MetridayTheme.secondary)
                 .frame(width: 58, alignment: .leading)
             ZStack(alignment: .topLeading) {
-                ForEach(0...24, id: \.self) { hour in
+                ForEach(timelineWindow.tickMinutes, id: \.self) { minute in
                     Rectangle()
-                        .fill(MetridayTheme.line.opacity(hour % 6 == 0 ? 0.9 : 0.4))
+                        .fill(MetridayTheme.line.opacity(minute % 360 == 0 ? 0.9 : 0.4))
                         .frame(width: 1, height: 18)
-                        .offset(x: chartWidth * CGFloat(hour) / 24)
+                        .offset(x: timelineWindow.x(for: minute, width: chartWidth))
                 }
                 content()
             }

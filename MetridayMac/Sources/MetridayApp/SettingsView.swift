@@ -137,6 +137,14 @@ struct SettingsSheet: View {
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
 
+            Toggle("Automatically zoom timeline to working hours", isOn: $preferences.automaticallyZoomTimelineToWorkingHours)
+                .toggleStyle(.checkbox)
+                .font(.system(size: 12))
+
+            Text("When enabled, Activities opens the timeline around the configured working-hours window.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+
             HStack(spacing: 8) {
                 Text("From")
                     .font(.system(size: 12))

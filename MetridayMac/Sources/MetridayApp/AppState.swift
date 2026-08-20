@@ -272,6 +272,9 @@ final class AppState: ObservableObject {
             if let value = body["working_hours_end_minute"] as? Int {
                 preferences.workingHoursEndMinute = min(max(value, 0), 1439)
             }
+            if let value = body["automatically_zoom_timeline_to_working_hours"] as? Bool {
+                preferences.automaticallyZoomTimelineToWorkingHours = value
+            }
             if let value = body["start_tracking_when_app_opens"] as? Bool {
                 preferences.startTrackingWhenAppOpens = value
             }
@@ -2361,6 +2364,7 @@ final class AppState: ObservableObject {
             "track_only_during_working_hours": preferences.trackOnlyDuringWorkingHours,
             "working_hours_start_minute": preferences.workingHoursStartMinute,
             "working_hours_end_minute": preferences.workingHoursEndMinute,
+            "automatically_zoom_timeline_to_working_hours": preferences.automaticallyZoomTimelineToWorkingHours,
             "start_tracking_when_app_opens": preferences.startTrackingWhenAppOpens,
             "auto_stop_timer_on_sleep": preferences.autoStopTimerOnSleep,
             "allow_local_network_api": preferences.allowLocalNetworkAPI,
