@@ -638,6 +638,12 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-activity-timeline-label:last-of-type { transform: translateX(-100%); }
 .web-activity-timeline-grid { position: absolute; inset: 0; pointer-events: none; }
 .web-activity-timeline-grid i { position: absolute; top: 0; bottom: 0; width: 1px; border-left: 1px dashed #eef0f3; }
+.web-activity-timeline-current-time { position: absolute; z-index: 5; pointer-events: none; background: #384ae0; }
+.web-activity-timeline-current-time.horizontal { top: 0; bottom: 0; width: 2px; transform: translateX(-1px); }
+.web-activity-timeline-current-time.vertical { left: 0; right: 0; height: 2px; transform: translateY(-1px); }
+.web-activity-timeline-current-time span { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #384ae0; box-shadow: 0 0 0 2px #fff; }
+.web-activity-timeline-current-time.horizontal span { top: -4px; left: -3px; }
+.web-activity-timeline-current-time.vertical span { top: -3px; left: -4px; }
 .web-activity-timeline-block { position: absolute; top: 22px; height: 52px; min-width: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #6f7480; cursor: pointer; }
 .web-activity-timeline-block:hover { z-index: 3; filter: saturate(1.15); box-shadow: 0 0 0 2px rgba(78, 95, 242, 0.13); }
 .web-activity-timeline-block:focus-visible { z-index: 4; outline: 2px solid var(--accent); outline-offset: 2px; }

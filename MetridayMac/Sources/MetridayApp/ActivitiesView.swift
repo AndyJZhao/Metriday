@@ -99,7 +99,7 @@ struct ActivitiesView: View {
     @State private var collapsedUnifiedAppGroups: Set<String> = []
     @State private var collapsedProjectIDs: Set<UUID> = []
     @State private var selectedDevice = ActivityDeviceFilter.all
-    @State private var timelineOrientation: ActivityTimelineOrientation = .horizontal
+    @State private var timelineOrientation: ActivityTimelineOrientation = .vertical
     @State private var showingDevicesPopover = false
     @State private var showingFiltersPopover = false
     @State private var hideDevicesWithoutTime = false
@@ -4347,6 +4347,24 @@ private struct ActivityTimelinePanel: View {
                             )
                     }
 
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        if let second = currentTimeSecond(at: context.date) {
+                            let x = proxy.size.width * CGFloat(second) / 86_400
+                            VStack(spacing: 0) {
+                                Circle()
+                                    .fill(MetridayTheme.accentDeep)
+                                    .frame(width: 8, height: 8)
+                                Rectangle()
+                                    .fill(MetridayTheme.accentDeep)
+                                    .frame(width: 2, height: 104)
+                            }
+                            .frame(width: 8, height: 112, alignment: .top)
+                            .position(x: x, y: 56)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                        }
+                    }
+
                     ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
                         let left = proxy.size.width * CGFloat(segment.startSecond) / 86_400
                         let width = max(
@@ -4733,6 +4751,25 @@ private struct ActivityTimelinePanel: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Vertical activity timeline")
             .accessibilityIdentifier("activities.vertical-timeline")
+            .overlay(alignment: .topLeading) {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    if let second = currentTimeSecond(at: context.date) {
+                        let x = 16 + labelWidth + 6 + chartWidth * CGFloat(second) / 86_400
+                        VStack(spacing: 0) {
+                            Circle()
+                                .fill(MetridayTheme.accentDeep)
+                                .frame(width: 8, height: 8)
+                            Rectangle()
+                                .fill(MetridayTheme.accentDeep)
+                                .frame(width: 2, height: 60)
+                        }
+                        .frame(width: 8, height: 68, alignment: .top)
+                        .position(x: x, y: 38)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                    }
+                }
+            }
         }
         .frame(height: 156)
         .padding(.horizontal, 16)
@@ -4772,6 +4809,12 @@ private struct ActivityTimelinePanel: View {
             $0.start < endOfSelection && $0.end > startOfSelection
         }.count
         return "Selected \(TimeFormat.range(start: selectionStart, end: selectionEnd)) · \(segmentsInSelection) activities · \(entries) entries"
+    }
+
+    private func currentTimeSecond(at date: Date) -> Int? {
+        guard Calendar.current.isDate(selectedDate, inSameDayAs: date) else { return nil }
+        let start = Calendar.current.startOfDay(for: date)
+        return max(0, min(86_400, Int(date.timeIntervalSince(start))))
     }
 
     private var startOfSelection: Date {

@@ -78,7 +78,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             groupByDevice = false
             includeIdle = false
             selectedDevice = "All Devices"
-            timelineOrientation = .horizontal
+            timelineOrientation = .vertical
             persist()
         }
     }
@@ -164,7 +164,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             groupByDevice = try container.decodeIfPresent(Bool.self, forKey: .groupByDevice) ?? false
             includeIdle = try container.decodeIfPresent(Bool.self, forKey: .includeIdle) ?? false
             selectedDevice = try container.decodeIfPresent(String.self, forKey: .selectedDevice) ?? "All Devices"
-            timelineOrientation = try container.decodeIfPresent(ActivityTimelineOrientation.self, forKey: .timelineOrientation) ?? .horizontal
+            timelineOrientation = try container.decodeIfPresent(ActivityTimelineOrientation.self, forKey: .timelineOrientation) ?? .vertical
         }
     }
 }
