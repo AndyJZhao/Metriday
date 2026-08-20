@@ -75,6 +75,7 @@ enum ReportBillingFilter: String, CaseIterable, Identifiable {
     case pending
     case billed
     case paid
+    case undetermined
 
     var id: Self { self }
 
@@ -92,6 +93,8 @@ enum ReportBillingFilter: String, CaseIterable, Identifiable {
             return BillingStatus.billed.label
         case .paid:
             return BillingStatus.paid.label
+        case .undetermined:
+            return BillingStatus.undetermined.label
         }
     }
 
@@ -109,6 +112,8 @@ enum ReportBillingFilter: String, CaseIterable, Identifiable {
             return status == .billed
         case .paid:
             return status == .paid
+        case .undetermined:
+            return status == .undetermined
         }
     }
 }

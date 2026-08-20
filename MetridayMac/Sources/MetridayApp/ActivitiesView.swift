@@ -5721,7 +5721,7 @@ private struct ProjectEditorSheet: View {
             }
 
             Picker("Default billing status", selection: $defaultBillingStatus) {
-                ForEach(BillingStatus.allCases) { status in
+                ForEach(BillingStatus.allCases.filter { $0 != .undetermined }) { status in
                     Text(status.label).tag(status)
                 }
             }

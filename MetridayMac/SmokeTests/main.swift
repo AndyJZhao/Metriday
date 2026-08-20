@@ -1297,6 +1297,8 @@ Task { @MainActor in
     )
     expect(BillingStatus.paid.label == "Paid", "Billing status should include paid entries")
     expect(ReportBillingFilter.paid.matches(.paid), "Reports should filter paid billing status")
+    expect(BillingStatus(rawValue: "undetermined")?.label == "Undetermined", "Billing status should preserve undetermined legacy entries")
+    expect(ReportBillingFilter.undetermined.matches(.undetermined), "Reports should filter undetermined billing status")
 
     let timerStart = entryEnd.addingTimeInterval(15 * 60)
     timeEntries.startTimer(

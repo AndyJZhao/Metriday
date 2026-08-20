@@ -7,6 +7,7 @@ enum BillingStatus: String, CaseIterable, Codable, Identifiable {
     case pending
     case billed
     case paid
+    case undetermined
 
     var id: Self { self }
 
@@ -22,6 +23,8 @@ enum BillingStatus: String, CaseIterable, Codable, Identifiable {
             return "Billed"
         case .paid:
             return "Paid"
+        case .undetermined:
+            return "Undetermined"
         }
     }
 }

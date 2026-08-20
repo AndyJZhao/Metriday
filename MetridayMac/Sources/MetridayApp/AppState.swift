@@ -2288,6 +2288,7 @@ final class AppState: ObservableObject {
             case "pending": options.billingFilter = .pending
             case "billed": options.billingFilter = .billed
             case "paid": options.billingFilter = .paid
+            case "undetermined": options.billingFilter = .undetermined
             default: break
             }
         }
