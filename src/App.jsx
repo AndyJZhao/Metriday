@@ -3022,7 +3022,7 @@ function WebReportPanel({ api, dateKey }) {
   </section>;
 }
 
-function ActivityContextMenu({ activity, x, y, onClose, onSelect, onCreateTimeEntry }) {
+function ActivityContextMenu({ activity, x, y, onClose, onSelect, onCreateTimeEntry, selectedCount = 0, onCreateSelectedTimeEntries }) {
   useEffect(() => {
     const closeOnOutsidePointer = (event) => {
       if (!event.target.closest?.(".activity-context-menu")) onClose();
@@ -3042,7 +3042,7 @@ function ActivityContextMenu({ activity, x, y, onClose, onSelect, onCreateTimeEn
   const app = activity.appName || activity.deviceName || "Unknown App";
   const category = activityCategory(activity);
   const menuWidth = 226;
-  const menuHeight = activity.__deleteActivity ? 180 : 142;
+  const menuHeight = (activity.__deleteActivity ? 180 : 142) + (selectedCount > 0 && onCreateSelectedTimeEntries ? 36 : 0);
   const left = Math.max(8, Math.min(x, (window.innerWidth || x + menuWidth) - menuWidth - 8));
   const top = Math.max(8, Math.min(y, (window.innerHeight || y + menuHeight) - menuHeight - 8));
   const select = () => {
@@ -3052,6 +3052,10 @@ function ActivityContextMenu({ activity, x, y, onClose, onSelect, onCreateTimeEn
   const createTimeEntry = () => {
     onClose();
     onCreateTimeEntry?.(activity);
+  };
+  const createSelectedTimeEntries = () => {
+    onClose();
+    onCreateSelectedTimeEntries?.();
   };
   const deleteActivity = async () => {
     onClose();
@@ -3067,6 +3071,7 @@ function ActivityContextMenu({ activity, x, y, onClose, onSelect, onCreateTimeEn
     <div className="activity-context-divider" />
     <button type="button" role="menuitem" onClick={select}><NotePencil size={15} />Open details</button>
     <button type="button" role="menuitem" onClick={createTimeEntry}><Clock size={15} />Create time entry</button>
+    {selectedCount > 0 && onCreateSelectedTimeEntries ? <button type="button" role="menuitem" onClick={createSelectedTimeEntries}><Sparkle size={15} />Create from {selectedCount} selected</button> : null}
     {activity.__deleteActivity ? <button type="button" role="menuitem" className="timeline-context-danger" onClick={deleteActivity}><Trash size={15} />Delete app usage</button> : null}
   </div>;
 }
@@ -3416,7 +3421,7 @@ function collapseShortActivities(activities, thresholdSeconds) {
   return [...longActivities, ...summaries].sort((left, right) => String(left.date || "").localeCompare(String(right.date || "")) || Number(left.startSecond || 0) - Number(right.startSecond || 0));
 }
 
-function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode = "none", unifiedGroupMode = "project", projects = [], displayPreferences = null, dateKey = "", api = null, onCreateTimeEntry }) {
+function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode = "none", unifiedGroupMode = "project", projects = [], displayPreferences = null, dateKey = "", api = null, onCreateTimeEntry, selectedActivityIDs = new Set(), onToggleActivitySelection, onCreateSelectedTimeEntries }) {
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
   const [contextMenu, setContextMenu] = useState(null);
   const rowClickTimer = useRef(null);
@@ -3441,8 +3446,11 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
       const count = Array.isArray(activity.collapsed_activity_ids) ? activity.collapsed_activity_ids.length : 0;
       const duration = activityDurationSeconds(activity);
       const project = projectTitleFor(projects, activity.projectID);
+      const collapsedIDs = (activity.collapsed_activity_ids || []).map(resourceID).filter(Boolean);
+      const allCollapsedSelected = collapsedIDs.length > 0 && collapsedIDs.every((id) => selectedActivityIDs.has(id));
       return <div className="activity-table-row activity-table-row-collapsed" key={activity.id} role="status" aria-label={`Collapsed short activities, ${count} activities, ${formatDurationSeconds(duration)}`} title="Collapsed short activities; change the threshold in Display settings">
         <div className="activity-app-cell">
+          {onToggleActivitySelection ? <button type="button" className={`activity-row-select activity-row-action ${allCollapsedSelected ? "selected" : ""}`} aria-label={allCollapsedSelected ? `Deselect ${count} collapsed activities` : `Select ${count} collapsed activities`} aria-pressed={allCollapsedSelected} onClick={(event) => { event.stopPropagation(); onToggleActivitySelection(collapsedIDs); }}><CheckCircle size={16} weight={allCollapsedSelected ? "fill" : "regular"} /></button> : null}
           <span className="activity-table-icon"><Waveform size={18} /></span>
           <span className="activity-app-copy"><strong>{activity.appName}</strong><small>{count} activities · Display-only summary</small></span>
         </div>
@@ -3510,8 +3518,10 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
       rowClickTimer.current = null;
       setContextMenu({ activity: { ...activity, __deleteActivity: api?.connected && api?.deleteActivity ? () => api.deleteActivity(activity.id, activity.date || dateKey) : null }, x: event.clientX, y: event.clientY });
     };
+    const selected = selectedActivityIDs.has(resourceID(activity.id));
     return <div className="activity-table-row" key={activity.id} role="button" tabIndex={0} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-metriday-activity", activity.id); event.dataTransfer.setData("text/plain", activity.id); event.dataTransfer.setData("application/x-metriday-activity-date", activity.date || dateKey); }} onClick={openDetails} onDoubleClick={openTimeEntry} onContextMenu={openContextMenu} onKeyDown={handleKeyDown} aria-label={`Open details for ${app} ${formatRange(start, end)}`} title="Drag this activity to a project to assign it">
       <div className="activity-app-cell">
+        {onToggleActivitySelection ? <button type="button" className={`activity-row-select activity-row-action ${selected ? "selected" : ""}`} aria-label={selected ? `Deselect ${app}` : `Select ${app}`} aria-pressed={selected} onClick={(event) => { event.stopPropagation(); onToggleActivitySelection(activity.id); }}><CheckCircle size={16} weight={selected ? "fill" : "regular"} /></button> : null}
         <span className="activity-table-icon"><Icon size={19} weight="duotone" /></span>
         <span className="activity-app-copy"><strong>{app}</strong>{context ? <small>{context}</small> : null}{displayPreferences?.show_activity_date_ranges ? <small className="activity-date-range">{activityDateRangeLabel(activity, api?.preferences?.wrap_days_at_minute)}</small> : null}</span>
       </div>
@@ -3522,7 +3532,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     </div>;
   };
   if (viewMode === "category") {
-    return <WebActivityCategoryCards activities={rows} dateKey={dateKey} displayPreferences={displayPreferences} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} />;
+    return <WebActivityCategoryCards activities={rows} dateKey={dateKey} displayPreferences={displayPreferences} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} selectedActivityIDs={selectedActivityIDs} onToggleActivitySelection={onToggleActivitySelection} onCreateSelectedTimeEntries={onCreateSelectedTimeEntries} />;
   }
   const resolvedListGrouping = viewMode === "unified"
     ? "none"
@@ -3534,7 +3544,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     return <div className="activity-table">
       <div className="activity-table-head" aria-hidden="true"><span>App</span><span>Category</span><span>Time</span><span>Device</span><span>Project</span></div>
       {rows.map(activityRow)}
-      {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} /> : null}
+      {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} selectedCount={selectedActivityIDs.size} onCreateSelectedTimeEntries={onCreateSelectedTimeEntries} /> : null}
     </div>;
   }
   const groupedFor = (items, groupingMode, keyPrefix = "") => [...items.reduce((groups, activity) => {
@@ -3639,7 +3649,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
           </div> : null}
         </section>;
       })}
-      {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} /> : null}
+      {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} selectedCount={selectedActivityIDs.size} onCreateSelectedTimeEntries={onCreateSelectedTimeEntries} /> : null}
     </div>;
   }
   if (grouping === "projectDevice") {
@@ -3673,11 +3683,11 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
   const grouped = groupedFor(rows, grouping);
   return <div className="activity-table">
     {grouped.map(renderFlatGroup)}
-    {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} /> : null}
+    {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} selectedCount={selectedActivityIDs.size} onCreateSelectedTimeEntries={onCreateSelectedTimeEntries} /> : null}
   </div>;
 }
 
-function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onSelect, onCreateTimeEntry }) {
+function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onSelect, onCreateTimeEntry, selectedActivityIDs = new Set(), onToggleActivitySelection }) {
   const durationFor = (activity) => activityDurationSeconds(activity);
   const websiteName = (activity) => {
     try {
@@ -3744,13 +3754,17 @@ function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onS
     event.dataTransfer.setData("text/plain", row.activities.map((activity) => resourceID(activity.id)).join("\n"));
     event.dataTransfer.setData("application/x-metriday-activity-date", row.activities[0]?.date || dateKey);
   };
+  const toggleRowSelection = (event, row) => {
+    event.stopPropagation();
+    onToggleActivitySelection?.(row.activities.map((activity) => activity.id));
+  };
   return <div className="activity-category-card-grid">
     {cards.map(({ key, title, Icon, segments, rows }) => <section className="activity-category-card" key={key} aria-label={title}>
       <header className="activity-category-card-heading"><span><Icon size={17} /><strong>{title}</strong></span><small>{formatDurationSeconds(segments.reduce((total, activity) => total + durationFor(activity), 0))}</small></header>
-      {rows.length ? <div className="activity-category-card-rows" aria-label={`${title} activity items`}>{rows.map((row) => <div className="activity-category-card-row" key={row.name} role="button" tabIndex={0} draggable onDragStart={(event) => dragStart(event, row)} onClick={(event) => openDetails(event, row.activities[0])} onDoubleClick={(event) => createTimeEntry(event, row.activities[0])} onKeyDown={(event) => handleKeyDown(event, row.activities[0])} aria-label={`Open ${row.name} in ${title}`} title="Click for details · double-click to create a time entry · drag to a project">
+      {rows.length ? <div className="activity-category-card-rows" aria-label={`${title} activity items`}>{rows.map((row) => { const rowIDs = row.activities.map((activity) => resourceID(activity.id)).filter(Boolean); const selectedCount = rowIDs.filter((id) => selectedActivityIDs.has(id)).length; const selected = rowIDs.length > 0 && selectedCount === rowIDs.length; return <div className={`activity-category-card-row ${selected ? "selected" : ""}`} key={row.name} role="button" tabIndex={0} draggable onDragStart={(event) => dragStart(event, row)} onClick={(event) => openDetails(event, row.activities[0])} onDoubleClick={(event) => createTimeEntry(event, row.activities[0])} onKeyDown={(event) => handleKeyDown(event, row.activities[0])} aria-label={`Open ${row.name} in ${title}`} title="Click for details · double-click to create a time entry · drag to a project">
         <span className={`activity-category-card-dot ${row.category.key}`} style={{ background: activityCategoryStyle(row.category).color }} title={row.category.label} aria-label={row.category.label} />
-        <strong>{row.name}</strong><span>{formatDurationSeconds(row.seconds)}</span>
-      </div>)}</div> : <p className="activity-category-card-empty">No matching activity</p>}
+        {onToggleActivitySelection ? <button type="button" className={`activity-category-card-select activity-row-action ${selected ? "selected" : ""}`} aria-label={selected ? `Deselect ${row.name}` : `Select ${row.name}`} aria-pressed={selected} onClick={(event) => toggleRowSelection(event, row)}><CheckCircle size={15} weight={selected ? "fill" : "regular"} /></button> : null}<strong>{row.name}</strong><span>{formatDurationSeconds(row.seconds)}</span>
+      </div>; })}</div> : <p className="activity-category-card-empty">No matching activity</p>}
     </section>)}
   </div>;
 }
@@ -4370,6 +4384,7 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   const [filtersMenuOpen, setFiltersMenuOpen] = useState(false);
   const [hideDevicesWithoutTime, setHideDevicesWithoutTime] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
+  const [selectedActivityIDs, setSelectedActivityIDs] = useState(() => new Set());
   const [timerBusy, setTimerBusy] = useState(false);
   const [timerMessage, setTimerMessage] = useState("");
   const [displayMessage, setDisplayMessage] = useState("");
@@ -4451,6 +4466,10 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   const timelineActivities = currentActivities
     .filter((activity) => (includeIdle || activityCategory(activity).key !== "idle") && filterActivity(activity))
     .map((activity) => ({ ...activity, _wrapAtMinute: wrapAtMinute }));
+  const selectedVisibleActivities = activities.filter((activity) => selectedActivityIDs.has(resourceID(activity.id)));
+  const entryOMaticActivities = selectedActivityIDs.size > 0
+    ? timelineActivities.filter((activity) => selectedActivityIDs.has(resourceID(activity.id)))
+    : timelineActivities;
   const hasFilters = Boolean(normalizedQuery || categoryFilter !== "all" || deviceFilter !== "all" || projectFilterID !== "all" || savedFilterID !== "all" || timelineSelection);
   const resetFilters = () => {
     setQuery("");
@@ -4460,6 +4479,17 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     setSavedFilterID("all");
     setTimelineSelection(null);
   };
+  const toggleActivitySelection = (value) => {
+    const ids = (Array.isArray(value) ? value : [value]).map(resourceID).filter(Boolean);
+    if (!ids.length) return;
+    setSelectedActivityIDs((current) => {
+      const next = new Set(current);
+      const allSelected = ids.every((id) => next.has(id));
+      ids.forEach((id) => allSelected ? next.delete(id) : next.add(id));
+      return next;
+    });
+  };
+  const clearActivitySelection = () => setSelectedActivityIDs(new Set());
   const handleActivityProjectDrop = (event, project) => assignActivitiesFromDrop({
     event,
     activities: allActivities,
@@ -4685,12 +4715,12 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     window.addEventListener("keydown", handleUndo);
     return () => window.removeEventListener("keydown", handleUndo);
   }, [entryOMaticUndo]);
-  useEffect(() => { setSelectedActivity(null); setSelectedTimeEntry(null); setTimelineSelection(null); }, [dateKey]);
+  useEffect(() => { setSelectedActivity(null); setSelectedTimeEntry(null); setTimelineSelection(null); setSelectedActivityIDs(new Set()); }, [dateKey]);
   const activityHeading = dateKey === localDateKey() ? "Today’s activity" : `${planDateLabel(dateKey)} activity`;
   const activityRangeDescription = activityRangeLoading
     ? `Loading ${activityTimeRangeLabel(activityTimeRange).toLowerCase()}…`
     : `${activityTimeRangeLabel(activityTimeRange)} history`;
-  return <main className="page supporting-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><div className="activities-page-actions"><DateControls dateKey={dateKey} onChange={setDateKey} label="Choose Activities date" /><button type="button" className="quiet-pill" onClick={() => openNewTimeEntry()} disabled={!api.connected}><Plus size={16} />New time entry</button><button type="button" className={`status-pill activities-timer ${timerRunning ? "active" : ""}`} onClick={toggleTimer} disabled={timerBusy || !api.connected}><Timer size={16} weight={timerRunning ? "fill" : "regular"} />{timerBusy ? "Updating…" : timerRunning ? "Stop timer" : "Start timer"}</button><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="activities-page-toolbar"><div className="activity-view-switcher" role="group" aria-label="Activity view"><button type="button" className={activityView === "unified" ? "active" : ""} onClick={() => setViewMode("unified")}>Unified</button><button type="button" className={activityView === "category" ? "active" : ""} onClick={() => setViewMode("category")}>By Category</button><button type="button" className={activityView === "chronological" ? "active" : ""} onClick={() => setViewMode("chronological")}>Chronological</button></div><label className="activity-display-toggle"><input type="checkbox" checked={includeIdle} onChange={(event) => setIdleVisibility(event.target.checked)} />Show Idle</label><label className="activity-display-toggle"><input type="checkbox" checked={groupByProject} disabled={activityView === "category"} onChange={(event) => setGrouping("project", event.target.checked)} />Group by project</label><label className="activity-display-toggle"><input type="checkbox" checked={groupByDevice} disabled={activityView === "category"} onChange={(event) => setGrouping("device", event.target.checked)} />Group by device</label><WebActivityDisplayMenu open={displayMenuOpen} onToggle={() => setDisplayMenuOpen((value) => !value)} preferences={api.activityPreferences} devices={devices} onChange={updateDisplayPreference} /><label className="activity-search"><Waveform size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search app, website, window title…" aria-label="Search activities" />{query ? <IconButton label="Clear activity search" onClick={() => setQuery("")}><X size={15} /></IconButton> : null}</label><WebActivityFiltersMenu open={filtersMenuOpen} filters={api.filters} projectFilterID={projectFilterID} savedFilterID={savedFilterID} categoryFilter={categoryFilter} onToggle={() => { setFiltersMenuOpen((value) => !value); setDevicesMenuOpen(false); }} onProjectFilter={(value) => { selectProjectFilter(value); setFiltersMenuOpen(false); }} onSavedFilter={(value) => { selectSavedFilter(value); setFiltersMenuOpen(false); }} onCategoryFilter={(value) => { setCategoryFilter(value); setFiltersMenuOpen(false); }} /><WebActivityDevicesMenu open={devicesMenuOpen} devices={devices} selectedDevice={deviceFilter} hideDevicesWithoutTime={hideDevicesWithoutTime} onToggle={() => { setDevicesMenuOpen((value) => !value); setFiltersMenuOpen(false); }} onSelect={setDeviceSelection} onToggleHide={setHideDevicesWithoutTime} /></div>{timerMessage ? <p className="entry-message activities-timer-message" role="status">{timerMessage}</p> : null}{displayMessage ? <p className="entry-message activities-display-message" role="status">{displayMessage}</p> : null}<div className="activities-workspace"><WebActivityProjectSidebar projects={api.projects} filters={api.filters} activities={allActivities} projectFilterID={projectFilterID} savedFilterID={savedFilterID} onProjectFilter={selectProjectFilter} onSavedFilter={selectSavedFilter} onEditProject={setEditProjectID} onCreateProjectFromActivities={createProjectFromActivities} onDropActivity={handleActivityProjectDrop} onReparentProject={reparentProject} /><div className="activities-workspace-main"><WebActivityTimeline activities={timelineActivities} dateKey={dateKey} api={api} onSelect={setSelectedActivity} onCreateTimeEntry={openActivityTimeEntry} onCreateSelection={openSelectedRangeTimeEntry} selection={timelineSelection} onSelectionChange={setTimelineSelection} onEditTimeEntry={setSelectedTimeEntry} onRecordCalendarEvent={openSourceTimeEntry} /><WebCalendarEventsPanel api={api} onRecord={openSourceTimeEntry} /><WebRemindersPanel api={api} onRecord={openSourceTimeEntry} /><WebPhoneCallsPanel api={api} onRecord={openSourceTimeEntry} /><WebScreenTimePanel api={api} /><WebActivityFiltersPanel api={api} /><WebActivityExclusionsPanel api={api} /><WebActivityCategoriesPanel api={api} /><section className="activities-list"><div className="activities-list-heading"><div><h2>{activityHeading}</h2><p>{api.connected ? hasFilters ? `${activities.length} of ${allActivities.length} locally recorded segments · ${activityRangeDescription}` : `${activities.length} locally recorded segments · ${activityRangeDescription}` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><div className="activities-list-heading-actions"><button type="button" className="quiet-pill" onClick={() => setEntryOMaticOpen(true)} disabled={!api.connected || timelineActivities.length === 0}><Sparkle size={16} />Create time entries</button><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? allActivities.length > 0 ? "No activity matches these filters" : "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || (hasFilters ? "Clear the filters to see all local activity." : "The hosted view keeps working with preview data until the loopback API is available.")}</span></div> : <ActivityTable activities={activities} viewMode={activityView} groupMode={activityView === "chronological" ? (groupByProject ? "project" : groupByDevice ? "device" : "none") : "none"} projects={api.projects} displayPreferences={api.activityPreferences} dateKey={dateKey} onSelect={setSelectedActivity} api={api} onCreateTimeEntry={openActivityTimeEntry} />}</section><ProjectPanel api={api} activities={allActivities} onDropActivity={handleActivityProjectDrop} editProjectID={editProjectID} onProjectEditHandled={() => setEditProjectID(null)} onAssignActivity={(id, projectID, activityDate) => api.assignActivity(id, projectID, activityDate || dateKey)} />{api.activityPreferences?.include_time_entries === false ? <TimeEntriesPanel api={api} dateKey={dateKey} /> : null}</div></div>{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} displayPreferences={api.activityPreferences} onClose={() => setSelectedActivity(null)} /> : null}<WebEntryOMaticDialog open={entryOMaticOpen} activities={timelineActivities} entries={api.entries} projects={api.projects} dateKey={dateKey} onClose={() => setEntryOMaticOpen(false)} onCreate={createGeneratedEntries} /><WebTimeEntryDialog mode={timeEntryDialogMode} open={Boolean(timeEntryDialogMode)} api={api} projects={api.projects} recentEntries={api.entries} dateKey={dateKey} initialEntry={timeEntryPrefill} onClose={() => { setTimeEntryDialogMode(null); setTimeEntryPrefill(null); }} /><WebTimeEntryEditDialog entry={selectedTimeEntry} api={api} projects={api.projects} dateKey={dateKey} onClose={() => setSelectedTimeEntry(null)} /></main>;
+  return <main className="page supporting-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><div className="activities-page-actions"><DateControls dateKey={dateKey} onChange={setDateKey} label="Choose Activities date" /><button type="button" className="quiet-pill" onClick={() => openNewTimeEntry()} disabled={!api.connected}><Plus size={16} />New time entry</button><button type="button" className={`status-pill activities-timer ${timerRunning ? "active" : ""}`} onClick={toggleTimer} disabled={timerBusy || !api.connected}><Timer size={16} weight={timerRunning ? "fill" : "regular"} />{timerBusy ? "Updating…" : timerRunning ? "Stop timer" : "Start timer"}</button><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="activities-page-toolbar"><div className="activity-view-switcher" role="group" aria-label="Activity view"><button type="button" className={activityView === "unified" ? "active" : ""} onClick={() => setViewMode("unified")}>Unified</button><button type="button" className={activityView === "category" ? "active" : ""} onClick={() => setViewMode("category")}>By Category</button><button type="button" className={activityView === "chronological" ? "active" : ""} onClick={() => setViewMode("chronological")}>Chronological</button></div><label className="activity-display-toggle"><input type="checkbox" checked={includeIdle} onChange={(event) => setIdleVisibility(event.target.checked)} />Show Idle</label><label className="activity-display-toggle"><input type="checkbox" checked={groupByProject} disabled={activityView === "category"} onChange={(event) => setGrouping("project", event.target.checked)} />Group by project</label><label className="activity-display-toggle"><input type="checkbox" checked={groupByDevice} disabled={activityView === "category"} onChange={(event) => setGrouping("device", event.target.checked)} />Group by device</label><WebActivityDisplayMenu open={displayMenuOpen} onToggle={() => setDisplayMenuOpen((value) => !value)} preferences={api.activityPreferences} devices={devices} onChange={updateDisplayPreference} /><label className="activity-search"><Waveform size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search app, website, window title…" aria-label="Search activities" />{query ? <IconButton label="Clear activity search" onClick={() => setQuery("")}><X size={15} /></IconButton> : null}</label><WebActivityFiltersMenu open={filtersMenuOpen} filters={api.filters} projectFilterID={projectFilterID} savedFilterID={savedFilterID} categoryFilter={categoryFilter} onToggle={() => { setFiltersMenuOpen((value) => !value); setDevicesMenuOpen(false); }} onProjectFilter={(value) => { selectProjectFilter(value); setFiltersMenuOpen(false); }} onSavedFilter={(value) => { selectSavedFilter(value); setFiltersMenuOpen(false); }} onCategoryFilter={(value) => { setCategoryFilter(value); setFiltersMenuOpen(false); }} /><WebActivityDevicesMenu open={devicesMenuOpen} devices={devices} selectedDevice={deviceFilter} hideDevicesWithoutTime={hideDevicesWithoutTime} onToggle={() => { setDevicesMenuOpen((value) => !value); setFiltersMenuOpen(false); }} onSelect={setDeviceSelection} onToggleHide={setHideDevicesWithoutTime} /></div>{timerMessage ? <p className="entry-message activities-timer-message" role="status">{timerMessage}</p> : null}{displayMessage ? <p className="entry-message activities-display-message" role="status">{displayMessage}</p> : null}<div className="activities-workspace"><WebActivityProjectSidebar projects={api.projects} filters={api.filters} activities={allActivities} projectFilterID={projectFilterID} savedFilterID={savedFilterID} onProjectFilter={selectProjectFilter} onSavedFilter={selectSavedFilter} onEditProject={setEditProjectID} onCreateProjectFromActivities={createProjectFromActivities} onDropActivity={handleActivityProjectDrop} onReparentProject={reparentProject} /><div className="activities-workspace-main"><WebActivityTimeline activities={timelineActivities} dateKey={dateKey} api={api} onSelect={setSelectedActivity} onCreateTimeEntry={openActivityTimeEntry} onCreateSelection={openSelectedRangeTimeEntry} selection={timelineSelection} onSelectionChange={setTimelineSelection} onEditTimeEntry={setSelectedTimeEntry} onRecordCalendarEvent={openSourceTimeEntry} /><WebCalendarEventsPanel api={api} onRecord={openSourceTimeEntry} /><WebRemindersPanel api={api} onRecord={openSourceTimeEntry} /><WebPhoneCallsPanel api={api} onRecord={openSourceTimeEntry} /><WebScreenTimePanel api={api} /><WebActivityFiltersPanel api={api} /><WebActivityExclusionsPanel api={api} /><WebActivityCategoriesPanel api={api} /><section className="activities-list"><div className="activities-list-heading"><div><h2>{activityHeading}</h2><p>{api.connected ? hasFilters ? `${activities.length} of ${allActivities.length} locally recorded segments · ${activityRangeDescription}` : `${activities.length} locally recorded segments · ${activityRangeDescription}` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><div className="activities-list-heading-actions">{selectedVisibleActivities.length > 0 ? <div className="activity-selection-actions" role="status"><span>{selectedVisibleActivities.length} selected</span><button type="button" className="quiet-pill" onClick={() => setEntryOMaticOpen(true)} disabled={!api.connected || entryOMaticActivities.length === 0}><Sparkle size={15} />Create selected</button><button type="button" className="quiet-pill" onClick={clearActivitySelection}>Clear</button></div> : null}<button type="button" className="quiet-pill" onClick={() => setEntryOMaticOpen(true)} disabled={!api.connected || timelineActivities.length === 0}><Sparkle size={16} />Create time entries</button><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? allActivities.length > 0 ? "No activity matches these filters" : "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || (hasFilters ? "Clear the filters to see all local activity." : "The hosted view keeps working with preview data until the loopback API is available.")}</span></div> : <ActivityTable activities={activities} viewMode={activityView} groupMode={activityView === "chronological" ? (groupByProject ? "project" : groupByDevice ? "device" : "none") : "none"} projects={api.projects} displayPreferences={api.activityPreferences} dateKey={dateKey} onSelect={setSelectedActivity} api={api} onCreateTimeEntry={openActivityTimeEntry} selectedActivityIDs={selectedActivityIDs} onToggleActivitySelection={toggleActivitySelection} onCreateSelectedTimeEntries={() => setEntryOMaticOpen(true)} />}</section><ProjectPanel api={api} activities={allActivities} onDropActivity={handleActivityProjectDrop} editProjectID={editProjectID} onProjectEditHandled={() => setEditProjectID(null)} onAssignActivity={(id, projectID, activityDate) => api.assignActivity(id, projectID, activityDate || dateKey)} />{api.activityPreferences?.include_time_entries === false ? <TimeEntriesPanel api={api} dateKey={dateKey} /> : null}</div></div>{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} displayPreferences={api.activityPreferences} onClose={() => setSelectedActivity(null)} /> : null}<WebEntryOMaticDialog open={entryOMaticOpen} activities={entryOMaticActivities} entries={api.entries} projects={api.projects} dateKey={dateKey} onClose={() => setEntryOMaticOpen(false)} onCreate={createGeneratedEntries} /><WebTimeEntryDialog mode={timeEntryDialogMode} open={Boolean(timeEntryDialogMode)} api={api} projects={api.projects} recentEntries={api.entries} dateKey={dateKey} initialEntry={timeEntryPrefill} onClose={() => { setTimeEntryDialogMode(null); setTimeEntryPrefill(null); }} /><WebTimeEntryEditDialog entry={selectedTimeEntry} api={api} projects={api.projects} dateKey={dateKey} onClose={() => setSelectedTimeEntry(null)} /></main>;
 }
 
 function StatsDonut({ rows, total, label, centerLabel = null, centerCaption = null }) {

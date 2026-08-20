@@ -844,6 +844,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-table-row-collapsed .activity-table-icon { background: #e9ebef; color: #737986; }
 .activity-row-project-static { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
 .activity-table-row:focus-visible { position: relative; z-index: 1; outline-offset: -2px; }
+.activity-row-select, .activity-category-card-select { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 24px; flex: 0 0 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #a0a4ae; cursor: pointer; }
+.activity-row-select:hover, .activity-row-select:focus-visible, .activity-row-select.selected, .activity-category-card-select:hover, .activity-category-card-select:focus-visible, .activity-category-card-select.selected { background: #e7ebff; color: var(--accent); outline: none; }
 .activity-table-head { min-height: 34px; color: var(--muted); font-size: 11px; font-weight: 650; }
 .activity-group { border-bottom: 1px solid #eceef1; }
 .activity-group-heading { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 46px; padding: 0 12px; border: 0; background: #fafbfc; color: #282b32; cursor: pointer; text-align: left; }
@@ -873,8 +875,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-category-card-heading strong { font-size: 13px; }
 .activity-category-card-heading small { color: var(--muted); font-size: 10px; font-weight: 650; }
 .activity-category-card-rows { display: grid; gap: 1px; max-height: 184px; overflow-y: auto; padding-right: 2px; }
-.activity-category-card-row { display: grid; grid-template-columns: 7px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 28px; padding: 3px 4px; border-radius: 5px; color: #343841; cursor: pointer; }
-.activity-category-card-row:hover, .activity-category-card-row:focus-visible { background: #fff; outline: none; }
+.activity-category-card-row { display: grid; grid-template-columns: 7px 22px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 28px; padding: 3px 4px; border-radius: 5px; color: #343841; cursor: pointer; }
+.activity-category-card-row:hover, .activity-category-card-row:focus-visible, .activity-category-card-row.selected { background: #fff; outline: none; }
 .activity-category-card-row strong { overflow: hidden; font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .activity-category-card-row > span:last-child { color: var(--muted); font-size: 10px; font-weight: 650; }
 .activity-category-card-dot { width: 6px; height: 6px; border-radius: 50%; }
@@ -891,6 +893,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-app-copy small { color: var(--muted); }
 .activity-app-copy small.activity-date-range { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; letter-spacing: .01em; }
 .activity-table-icon { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 7px; background: #f0f1f4; color: #3f434d; }
+.activity-selection-actions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.activity-selection-actions > span { color: var(--accent); font-size: 11px; font-weight: 650; }
 .activity-category { display: inline-flex; align-items: center; gap: 6px; width: fit-content; min-height: 24px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 650; }
 .activity-category i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .activity-category.focused { background: #eef1ff; color: var(--accent); }
