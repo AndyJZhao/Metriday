@@ -893,6 +893,7 @@ struct ActivitiesView: View {
                         savedFilterButton(savedFilter)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 10)
             }
             .frame(maxHeight: .infinity)
@@ -2139,6 +2140,8 @@ struct ActivitiesView: View {
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
 
         if let onDoubleTap {
             return AnyView(
@@ -2298,23 +2301,17 @@ struct ActivitiesView: View {
             .buttonStyle(.plain)
             .padding(.leading, 14 + CGFloat(depth * 16))
             .padding(.trailing, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .simultaneousGesture(
+                TapGesture(count: 2)
+                    .onEnded { editingProject = project }
+            )
         }
         .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
         .background(filter == target ? MetridayTheme.accentSoft : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .gesture(
-            TapGesture(count: 2)
-                .exclusively(before: TapGesture())
-                .onEnded { result in
-                    switch result {
-                    case .first:
-                        editingProject = project
-                    case .second:
-                        selectActivityFilter(target)
-                    }
-                }
-        )
         .onDrop(of: [UTType.plainText], isTargeted: nil) { providers, _ in
             handleActivityDrop(providers, onto: project)
         }
@@ -2329,6 +2326,7 @@ struct ActivitiesView: View {
             }
         }
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("activities.project.\(project.id.uuidString)")
         .accessibilityLabel("Project \(project.name), \(formatMinutes(projectDurationSeconds(for: project.id)))")
     }
     }

@@ -436,6 +436,7 @@ struct SidebarView: View {
                             .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                     }
                     .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("sidebar.\(section.rawValue.lowercased())")
                 }
             }
@@ -459,6 +460,7 @@ struct SidebarView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("sidebar.data")
 
                 Button {
@@ -473,6 +475,7 @@ struct SidebarView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("sidebar.settings")
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
@@ -524,10 +527,17 @@ struct GlobalTopHeader: View {
                     .minimumScaleFactor(0.72)
 
                 ZStack(alignment: .leading) {
-                    Color.clear
-                        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                        .onTapGesture { appState.goToToday() }
-                        .accessibilityHidden(true)
+                    Button {
+                        appState.goToToday()
+                    } label: {
+                        Rectangle()
+                            .fill(.clear)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .accessibilityLabel("Today")
+                    .accessibilityIdentifier("header.today-banner")
 
                     HStack(spacing: 12) {
                         Button {
@@ -668,10 +678,17 @@ struct PageDateHeader: View {
             Spacer()
             if showsDateControls {
                 ZStack(alignment: .leading) {
-                    Color.clear
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .onTapGesture { appState.goToToday() }
-                        .accessibilityHidden(true)
+                    Button {
+                        appState.goToToday()
+                    } label: {
+                        Rectangle()
+                            .fill(.clear)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityLabel("Today")
+                    .accessibilityIdentifier("\(title.lowercased()).date-today-banner")
 
                     HStack(spacing: 7) {
                         Button {
