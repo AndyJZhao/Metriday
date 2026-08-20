@@ -790,6 +790,16 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-group-meta svg { transition: transform 160ms ease; }
 .activity-group-meta svg.collapsed { transform: rotate(-90deg); }
 .activity-group-rows .activity-table-row:last-child { border-bottom: 0; }
+.activity-table-unified > .activity-group-project { border-bottom: 1px solid #e5e8ed; }
+.activity-group-project-heading { min-height: 50px; background: #f7f8fa; }
+.activity-group-project-heading .activity-group-title { gap: 8px; }
+.activity-group-project-heading .activity-group-title > svg { color: var(--muted); }
+.activity-group-nested { margin-left: 18px; border-left: 1px solid #e6e8ec; }
+.activity-group-application { border-bottom: 1px solid #eceef1; }
+.activity-group-application:last-child { border-bottom: 0; }
+.activity-group-application-heading { min-height: 44px; padding-left: 12px; background: #fff; }
+.activity-group-application-heading:hover { background: #fafbff; }
+.activity-group-app-icon { width: 26px; height: 26px; flex-basis: 26px; border-radius: 6px; }
 .activity-table-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
 .activity-table-row small { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .activity-row-project { display: flex; align-items: center; min-width: 0; gap: 5px; }

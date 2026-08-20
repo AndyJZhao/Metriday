@@ -2821,10 +2821,11 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
       {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} /> : null}
     </div>;
   }
-  const grouped = [...rows.reduce((groups, activity) => {
+  const groupedFor = (items, groupingMode, keyPrefix = "") => [...items.reduce((groups, activity) => {
     const category = activityCategory(activity);
-    const key = grouping === "category" ? `${category.key}:${category.label}` : grouping === "project" ? resourceID(activity.projectID) || "unassigned" : grouping === "device" ? activity.deviceName || "This Mac" : activity.appName || activity.deviceName || "Unknown App";
-    const label = grouping === "category" ? category.label : grouping === "project" ? projectTitleFor(projects, activity.projectID) : grouping === "device" ? activity.deviceName || "This Mac" : activity.appName || activity.deviceName || "Unknown App";
+    const rawKey = groupingMode === "category" ? `${category.key}:${category.label}` : groupingMode === "project" ? resourceID(activity.projectID) || "unassigned" : groupingMode === "device" ? activity.deviceName || "This Mac" : activity.appName || activity.deviceName || "Unknown App";
+    const key = `${keyPrefix}${rawKey}`;
+    const label = groupingMode === "category" ? category.label : groupingMode === "project" ? projectTitleFor(projects, activity.projectID) : groupingMode === "device" ? activity.deviceName || "This Mac" : activity.appName || activity.deviceName || "Unknown App";
     const existing = groups.get(key) || { key, label, category, categories: new Map(), activities: [], seconds: 0 };
     existing.categories.set(`${category.key}:${category.label}:${category.color}`, category);
     existing.activities.push(activity);
@@ -2832,18 +2833,58 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     groups.set(key, existing);
     return groups;
   }, new Map()).values()].sort((left, right) => right.seconds - left.seconds || left.label.localeCompare(right.label));
+  const categorySummary = (categories) => categories.length ? <span className="activity-group-category-summary">{categories.map((item) => <span key={`${item.key}:${item.label}:${item.color}`} className={`activity-category-dot ${item.key}`} style={{ background: activityCategoryStyle(item).color }} title={item.label} aria-label={item.label} />)}<small>{categories.length === 1 ? categories[0].label : "Multiple categories"}</small></span> : null;
+  const toggleGroup = (key) => setCollapsedGroups((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
+  const renderGroupMeta = (group, collapsed) => <span className="activity-group-meta">{formatDurationSeconds(group.seconds)} · {group.activities.length} segment{group.activities.length === 1 ? "" : "s"}<CaretDown size={15} className={collapsed ? "collapsed" : ""} /></span>;
+  const renderFlatGroup = (group) => {
+    const collapsed = collapsedGroups.has(group.key);
+    const categories = [...(group.categories?.values?.() || [])];
+    return <section className="activity-group" key={group.key}>
+      <button type="button" className="activity-group-heading" onClick={() => toggleGroup(group.key)} aria-expanded={!collapsed}>
+        <span className="activity-group-title">{grouping === "category" ? <span className={`activity-category ${group.category.key}`} style={activityCategoryStyle(group.category)}><i />{group.label}</span> : <><strong>{group.label}</strong>{grouping === "application" ? categorySummary(categories) : null}</>}</span>
+        {renderGroupMeta(group, collapsed)}
+      </button>
+      {!collapsed ? <div className="activity-group-rows">{group.activities.map(activityRow)}</div> : null}
+    </section>;
+  };
+  if (grouping === "application") {
+    const projectGroups = groupedFor(rows, "project", "project:");
+    return <div className="activity-table activity-table-unified">
+      {projectGroups.map((projectGroup) => {
+        const projectCollapsed = collapsedGroups.has(projectGroup.key);
+        const appGroups = groupedFor(projectGroup.activities, "application", `${projectGroup.key}::application:`);
+        return <section className="activity-group activity-group-project" key={projectGroup.key}>
+          <button type="button" className="activity-group-heading activity-group-project-heading" onClick={() => toggleGroup(projectGroup.key)} aria-expanded={!projectCollapsed}>
+            <span className="activity-group-title"><FolderSimple size={16} /><strong>{projectGroup.label}</strong></span>
+            {renderGroupMeta(projectGroup, projectCollapsed)}
+          </button>
+          {!projectCollapsed ? <div className="activity-group-nested">
+            {appGroups.map((appGroup) => {
+              const appCollapsed = collapsedGroups.has(appGroup.key);
+              const AppIcon = activityIcon(appGroup.activities[0]);
+              const categories = [...(appGroup.categories?.values?.() || [])];
+              return <section className="activity-group activity-group-application" key={appGroup.key}>
+                <button type="button" className="activity-group-heading activity-group-application-heading" onClick={() => toggleGroup(appGroup.key)} aria-expanded={!appCollapsed}>
+                  <span className="activity-group-title"><span className="activity-table-icon activity-group-app-icon"><AppIcon size={17} weight="duotone" /></span><strong>{appGroup.label}</strong>{categorySummary(categories)}</span>
+                  {renderGroupMeta(appGroup, appCollapsed)}
+                </button>
+                {!appCollapsed ? <div className="activity-group-rows">{appGroup.activities.map(activityRow)}</div> : null}
+              </section>;
+            })}
+          </div> : null}
+        </section>;
+      })}
+      {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} /> : null}
+    </div>;
+  }
+  const grouped = groupedFor(rows, grouping);
   return <div className="activity-table">
-    {grouped.map((group) => {
-      const collapsed = collapsedGroups.has(group.key);
-      const categories = [...(group.categories?.values?.() || [])];
-      return <section className="activity-group" key={group.key}>
-        <button type="button" className="activity-group-heading" onClick={() => setCollapsedGroups((current) => { const next = new Set(current); if (next.has(group.key)) next.delete(group.key); else next.add(group.key); return next; })} aria-expanded={!collapsed}>
-          <span className="activity-group-title">{grouping === "category" ? <span className={`activity-category ${group.category.key}`} style={activityCategoryStyle(group.category)}><i />{group.label}</span> : <><strong>{group.label}</strong>{grouping === "application" && categories.length ? <span className="activity-group-category-summary">{categories.map((item) => <span key={`${item.key}:${item.label}:${item.color}`} className={`activity-category-dot ${item.key}`} style={{ background: activityCategoryStyle(item).color }} title={item.label} aria-label={item.label} />)}<small>{categories.length === 1 ? categories[0].label : "Multiple categories"}</small></span> : null}</>}</span>
-          <span className="activity-group-meta">{formatDurationSeconds(group.seconds)} · {group.activities.length} segment{group.activities.length === 1 ? "" : "s"}<CaretDown size={15} className={collapsed ? "collapsed" : ""} /></span>
-        </button>
-        {!collapsed ? <div className="activity-group-rows">{group.activities.map(activityRow)}</div> : null}
-      </section>;
-    })}
+    {grouped.map(renderFlatGroup)}
     {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} /> : null}
   </div>;
 }
