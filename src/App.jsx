@@ -3089,7 +3089,7 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
  };
  const clockForAxisMinute = (minute) => {
-   const bounded = Math.max(0, Math.min(24 * 60, Number(minute || 0)));
+   const bounded = Math.max(0, Math.min(timelineEndMinute, Number(minute || 0)));
    if (bounded >= 24 * 60 && wrapAtMinute === 0) return "24:00";
    return formatTime(wallMinuteForAxisMinute(bounded));
  };
@@ -3115,7 +3115,7 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
  };
  const minutePercent = (minute) => ((minute - timelineStartMinute) / timelineSpanMinutes) * 100;
  const dayMinuteToTimelineMinute = (minute) => {
-   const bounded = Math.max(0, Math.min(24 * 60, Number(minute || 0)));
+   const bounded = Math.max(0, Math.min(timelineEndMinute, Number(minute || 0)));
    return timelineEndMinute > 24 * 60 && bounded < timelineStartMinute ? bounded + 24 * 60 : bounded;
  };
   const [now, setNow] = useState(() => new Date());
@@ -3135,20 +3135,20 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
     const offset = orientation === "vertical" ? clientPosition - rect.top : clientPosition - rect.left;
     const length = orientation === "vertical" ? rect.height : rect.width;
     const absolute = timelineStartMinute + Math.round((offset / length) * timelineSpanMinutes / 15) * 15;
-    return Math.max(0, Math.min(24 * 60, absolute));
+    return Math.max(timelineStartMinute, Math.min(timelineEndMinute, absolute));
   };
   const startSelection = (event) => {
     if (event.button !== 0 || !trackRef.current) return;
     const rect = trackRef.current.getBoundingClientRect();
     const position = orientation === "vertical" ? event.clientY : event.clientX;
     const start = minuteAt(position, rect);
-    let latest = { start, end: Math.min(start + 15, 24 * 60) };
+    let latest = { start, end: Math.min(start + 15, timelineEndMinute) };
     updateSelection(latest);
     const move = (moveEvent) => {
       const movePosition = orientation === "vertical" ? moveEvent.clientY : moveEvent.clientX;
       const end = minuteAt(movePosition, rect);
-      latest = { start: Math.min(start, end), end: Math.max(start, end) || Math.min(start + 15, 24 * 60) };
-      if (latest.end === latest.start) latest.end = Math.min(latest.start + 15, 24 * 60);
+      latest = { start: Math.min(start, end), end: Math.max(start, end) || Math.min(start + 15, timelineEndMinute) };
+      if (latest.end === latest.start) latest.end = Math.min(latest.start + 15, timelineEndMinute);
       updateSelection(latest);
     };
     const up = () => {

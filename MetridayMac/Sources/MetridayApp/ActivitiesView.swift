@@ -118,7 +118,7 @@ private struct ActivityTimelineWindow: Equatable {
         let normalized = min(1, max(0, x / max(1, width)))
         let absolute = startMinute + Int((normalized * CGFloat(spanMinutes)).rounded())
         // Selection and entry APIs use minutes within the selected calendar day.
-        return min(1_440, max(0, (absolute / 15) * 15))
+        return min(endMinute, max(startMinute, (absolute / 15) * 15))
     }
 
     func label(for minute: Int) -> String {
@@ -5839,7 +5839,7 @@ private struct ActivityTimelinePanel: View {
                             guard let anchor = dragAnchorMinute else { return }
                             selectionStart = min(anchor, minute)
                             selectionEnd = max(anchor + 15, minute)
-                            selectionEnd = min(1_440, selectionEnd ?? 1_440)
+                            selectionEnd = min(timelineWindow.endMinute, selectionEnd ?? timelineWindow.endMinute)
                         }
                         .onEnded { _ in
                             dragAnchorMinute = nil
@@ -6140,7 +6140,7 @@ private struct ActivityTimelinePanel: View {
                         }
                         guard let anchor = dragAnchorMinute else { return }
                         selectionStart = min(anchor, minute)
-                        selectionEnd = min(1_440, max(anchor + 15, minute))
+                        selectionEnd = min(timelineWindow.endMinute, max(anchor + 15, minute))
                     }
                     .onEnded { _ in
                         dragAnchorMinute = nil
