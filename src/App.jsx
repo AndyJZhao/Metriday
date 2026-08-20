@@ -1731,9 +1731,9 @@ function TodayInsightBar({ api, setPage }) {
     return <div {...bannerProps}><TrendUp size={26} color="#4f63ef" weight="duotone" /><div><p><strong>Started 8 min late</strong><b>·</b><strong className="positive">82% task-related</strong><b>·</b><strong className="warning">Estimate likely +25 min</strong></p><span>Connect Metriday to replace the preview insight with local activity evidence.</span></div><button type="button" className="secondary-button" onClick={(event) => { event.stopPropagation(); openRules(); }}><ShieldCheck size={18} /> Adjust blocklist</button></div>;
   }
   const activities = Array.isArray(api.activities) ? api.activities : [];
-  const active = activities.filter((activity) => activity.relevance !== "idle");
-  const relatedSeconds = active.filter((activity) => activity.relevance === "related").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
-  const distractedSeconds = active.filter((activity) => activity.relevance === "distracted").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
+  const active = activities.filter((activity) => activityCategory(activity).key !== "idle");
+  const relatedSeconds = active.filter((activity) => activityCategory(activity).key === "focused").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
+  const distractedSeconds = active.filter((activity) => activityCategory(activity).key === "distracting").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
   const activeSeconds = active.reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
   const taskRelated = activeSeconds > 0 ? Math.round((relatedSeconds / activeSeconds) * 100) : 0;
   const distraction = api.insights?.find((insight) => insight.id === "distraction");
@@ -2576,15 +2576,16 @@ function ReviewPage({ api, dateKey, setDateKey, setPage }) {
   const days = reviewWeekly.length >= 7 ? reviewWeekly.slice(-7).map((day) => {
     const plannedMinutes = (day.plan?.tasks || []).reduce((total, task) => total + (Number.isFinite(task.start_minute) && Number.isFinite(task.end_minute) ? Math.max(0, task.end_minute - task.start_minute) : 0), 0);
     const activities = (day.activities || []).filter((activity) => activityMatchesSelectedDevice(activity, selectedDevice));
-    const activeSeconds = activities.reduce((total, activity) => total + (activity.relevance === "idle" ? 0 : Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0))), 0);
+    const activeSeconds = activities.reduce((total, activity) => total + (activityCategory(activity).key === "idle" ? 0 : Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0))), 0);
     return { date: day.date, label: new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short" }), planned: plannedMinutes / 60, actual: activeSeconds / 3600, activities, entries: day.entries || [] };
   }) : fallbackDays;
   const selectedActivities = api.activities.filter((activity) => activityMatchesSelectedDevice(activity, selectedDevice));
-  const relatedSeconds = selectedActivities.filter((activity) => activity.relevance === "related").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
-  const distractedSeconds = selectedActivities.filter((activity) => activity.relevance === "distracted").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
-  const totalActive = relatedSeconds + distractedSeconds + selectedActivities.filter((activity) => activity.relevance === "other").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
+  const activeSelectedActivities = selectedActivities.filter((activity) => activityCategory(activity).key !== "idle");
+  const relatedSeconds = activeSelectedActivities.filter((activity) => activityCategory(activity).key === "focused").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
+  const distractedSeconds = activeSelectedActivities.filter((activity) => activityCategory(activity).key === "distracting").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
+  const totalActive = activeSelectedActivities.reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
   const taskRelated = totalActive > 0 ? Math.round((relatedSeconds / totalActive) * 100) : 0;
-  const productivityScore = totalActive > 0 ? Math.round(selectedActivities.filter((activity) => activity.relevance !== "idle").reduce((total, activity) => total + activityProductivityValue(activity, api.projects) * Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0) / totalActive) : 0;
+  const productivityScore = totalActive > 0 ? Math.round(activeSelectedActivities.reduce((total, activity) => total + activityProductivityValue(activity, api.projects) * Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0) / totalActive) : 0;
   const deepWork = api.connected ? formatDurationSeconds(relatedSeconds) : "22h 14m";
   const distraction = api.connected ? formatDurationSeconds(distractedSeconds) : "91%";
   const categoryActivities = api.connected
@@ -2839,7 +2840,7 @@ function WebReportPanel({ api, dateKey }) {
     });
     if (includeMode !== "time") {
       dataset.activities.forEach((activity) => {
-        if (activity.relevance === "idle") return;
+        if (activityCategory(activity).key === "idle") return;
         if (!activityMatchesSelectedDevice(activity, selectedDevice)) return;
         if (!includesProject(activity.projectID)) return;
         const start = reportDateTime(activity.date, activity.startSecond);
