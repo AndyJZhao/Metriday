@@ -4765,7 +4765,7 @@ function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProje
     return groups;
   }, new Map()).values()].sort((left, right) => right.seconds - left.seconds);
   const categoryTotal = categoryRows.reduce((total, row) => total + row.seconds, 0);
-  const categoryDonutRows = categoryRows.map((row) => ({ ...row, color: activityCategoryStyle({ color: row.color }).color }));
+  const categoryDonutRows = categoryRows.map((row) => ({ ...row, color: activityCategoryStyle(row).color }));
   const applicationDonutRows = appRows.map((row) => ({ ...row, key: `${row.name}:${row.category.label}`, label: row.name, color: activityCategoryStyle(row.category).color }));
   const projectDonutRows = projectRows.map(([name, seconds], index) => {
     const project = api.projects.find((item) => projectTitleFor(api.projects, item.id) === name);
