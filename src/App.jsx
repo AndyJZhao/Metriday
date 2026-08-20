@@ -771,24 +771,55 @@ function activityIcon(activity) {
   return Browsers;
 }
 
-function activityApplicationGroupName(activity, displayPreferences = null) {
+function activityFilePath(resource) {
+  const value = String(resource || "").trim();
+  if (!value) return "";
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === "file:") return decodeURIComponent(parsed.pathname);
+    if (parsed.host) return "";
+  } catch {
+    // Raw local paths are valid activity resources too.
+  }
+  return value.replace(/^file:\/\//, "");
+}
+
+function pathGroupingNames(resource, displayPreferences = null) {
+  const filePath = activityFilePath(resource);
+  if (!filePath) return [];
+  const grouping = displayPreferences?.group_paths_by || "allDirectories";
+  const normalized = filePath.replace(/\\+/g, "/").replace(/\/\.\//g, "/").replace(/\/+/g, "/");
+  if (grouping === "filePathOnly") return [normalized];
+  const lastSlash = normalized.lastIndexOf("/");
+  const immediateParent = lastSlash > 0 ? normalized.slice(0, lastSlash) : "/";
+  if (grouping === "immediateParentDirectory") return [immediateParent];
+  const names = [];
+  let current = immediateParent;
+  while (current && current !== "/") {
+    names.push(current);
+    const parentSlash = current.lastIndexOf("/");
+    const parent = parentSlash > 0 ? current.slice(0, parentSlash) : "/";
+    if (parent === current) break;
+    current = parent;
+  }
+  return names;
+}
+
+function activityApplicationGroupNames(activity, displayPreferences = null) {
   const resource = String(activity?.resource || "").trim();
   if (displayPreferences?.group_websites_independently && resource) {
     try {
       const host = new URL(resource).host;
-      if (host) return host;
+      if (host) return [host];
     } catch {
       // Continue with the normal application grouping.
     }
   }
   if (displayPreferences?.group_paths_independently && resource) {
-    try {
-      if (!new URL(resource).host) return resource.replace(/^file:\/\//, "");
-    } catch {
-      return resource.replace(/^file:\/\//, "");
-    }
+    const names = pathGroupingNames(resource, displayPreferences);
+    if (names.length) return names;
   }
-  return activity?.appName || activity?.deviceName || "Unknown App";
+  return [activity?.appName || activity?.deviceName || "Unknown App"];
 }
 
 function activityCategory(activity) {
@@ -3277,7 +3308,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     </div>;
   };
   if (viewMode === "category") {
-    return <WebActivityCategoryCards activities={rows} dateKey={dateKey} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} />;
+    return <WebActivityCategoryCards activities={rows} dateKey={dateKey} displayPreferences={displayPreferences} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} />;
   }
   const grouping = viewMode === "category" ? "category" : groupMode !== "none" ? groupMode : viewMode === "unified" ? "application" : "none";
   if (grouping === "none") {
@@ -3289,14 +3320,21 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
   }
   const groupedFor = (items, groupingMode, keyPrefix = "") => [...items.reduce((groups, activity) => {
     const category = activityCategory(activity);
-    const rawKey = groupingMode === "category" ? `${category.key}:${category.label}` : groupingMode === "project" ? resourceID(activity.projectID) || "unassigned" : groupingMode === "device" ? activity.deviceName || "This Mac" : activityApplicationGroupName(activity, displayPreferences);
-    const key = `${keyPrefix}${rawKey}`;
-    const label = groupingMode === "category" ? category.label : groupingMode === "project" ? projectTitleFor(projects, activity.projectID) : groupingMode === "device" ? activity.deviceName || "This Mac" : activityApplicationGroupName(activity, displayPreferences);
-    const existing = groups.get(key) || { key, label, category, categories: new Map(), activities: [], seconds: 0 };
-    existing.categories.set(`${category.key}:${category.label}:${category.color}`, category);
-    existing.activities.push(activity);
-    existing.seconds += activityDurationSeconds(activity);
-    groups.set(key, existing);
+    const names = groupingMode === "category"
+      ? [{ key: `${category.key}:${category.label}`, label: category.label }]
+      : groupingMode === "project"
+      ? [{ key: resourceID(activity.projectID) || "unassigned", label: projectTitleFor(projects, activity.projectID) }]
+      : groupingMode === "device"
+      ? [{ key: activity.deviceName || "This Mac", label: activity.deviceName || "This Mac" }]
+      : activityApplicationGroupNames(activity, displayPreferences).map((name) => ({ key: name, label: name }));
+    names.forEach(({ key: rawKey, label }) => {
+      const groupKey = `${keyPrefix}${rawKey}`;
+      const existing = groups.get(groupKey) || { key: groupKey, label, category, categories: new Map(), activities: [], seconds: 0 };
+      existing.categories.set(`${category.key}:${category.label}:${category.color}`, category);
+      existing.activities.push(activity);
+      existing.seconds += activityDurationSeconds(activity);
+      groups.set(groupKey, existing);
+    });
     return groups;
   }, new Map()).values()].sort((left, right) => right.seconds - left.seconds || left.label.localeCompare(right.label));
   const categorySummary = (categories) => categories.length ? <span className="activity-group-category-summary">{categories.map((item) => <span key={`${item.key}:${item.label}:${item.color}`} className={`activity-category-dot ${item.key}`} style={{ background: activityCategoryStyle(item).color }} title={item.label} aria-label={item.label} />)}<small>{categories.length === 1 ? categories[0].label : "Multiple categories"}</small></span> : null;
@@ -3355,7 +3393,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
   </div>;
 }
 
-function WebActivityCategoryCards({ activities, dateKey, onSelect, onCreateTimeEntry }) {
+function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onSelect, onCreateTimeEntry }) {
   const durationFor = (activity) => activityDurationSeconds(activity);
   const websiteName = (activity) => {
     try {
@@ -3365,8 +3403,8 @@ function WebActivityCategoryCards({ activities, dateKey, onSelect, onCreateTimeE
     }
   };
   const pathName = (activity) => {
-    if (!activity.resource || websiteName(activity)) return "";
-    return String(activity.resource).replace(/^file:\/\//, "") || "";
+    if (!activity.resource || websiteName(activity)) return [];
+    return pathGroupingNames(activity.resource, displayPreferences);
   };
   const keywordNames = (activity) => {
     const stopWords = new Set(["the", "and", "for", "with", "from", "http", "https", "www", "com"]);
@@ -3378,7 +3416,7 @@ function WebActivityCategoryCards({ activities, dateKey, onSelect, onCreateTimeE
   const groupedRows = (segments, namesFor) => {
     const groups = new Map();
     segments.forEach((activity) => {
-      namesFor(activity).filter(Boolean).forEach((name) => {
+    namesFor(activity).flatMap((name) => Array.isArray(name) ? name : [name]).filter(Boolean).forEach((name) => {
         const category = activityCategory(activity);
         const row = groups.get(name) || { name, activities: [], seconds: 0, categories: new Map() };
         row.activities.push(activity);
@@ -3398,7 +3436,7 @@ function WebActivityCategoryCards({ activities, dateKey, onSelect, onCreateTimeE
   const cards = [
     { key: "websites", title: "Websites", Icon: GlobeSimple, segments: activities.filter((activity) => Boolean(websiteName(activity))), rows: groupedRows(activities, (activity) => [websiteName(activity)]) },
     { key: "applications", title: "Applications", Icon: Laptop, segments: activities.filter((activity) => Boolean(activity.appName || activity.deviceName)), rows: groupedRows(activities, (activity) => [activity.appName || activity.deviceName || "Unknown App"]) },
-    { key: "paths", title: "Paths", Icon: FolderSimple, segments: activities.filter((activity) => Boolean(pathName(activity))), rows: groupedRows(activities, (activity) => [pathName(activity)]) },
+    { key: "paths", title: "Paths", Icon: FolderSimple, segments: activities.filter((activity) => pathName(activity).length > 0), rows: groupedRows(activities, pathName) },
     { key: "keywords", title: "Keywords", Icon: FileText, segments: activities.filter((activity) => keywordNames(activity).length > 0), rows: groupedRows(activities, keywordNames) },
   ];
   const openDetails = (event, activity) => {
@@ -3744,11 +3782,12 @@ function WebActivityDisplayMenu({ open, onToggle, preferences, devices, onChange
     include_titles_in_addition_to_paths: true,
     group_websites_independently: false,
     group_paths_independently: false,
+    group_paths_by: "allDirectories",
     activity_time_range: "selectedDay",
     selected_device: "All Devices",
     collapse_activities_shorter_than_seconds: 0,
   };
-  return <div className="activity-display-menu"><button type="button" className={`quiet-pill activity-display-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />Display</button>{open ? <div className="activity-display-popover" role="dialog" aria-label="Activity display settings"><strong>Display settings</strong><label><input type="checkbox" checked={Boolean(values.include_time_entries)} onChange={(event) => onChange({ include_time_entries: event.target.checked })} />Include time entries</label><label><input type="checkbox" checked={Boolean(values.show_window_titles)} onChange={(event) => onChange({ show_window_titles: event.target.checked })} />Show window titles</label><label><input type="checkbox" checked={Boolean(values.show_resource_paths)} onChange={(event) => onChange({ show_resource_paths: event.target.checked })} />Show website paths</label><label><input type="checkbox" checked={Boolean(values.show_activity_date_ranges)} onChange={(event) => onChange({ show_activity_date_ranges: event.target.checked })} />Show app-usage date ranges</label><label><input type="checkbox" checked={Boolean(values.include_titles_in_addition_to_paths)} onChange={(event) => onChange({ include_titles_in_addition_to_paths: event.target.checked })} />Create entries for titles in addition to paths</label><label className="activity-display-select">Collapse activities shorter than<select value={Number(values.collapse_activities_shorter_than_seconds || 0)} onChange={(event) => onChange({ collapse_activities_shorter_than_seconds: Number(event.target.value) })}><option value="0">Never</option><option value="5">5 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option></select></label><label><input type="checkbox" checked={Boolean(values.group_websites_independently)} onChange={(event) => onChange({ group_websites_independently: event.target.checked })} />Group websites independently of browser</label><label><input type="checkbox" checked={Boolean(values.group_paths_independently)} onChange={(event) => onChange({ group_paths_independently: event.target.checked })} />Group paths independently of app</label><label className="activity-display-select">Activity range<select value={values.activity_time_range || "selectedDay"} onChange={(event) => onChange({ activity_time_range: event.target.value })}><option value="selectedDay">Selected day</option><option value="lastSevenDays">Last 7 days</option><option value="lastThirtyDays">Last 30 days</option><option value="lastNinetyDays">Last 90 days</option></select></label></div> : null}</div>;
+  return <div className="activity-display-menu"><button type="button" className={`quiet-pill activity-display-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />Display</button>{open ? <div className="activity-display-popover" role="dialog" aria-label="Activity display settings"><strong>Display settings</strong><label><input type="checkbox" checked={Boolean(values.include_time_entries)} onChange={(event) => onChange({ include_time_entries: event.target.checked })} />Include time entries</label><label><input type="checkbox" checked={Boolean(values.show_window_titles)} onChange={(event) => onChange({ show_window_titles: event.target.checked })} />Show window titles</label><label><input type="checkbox" checked={Boolean(values.show_resource_paths)} onChange={(event) => onChange({ show_resource_paths: event.target.checked })} />Show website paths</label><label><input type="checkbox" checked={Boolean(values.show_activity_date_ranges)} onChange={(event) => onChange({ show_activity_date_ranges: event.target.checked })} />Show app-usage date ranges</label><label><input type="checkbox" checked={Boolean(values.include_titles_in_addition_to_paths)} onChange={(event) => onChange({ include_titles_in_addition_to_paths: event.target.checked })} />Create entries for titles in addition to paths</label><label className="activity-display-select">Collapse activities shorter than<select value={Number(values.collapse_activities_shorter_than_seconds || 0)} onChange={(event) => onChange({ collapse_activities_shorter_than_seconds: Number(event.target.value) })}><option value="0">Never</option><option value="5">5 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option></select></label><label><input type="checkbox" checked={Boolean(values.group_websites_independently)} onChange={(event) => onChange({ group_websites_independently: event.target.checked })} />Group websites independently of browser</label><label><input type="checkbox" checked={Boolean(values.group_paths_independently)} onChange={(event) => onChange({ group_paths_independently: event.target.checked })} />Group paths independently of app</label><label className="activity-display-select">Group file paths by<select value={values.group_paths_by || "allDirectories"} onChange={(event) => onChange({ group_paths_by: event.target.value })}><option value="immediateParentDirectory">Immediate parent directory</option><option value="allDirectories">All directories</option><option value="filePathOnly">File path only</option></select></label><label className="activity-display-select">Activity range<select value={values.activity_time_range || "selectedDay"} onChange={(event) => onChange({ activity_time_range: event.target.value })}><option value="selectedDay">Selected day</option><option value="lastSevenDays">Last 7 days</option><option value="lastThirtyDays">Last 30 days</option><option value="lastNinetyDays">Last 90 days</option></select></label></div> : null}</div>;
 }
 
 function WebActivityDevicesMenu({ open, devices, selectedDevice, hideDevicesWithoutTime, onToggle, onSelect, onToggleHide }) {

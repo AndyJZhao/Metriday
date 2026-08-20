@@ -364,6 +364,10 @@ final class AppState: ObservableObject {
             if let value = body["group_paths_independently"] as? Bool {
                 activitiesPreferences.groupPathsIndependently = value
             }
+            if let value = body["group_paths_by"] as? String,
+               let grouping = ActivityPathGrouping(rawValue: value) {
+                activitiesPreferences.groupPathsBy = grouping
+            }
             if let value = body["activity_time_range"] as? String,
                let range = ActivityTimeRange(rawValue: value) {
                 activitiesPreferences.activityTimeRange = range
@@ -2439,6 +2443,7 @@ final class AppState: ObservableObject {
             "include_titles_in_addition_to_paths": activitiesPreferences.includeTitlesInAdditionToPaths,
             "group_websites_independently": activitiesPreferences.groupWebsitesIndependently,
             "group_paths_independently": activitiesPreferences.groupPathsIndependently,
+            "group_paths_by": activitiesPreferences.groupPathsBy.rawValue,
             "activity_time_range": activitiesPreferences.activityTimeRange.rawValue,
             "activity_display_mode": activitiesPreferences.activityDisplayMode,
             "group_by_project": activitiesPreferences.groupByProject,

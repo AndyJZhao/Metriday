@@ -31,6 +31,23 @@ expect(TimeFormat.parseRange("09:30-10:15")?.start == 570, "ASCII time range sho
 expect(TimeFormat.parseRange("14:00–16:00")?.end == 960, "En dash time range should parse")
 expect(TimeFormat.parseRange("16:00–14:00") == nil, "Reverse range should be rejected")
 
+let samplePath = "/Users/andyzhao/Projects/Metriday/Calendar/2026-08-21.md"
+expect(
+    ActivityPathGrouping.immediateParentDirectory.groupNames(for: samplePath) == ["/Users/andyzhao/Projects/Metriday/Calendar"],
+    "Immediate parent path grouping should return only the containing directory"
+)
+expect(
+    ActivityPathGrouping.filePathOnly.groupNames(for: samplePath) == [samplePath],
+    "File path grouping should keep each path as its own group"
+)
+let allDirectoryNames = ActivityPathGrouping.allDirectories.groupNames(for: samplePath)
+expect(
+    allDirectoryNames.contains("/Users/andyzhao/Projects/Metriday/Calendar")
+        && allDirectoryNames.contains("/Users/andyzhao/Projects/Metriday"),
+    "All-directory path grouping should include parent folders"
+)
+expect(ActivityPathGrouping.allDirectories.groupNames(for: "https://example.com/file").isEmpty, "Path grouping should ignore website URLs")
+
 let wrapCalendar = Calendar.current
 let wrapDay = wrapCalendar.date(from: DateComponents(year: 2026, month: 8, day: 20))!
 let beforeWrap = wrapCalendar.date(from: DateComponents(year: 2026, month: 8, day: 20, hour: 4, minute: 30))!
@@ -1009,6 +1026,7 @@ Task { @MainActor in
     activityPreferences.activityTimeRange = .lastSevenDays
     activityPreferences.groupWebsitesIndependently = true
     activityPreferences.groupPathsIndependently = true
+    activityPreferences.groupPathsBy = .filePathOnly
     activityPreferences.activityDisplayMode = "unified"
     activityPreferences.groupByProject = false
     activityPreferences.groupByDevice = true
@@ -1023,6 +1041,7 @@ Task { @MainActor in
     expect(!reloadedActivityPreferences.includeTitlesInAdditionToPaths, "Activity display preferences should persist title and path composition")
     expect(reloadedActivityPreferences.groupWebsitesIndependently, "Activity display preferences should persist independent website grouping")
     expect(reloadedActivityPreferences.groupPathsIndependently, "Activity display preferences should persist independent path grouping")
+    expect(reloadedActivityPreferences.groupPathsBy == .filePathOnly, "Activity display preferences should persist path grouping depth")
     expect(reloadedActivityPreferences.activityTimeRange == .lastSevenDays, "Activity display preferences should persist the selected usage range")
     expect(reloadedActivityPreferences.activityDisplayMode == "unified", "Activity display mode should persist")
     expect(!reloadedActivityPreferences.groupByProject && reloadedActivityPreferences.groupByDevice, "Activity grouping preferences should persist")

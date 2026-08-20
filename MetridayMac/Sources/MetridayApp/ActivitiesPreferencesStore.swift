@@ -17,6 +17,7 @@ enum ActivityTimeRange: String, CaseIterable, Codable, Identifiable {
         case .lastNinetyDays: return "Last 90 days"
         }
     }
+
 }
 
 enum ActivityTimelineOrientation: String, CaseIterable, Codable, Identifiable {
@@ -40,6 +41,53 @@ enum ActivityTimelineOrientation: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+enum ActivityPathGrouping: String, CaseIterable, Codable, Identifiable {
+    case immediateParentDirectory
+    case allDirectories
+    case filePathOnly
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .immediateParentDirectory: return "Immediate parent directory"
+        case .allDirectories: return "All directories"
+        case .filePathOnly: return "File path only"
+        }
+    }
+
+    func groupNames(for resource: String) -> [String] {
+        let value = resource.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return [] }
+        let path: String
+        if let url = URL(string: value), url.isFileURL {
+            path = url.path
+        } else if let url = URL(string: value), url.host != nil {
+            return []
+        } else {
+            path = value
+        }
+        let normalized = URL(fileURLWithPath: path).standardizedFileURL.path
+        let fileURL = URL(fileURLWithPath: normalized)
+        switch self {
+        case .filePathOnly:
+            return [normalized]
+        case .immediateParentDirectory:
+            return [fileURL.deletingLastPathComponent().path]
+        case .allDirectories:
+            var names: [String] = []
+            var current = fileURL.deletingLastPathComponent().path
+            while !current.isEmpty, current != "/" {
+                names.append(current)
+                let parent = URL(fileURLWithPath: current).deletingLastPathComponent().path
+                if parent == current { break }
+                current = parent
+            }
+            return names
+        }
+    }
+}
+
 /// Display-only preferences for Activities. They do not change what the
 /// activity monitor captures or what is stored on disk.
 @MainActor
@@ -51,6 +99,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
     @Published var includeTitlesInAdditionToPaths: Bool { didSet { persist() } }
     @Published var groupWebsitesIndependently: Bool { didSet { persist() } }
     @Published var groupPathsIndependently: Bool { didSet { persist() } }
+    @Published var groupPathsBy: ActivityPathGrouping { didSet { persist() } }
     @Published var activityTimeRange: ActivityTimeRange { didSet { persist() } }
     @Published var activityDisplayMode: String { didSet { persist() } }
     @Published var groupByProject: Bool { didSet { persist() } }
@@ -74,6 +123,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTitlesInAdditionToPaths = payload.includeTitlesInAdditionToPaths
             groupWebsitesIndependently = payload.groupWebsitesIndependently
             groupPathsIndependently = payload.groupPathsIndependently
+            groupPathsBy = payload.groupPathsBy
             activityTimeRange = payload.activityTimeRange
             activityDisplayMode = payload.activityDisplayMode
             groupByProject = payload.groupByProject
@@ -90,6 +140,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTitlesInAdditionToPaths = true
             groupWebsitesIndependently = false
             groupPathsIndependently = false
+            groupPathsBy = .allDirectories
             activityTimeRange = .selectedDay
             activityDisplayMode = "chronological"
             groupByProject = true
@@ -116,6 +167,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
                 includeTitlesInAdditionToPaths: includeTitlesInAdditionToPaths,
                 groupWebsitesIndependently: groupWebsitesIndependently,
                 groupPathsIndependently: groupPathsIndependently,
+                groupPathsBy: groupPathsBy,
                 activityTimeRange: activityTimeRange,
                 activityDisplayMode: activityDisplayMode,
                 groupByProject: groupByProject,
@@ -149,6 +201,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
         let includeTitlesInAdditionToPaths: Bool
         let groupWebsitesIndependently: Bool
         let groupPathsIndependently: Bool
+        let groupPathsBy: ActivityPathGrouping
         let activityTimeRange: ActivityTimeRange
         let activityDisplayMode: String
         let groupByProject: Bool
@@ -166,6 +219,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTitlesInAdditionToPaths: Bool,
             groupWebsitesIndependently: Bool,
             groupPathsIndependently: Bool,
+            groupPathsBy: ActivityPathGrouping,
             activityTimeRange: ActivityTimeRange,
             activityDisplayMode: String,
             groupByProject: Bool,
@@ -182,6 +236,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             self.includeTitlesInAdditionToPaths = includeTitlesInAdditionToPaths
             self.groupWebsitesIndependently = groupWebsitesIndependently
             self.groupPathsIndependently = groupPathsIndependently
+            self.groupPathsBy = groupPathsBy
             self.activityTimeRange = activityTimeRange
             self.activityDisplayMode = activityDisplayMode
             self.groupByProject = groupByProject
@@ -201,6 +256,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTitlesInAdditionToPaths = try container.decodeIfPresent(Bool.self, forKey: .includeTitlesInAdditionToPaths) ?? true
             groupWebsitesIndependently = try container.decodeIfPresent(Bool.self, forKey: .groupWebsitesIndependently) ?? false
             groupPathsIndependently = try container.decodeIfPresent(Bool.self, forKey: .groupPathsIndependently) ?? false
+            groupPathsBy = try container.decodeIfPresent(ActivityPathGrouping.self, forKey: .groupPathsBy) ?? .allDirectories
             activityTimeRange = try container.decodeIfPresent(ActivityTimeRange.self, forKey: .activityTimeRange) ?? .selectedDay
             activityDisplayMode = try container.decodeIfPresent(String.self, forKey: .activityDisplayMode) ?? "chronological"
             groupByProject = try container.decodeIfPresent(Bool.self, forKey: .groupByProject) ?? true

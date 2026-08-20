@@ -1709,7 +1709,7 @@ struct ActivitiesView: View {
                 title: "Paths",
                 icon: "folder",
                 segments: pathSegments,
-                nameFor: { $0.resource.replacingOccurrences(of: "file://", with: "") }
+                rows: pathRows
             )
             categoryCard(
                 title: "Keywords",
@@ -1894,10 +1894,13 @@ struct ActivitiesView: View {
     }
 
     private func unifiedAppGroups(for projectGroup: ActivityGroup) -> [ActivityGroup] {
-        Dictionary(grouping: projectGroup.segments) { segment in
-            unifiedGroupName(for: segment)
+        var grouped: [String: [ActivitySegment]] = [:]
+        for segment in projectGroup.segments {
+            for name in unifiedGroupNames(for: segment) {
+                grouped[name, default: []].append(segment)
+            }
         }
-        .map { name, segments in
+        return grouped.map { name, segments in
             ActivityGroup(
                 name: name,
                 segments: segments.sorted { $0.startSecond < $1.startSecond },
@@ -1910,20 +1913,22 @@ struct ActivitiesView: View {
         }
     }
 
-    private func unifiedGroupName(for segment: ActivitySegment) -> String {
+    private func unifiedGroupNames(for segment: ActivitySegment) -> [String] {
         if preferences.groupWebsitesIndependently,
            let host = URL(string: segment.resource)?.host,
            !host.isEmpty {
-            return host
+            return [host]
         }
         if preferences.groupPathsIndependently,
            !segment.resource.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
            URL(string: segment.resource)?.host == nil {
-            return resourceLabel(segment.resource)
+            return pathGroupingNames(for: segment.resource)
         }
-        return segment.appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "Unknown application"
-            : segment.appName
+        return [
+            segment.appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "Unknown application"
+                : segment.appName
+        ]
     }
 
     private var groupedActivityListByDevice: some View {
@@ -3391,6 +3396,16 @@ struct ActivitiesView: View {
         }
     }
 
+    private var pathRows: [CategoryRow] {
+        categoryRows(pathSegments, namesFor: { segment in
+            pathGroupingNames(for: segment.resource)
+        })
+    }
+
+    private func pathGroupingNames(for resource: String) -> [String] {
+        preferences.groupPathsBy.groupNames(for: resource)
+    }
+
     private var keywordSegments: [ActivitySegment] {
         filteredSegments.filter { !$0.windowTitle.isEmpty }
     }
@@ -3434,18 +3449,19 @@ struct ActivitiesView: View {
 
     private func categoryRows(
         _ segments: [ActivitySegment],
-        nameFor: ((ActivitySegment) -> String)? = nil
+        nameFor: ((ActivitySegment) -> String)? = nil,
+        namesFor: ((ActivitySegment) -> [String])? = nil
     ) -> [CategoryRow] {
         var values: [String: CategoryAggregation] = [:]
         for segment in segments {
-            let name = (nameFor?(segment) ?? categoryName(for: segment))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !name.isEmpty else { continue }
-            values[name, default: CategoryAggregation()].add(
-                seconds: segment.durationSeconds,
-                category: category(for: segment),
-                segment: segment
-            )
+            let names = namesFor?(segment) ?? [nameFor?(segment) ?? categoryName(for: segment)]
+            for name in names.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }).filter({ !$0.isEmpty }) {
+                values[name, default: CategoryAggregation()].add(
+                    seconds: segment.durationSeconds,
+                    category: category(for: segment),
+                    segment: segment
+                )
+            }
         }
         return values.map { name, value in
             CategoryRow(
@@ -3843,6 +3859,16 @@ private struct ActivityDisplaySettingsSheet: View {
                 .toggleStyle(.checkbox)
             Toggle("Group file paths independently of their app", isOn: $preferences.groupPathsIndependently)
                 .toggleStyle(.checkbox)
+            Picker("Group file paths by", selection: $preferences.groupPathsBy) {
+                ForEach(ActivityPathGrouping.allCases) { grouping in
+                    Text(grouping.label).tag(grouping)
+                }
+            }
+            .pickerStyle(.menu)
+            Text("All directories includes the parent folders of each file; File path only keeps each file as its own group.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             Picker("Activity usage range", selection: $preferences.activityTimeRange) {
                 ForEach(ActivityTimeRange.allCases) { range in
