@@ -153,6 +153,8 @@ enum ProjectRuleField: String, CaseIterable, Codable, Identifiable {
     case application
     case bundleIdentifier
     case titleContains
+    case titleOrPath
+    case filePath
     case resourceContains
     case domain
     case fullURL
@@ -170,6 +172,10 @@ enum ProjectRuleField: String, CaseIterable, Codable, Identifiable {
             return "Bundle identifier"
         case .titleContains:
             return "Title contains"
+        case .titleOrPath:
+            return "Title or path"
+        case .filePath:
+            return "File path"
         case .resourceContains:
             return "URL or path contains"
         case .domain:
@@ -691,24 +697,34 @@ final class ProjectStore: ObservableObject {
     }
 
     private func matches(rule: ProjectRule, activity: ActivitySegment, date: Date?) -> Bool {
-        let candidate: String
+        let candidates: [String]
         switch rule.field {
         case .application:
-            candidate = activity.appName
+            candidates = [activity.appName]
         case .bundleIdentifier:
-            candidate = activity.bundleIdentifier
+            candidates = [activity.bundleIdentifier]
         case .titleContains:
-            candidate = activity.windowTitle
+            candidates = [activity.windowTitle]
+        case .titleOrPath:
+            candidates = [activity.windowTitle, activity.resource]
+        case .filePath:
+            if let url = URL(string: activity.resource),
+               let scheme = url.scheme?.lowercased(),
+               ["http", "https"].contains(scheme) {
+                candidates = []
+            } else {
+                candidates = [activity.resource]
+            }
         case .resourceContains:
-            candidate = activity.resource
+            candidates = [activity.resource]
         case .domain:
-            candidate = URL(string: activity.resource)?.host ?? ""
+            candidates = [URL(string: activity.resource)?.host ?? ""]
         case .fullURL:
-            candidate = activity.resource
+            candidates = [activity.resource]
         case .keyword:
-            candidate = "\(activity.windowTitle) \(activity.resource)"
+            candidates = ["\(activity.windowTitle) \(activity.resource)"]
         case .startTime:
-            candidate = String(format: "%02d:%02d", activity.startMinute / 60, activity.startMinute % 60)
+            candidates = [String(format: "%02d:%02d", activity.startMinute / 60, activity.startMinute % 60)]
         case .dayOfWeek:
             guard let date else { return false }
             let dayStart = Calendar.current.startOfDay(for: date)
@@ -720,28 +736,30 @@ final class ProjectStore: ObservableObject {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.dateFormat = "EEEE"
-            candidate = formatter.string(from: segmentDate)
+            candidates = [formatter.string(from: segmentDate)]
         }
 
         let options: String.CompareOptions = rule.isCaseSensitive
             ? []
             : [.caseInsensitive, .diacriticInsensitive]
-        if rule.comparison != .matchesRegex,
-           rule.pattern.contains("||") || rule.pattern.contains("&&") {
-            return matchesLogicalExpression(
+        return candidates.contains { candidate in
+            if rule.comparison != .matchesRegex,
+               rule.pattern.contains("||") || rule.pattern.contains("&&") {
+                return matchesLogicalExpression(
+                    candidate: candidate,
+                    expression: rule.pattern,
+                    comparison: rule.comparison,
+                    options: options
+                )
+            }
+            return matchesAtom(
                 candidate: candidate,
-                expression: rule.pattern,
+                pattern: rule.pattern,
                 comparison: rule.comparison,
-                options: options
+                options: options,
+                isCaseSensitive: rule.isCaseSensitive
             )
         }
-        return matchesAtom(
-            candidate: candidate,
-            pattern: rule.pattern,
-            comparison: rule.comparison,
-            options: options,
-            isCaseSensitive: rule.isCaseSensitive
-        )
     }
 
     private func matchesLogicalExpression(

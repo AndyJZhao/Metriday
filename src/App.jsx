@@ -5325,7 +5325,7 @@ function WebProjectRulesPanel({ api, dateKey }) {
   const [pattern, setPattern] = useState("");
   const [reapplyBusy, setReapplyBusy] = useState("");
   const [message, setMessage] = useState("");
-  const fields = { application: "Application", bundleIdentifier: "Bundle identifier", titleContains: "Title contains", resourceContains: "URL or path contains", domain: "Domain", fullURL: "Full website URL", keyword: "Keyword", startTime: "Start time", dayOfWeek: "Day of week" };
+  const fields = { application: "Application", bundleIdentifier: "Bundle identifier", titleContains: "Title contains", titleOrPath: "Title or path", filePath: "File path", resourceContains: "URL or path contains", domain: "Domain", fullURL: "Full website URL", keyword: "Keyword", startTime: "Start time", dayOfWeek: "Day of week" };
   const projects = api.projects || [];
   const submit = async (event) => {
     event.preventDefault();

@@ -950,6 +950,54 @@ Task { @MainActor in
             && projectStore.rules(for: childProjectID).contains { $0.field == .resourceContains },
         "Default project name rules should cover titles and paths"
     )
+    _ = projectStore.addRule(
+        projectID: childProjectID,
+        field: .titleOrPath,
+        pattern: "Metriday",
+        comparison: .equals
+    )
+    _ = projectStore.addRule(
+        projectID: childProjectID,
+        field: .filePath,
+        pattern: "README.md",
+        comparison: .endsWith
+    )
+    let titleOrPathActivity = ActivitySegment(
+        appName: "TextEdit",
+        windowTitle: "Metriday",
+        resource: "/tmp/README.md",
+        startMinute: 600,
+        endMinute: 610,
+        relevance: .related
+    )
+    expect(
+        projectStore.matchingProjectID(for: titleOrPathActivity, date: date) == childProjectID,
+        "Title or path rules should match either field independently"
+    )
+    let localFileActivity = ActivitySegment(
+        appName: "TextEdit",
+        windowTitle: "Unrelated document",
+        resource: "/tmp/README.md",
+        startMinute: 600,
+        endMinute: 610,
+        relevance: .related
+    )
+    expect(
+        projectStore.matchingProjectID(for: localFileActivity, date: date) == childProjectID,
+        "File path rules should match local resources"
+    )
+    let webFileActivity = ActivitySegment(
+        appName: "Safari",
+        windowTitle: "Unrelated page",
+        resource: "https://example.com/README.md",
+        startMinute: 600,
+        endMinute: 610,
+        relevance: .related
+    )
+    expect(
+        projectStore.matchingProjectID(for: webFileActivity, date: date) == nil,
+        "File path rules should not treat web URLs as local files"
+    )
     expect(
         projectStore.hierarchyPath(for: childProjectID) == "Smoke Research > Smoke Subproject",
         "Project hierarchy paths should include parent projects"
