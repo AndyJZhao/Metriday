@@ -235,7 +235,7 @@ struct StatsView: View {
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("stats.project-scope.(scope.identifier)")
+        .accessibilityIdentifier("stats.project-scope.\(scope.identifier)")
         .accessibilityAddTraits(projectScope == scope ? .isSelected : [])
     }
 
