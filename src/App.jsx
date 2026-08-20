@@ -2822,7 +2822,7 @@ function WebReportPanel({ api, dateKey }) {
       const details = projectDetails(entry.project);
       rows.push({ kind: "Time entry", type: entry.is_manual ? "Time Entry" : "Timer", title: entry.title || "Untitled", project: projectFor(entry.project), group: "", application: "", device: localDeviceName, resource: entry.notes || "", billing: billingLabel(entry.billing_status), currency: details.currency, start: clippedStart, end: clippedEnd, seconds, amount: seconds / 3600 * details.rate, notes: entry.notes || "" });
     });
-    if (includeMode !== "time" && billingFilter === "all") {
+    if (includeMode !== "time") {
       dataset.activities.forEach((activity) => {
         if (activity.relevance === "idle") return;
         if (!activityMatchesSelectedDevice(activity, selectedDevice)) return;
