@@ -226,21 +226,21 @@ Task { @MainActor in
     _ = categoryStore.createCategory(
         name: "Focused coding",
         role: .focused,
-        color: .blue,
+        color: .purple,
         matchMode: .any,
         rules: [ActivityFilterRule(field: .application, pattern: "Visual Studio Code")]
     )
     _ = categoryStore.createCategory(
         name: "Distracting video",
         role: .distracting,
-        color: .red,
+        color: .green,
         matchMode: .any,
         rules: [ActivityFilterRule(field: .domain, pattern: "youtube.com")]
     )
     _ = categoryStore.createCategory(
         name: "Focused research",
         role: .focused,
-        color: .blue,
+        color: .orange,
         matchMode: .any,
         rules: [ActivityFilterRule(field: .domain, pattern: "github.com")]
     )
