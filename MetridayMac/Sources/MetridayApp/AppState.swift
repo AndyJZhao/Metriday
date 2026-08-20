@@ -2390,6 +2390,7 @@ final class AppState: ObservableObject {
             "startSecond": segment.startSecond,
             "endSecond": segment.endSecond,
             "relevance": category.role.relevance.rawValue,
+            "categoryID": category.id.uuidString,
             "categoryName": category.name,
             "categoryRole": category.role.rawValue,
             "categoryColor": category.color.rawValue,
