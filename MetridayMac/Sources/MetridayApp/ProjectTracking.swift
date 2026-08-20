@@ -241,6 +241,10 @@ final class ProjectStore: ObservableObject {
         projects.filter { !$0.isArchived }
     }
 
+    var archivedProjects: [TrackingProject] {
+        projects.filter(\.isArchived)
+    }
+
     func childProjects(of parentID: UUID?) -> [TrackingProject] {
         activeProjects.filter { $0.parentID == parentID }
     }
@@ -332,6 +336,18 @@ final class ProjectStore: ObservableObject {
         updated.isArchived = true
         updateProject(updated)
         statusMessage = "Project archived · \(project.name)"
+    }
+
+    func restore(_ project: TrackingProject) {
+        guard project.isArchived else { return }
+        var updated = project
+        updated.isArchived = false
+        if let parentID = updated.parentID,
+           !activeProjects.contains(where: { $0.id == parentID }) {
+            updated.parentID = nil
+        }
+        updateProject(updated)
+        statusMessage = "Project restored · \(project.name)"
     }
 
     @discardableResult

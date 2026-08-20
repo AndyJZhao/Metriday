@@ -988,6 +988,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .project-edit-card-actions > button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 11px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; font-size: 11px; font-weight: 650; }
 .project-edit-card-actions > button.secondary-button { border-color: var(--border); background: #fff; color: #555b66; }
 .project-row.drop-target { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.project-row.archived { background: #fafafa; color: #858a94; }
+.project-row.archived strong { color: #626873; }
 .project-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
 .project-row small { color: var(--muted); }
 .project-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }

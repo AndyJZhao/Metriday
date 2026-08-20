@@ -597,6 +597,32 @@ Task { @MainActor in
         !projectStore.validParentProjects(for: researchProjectID).contains { $0.id == childProjectID },
         "Project hierarchies should not allow a descendant to become its parent's parent"
     )
+    guard let archivedProjectID = projectStore.createProject(name: "Archived Smoke Project"),
+          let archivedProject = projectStore.project(archivedProjectID) else {
+        expect(false, "Project store should create an archive smoke project")
+        return
+    }
+    projectStore.archive(archivedProject)
+    expect(projectStore.archivedProjects.contains { $0.id == archivedProjectID }, "Archived projects should remain recoverable")
+    expect(!projectStore.activeProjects.contains { $0.id == archivedProjectID }, "Archived projects should leave the active list")
+    if let archivedProject = projectStore.project(archivedProjectID) {
+        projectStore.restore(archivedProject)
+    }
+    expect(projectStore.activeProjects.contains { $0.id == archivedProjectID }, "Archived projects should be restorable")
+    guard let hiddenParentID = projectStore.createProject(name: "Archived Parent"),
+          let hiddenChildID = projectStore.createProject(name: "Archived Child", parentID: hiddenParentID),
+          let hiddenParent = projectStore.project(hiddenParentID) else {
+        expect(false, "Project store should create nested archive smoke data")
+        return
+    }
+    projectStore.archive(hiddenParent)
+    if let hiddenChild = projectStore.project(hiddenChildID) {
+        projectStore.archive(hiddenChild)
+    }
+    if let archivedChild = projectStore.project(hiddenChildID) {
+        projectStore.restore(archivedChild)
+    }
+    expect(projectStore.project(hiddenChildID)?.parentID == nil, "Restoring a child of an archived project should promote it safely")
     if var cyclicProject = projectStore.project(researchProjectID) {
         cyclicProject.parentID = childProjectID
         projectStore.updateProject(cyclicProject)

@@ -735,8 +735,10 @@ final class AppState: ObservableObject {
         }
 
         if timingWebAPI, request.method == "GET", path == "/v1/projects" {
+            let includeArchived = apiBoolean(request.query["include_archived"], default: false)
+            let projects = includeArchived ? projectStore.projects : projectStore.activeProjects
             return .jsonObject([
-                "data": projectStore.activeProjects.map(officialProject),
+                "data": projects.map(officialProject),
                 "links": ["self": "\(localAPIServer.baseEndpoint)/api/v1/projects"]
             ])
         }

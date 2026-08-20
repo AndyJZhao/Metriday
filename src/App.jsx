@@ -409,6 +409,7 @@ function useMetridayAPI(dateKey, apiBase) {
   }, [request]);
 
   const fetchPlan = useCallback((date = localDateKey()) => request(`/v1/plans?date=${date}`), [request]);
+  const fetchProjects = useCallback((includeArchived = false) => request(`/api/v1/projects${includeArchived ? "?include_archived=true" : ""}`), [request]);
 
   return {
     ...snapshot,
@@ -416,6 +417,7 @@ function useMetridayAPI(dateKey, apiBase) {
     refresh,
     fetchRange,
     fetchPlan,
+    fetchProjects,
     downloadReportFile: async ({ startDate, endDate, format, include, groupBy, billingFilter, rounding, roundingMinutes, projectIDs = [], durationFormat = "decimalMinutes", includeShortEntries = true, includeCoveredAppUsage = false, roundIndividualEntries = true, columns = [] }) => {
       const params = new URLSearchParams({ start_date: startDate, end_date: endDate, format, include, group_by: groupBy, billing_status: billingFilter, rounding, rounding_minutes: String(roundingMinutes), duration_format: durationFormat, include_short_entries: String(includeShortEntries), include_covered_app_usage: String(includeCoveredAppUsage), round_individual_entries: String(roundIndividualEntries) });
       if (projectIDs.length > 0) params.set("project_ids", projectIDs.join(","));
@@ -2046,9 +2048,34 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
   const [editing, setEditing] = useState(null);
   const [message, setMessage] = useState("");
   const [dropTarget, setDropTarget] = useState(null);
+  const [showArchivedProjects, setShowArchivedProjects] = useState(false);
+  const [archivedProjects, setArchivedProjects] = useState([]);
   const projects = [...api.projects].sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
   const teams = [...(api.teams || [])].sort((left, right) => String(left.name || "").localeCompare(String(right.name || "")));
   const parentOptions = projectOptionRows(api.projects);
+  const displayedProjects = [...(showArchivedProjects ? [...projects, ...archivedProjects.filter((archived) => !projects.some((project) => resourceID(project.id) === resourceID(archived.id)))] : projects)].sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
+  const reloadProjectInventory = async () => {
+    if (!showArchivedProjects) return;
+    try {
+      const result = await api.fetchProjects(true);
+      setArchivedProjects(result?.data || []);
+    } catch (error) {
+      setMessage(error.message || "Could not load archived projects.");
+    }
+  };
+  const toggleArchivedProjects = async () => {
+    if (showArchivedProjects) {
+      setShowArchivedProjects(false);
+      return;
+    }
+    try {
+      const result = await api.fetchProjects(true);
+      setArchivedProjects(result?.data || []);
+      setShowArchivedProjects(true);
+    } catch (error) {
+      setMessage(error.message || "Could not load archived projects.");
+    }
+  };
   const create = async (event) => {
     event.preventDefault();
     if (!title.trim()) return;
@@ -2060,6 +2087,7 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
       setTeamID("");
       setAddDefaultNameRules(true);
       setMessage("Project saved locally.");
+      await reloadProjectInventory();
     } catch (error) {
       setMessage(error.message || "Could not save the project.");
     }
@@ -2081,6 +2109,7 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
       await api.updateProject(editing.id, { title: editing.title.trim(), parent: editing.parentID || null, team_id: editing.teamID || null, color: editing.color, productivity: Math.max(-100, Math.min(100, Number(editing.productivity) || 0)), notes: editing.notes, billing_rate: Number(editing.rate) || 0, currency: editing.currency.trim().toUpperCase() || "USD", default_billing_status: editing.billingStatus });
       setEditing(null);
       setMessage("Project updated locally.");
+      await reloadProjectInventory();
     } catch (error) {
       setMessage(error.message || "Could not update the project.");
     }
@@ -2090,8 +2119,18 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
     try {
       await api.deleteProject(project.id);
       setMessage("Project archived.");
+      await reloadProjectInventory();
     } catch (error) {
       setMessage(error.message || "Could not archive the project.");
+    }
+  };
+  const restore = async (project) => {
+    try {
+      await api.updateProject(project.id, { is_archived: false });
+      setMessage("Project restored.");
+      await reloadProjectInventory();
+    } catch (error) {
+      setMessage(error.message || "Could not restore the project.");
     }
   };
   const dropOnProject = async (event, project) => {
@@ -2108,7 +2147,7 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
     }
   };
   return <section id="web-projects-panel" className="projects-panel">
-    <div className="activities-list-heading"><div><h2>Projects & clients</h2><p>Drag an App / Category row here to assign its activity to a project.</p></div><span className="api-badge online">{projects.length} active</span></div>
+    <div className="activities-list-heading"><div><h2>Projects & clients</h2><p>Drag an App / Category row here to assign its activity to a project.</p></div><div className="activities-list-heading-actions"><button type="button" className="quiet-pill" onClick={toggleArchivedProjects} disabled={!api.connected}>{showArchivedProjects ? "Hide archived" : "Show archived"}</button><span className="api-badge online">{showArchivedProjects ? `${displayedProjects.length} total` : `${projects.length} active`}</span></div></div>
     <form className="project-create-form" onSubmit={create}>
       <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Project or client name" aria-label="Project name" />
       <select value={parentID} onChange={(event) => setParentID(event.target.value)} aria-label="Project parent"><option value="">Top level</option>{parentOptions.map(({ project, depth }) => <option value={resourceID(project.id)} key={project.id}>{"— ".repeat(depth)}{project.title}</option>)}</select>
@@ -2120,7 +2159,7 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
     </form>
     <label className="project-auto-rules-toggle"><input type="checkbox" checked={addDefaultNameRules} onChange={(event) => setAddDefaultNameRules(event.target.checked)} /><span>Automatically match this project&apos;s title and path</span><small>Adds title and URL/path rules for future activity.</small></label>
     {message ? <p className="entry-message" role="status">{message}</p> : null}
-    {projects.length > 0 ? <div className="project-table">{projects.map((project) => editing?.id === project.id ? <form className="project-edit-card" key={project.id} onSubmit={saveEdit}>
+    {displayedProjects.length > 0 ? <div className="project-table">{displayedProjects.map((project) => editing?.id === project.id ? <form className="project-edit-card" key={project.id} onSubmit={saveEdit}>
       <div className="project-edit-fields">
         <label>Project name<input value={editing.title} onChange={(event) => setEditing((value) => ({ ...value, title: event.target.value }))} aria-label={`Edit ${project.title} name`} /></label>
         <label>Parent project<select value={editing.parentID} onChange={(event) => setEditing((value) => ({ ...value, parentID: event.target.value }))} aria-label={`Edit ${project.title} parent`}><option value="">Top level</option>{projectOptionRows(api.projects, resourceID(project.id)).map(({ project: option, depth }) => <option value={resourceID(option.id)} key={option.id}>{"— ".repeat(depth)}{option.title}</option>)}</select></label>
@@ -2133,7 +2172,7 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
         <label className="project-edit-notes">Notes<textarea value={editing.notes} onChange={(event) => setEditing((value) => ({ ...value, notes: event.target.value }))} rows={2} aria-label={`Edit ${project.title} notes`} /></label>
       </div>
       <div className="project-edit-card-actions"><button type="submit" aria-label="Save project"><Check size={16} />Save</button><button type="button" className="secondary-button" onClick={() => setEditing(null)}>Cancel</button></div>
-    </form> : <div className={`project-row ${dropTarget === project.id ? "drop-target" : ""}`} key={project.id} onDragOver={(event) => { event.preventDefault(); setDropTarget(project.id); }} onDragLeave={() => setDropTarget(null)} onDrop={(event) => dropOnProject(event, project)}><span className="project-dot" style={{ background: project.color || "var(--accent)" }} /><strong>{project.title}</strong><span>{projectParentID(project) ? `↳ ${projectTitleFor(projects, projectParentID(project))}` : "Top level"}</span><span>{project.currency || "USD"} {Number(project.billing_rate || 0).toFixed(2)}/h</span><small>{billingLabel(project.default_billing_status)}</small><span className="project-actions"><IconButton label={`Edit ${project.title}`} onClick={() => beginEdit(project)}><NotePencil size={15} /></IconButton><IconButton label={`Archive ${project.title}`} onClick={() => remove(project)}><Trash size={15} /></IconButton></span></div>)}</div> : <div className="entries-empty"><FolderSimple size={24} /><span>{api.connected ? "Create a project to organize time and billing." : "Connect the native app to manage projects."}</span></div>}
+    </form> : <div className={`project-row ${project.is_archived ? "archived" : ""} ${dropTarget === project.id ? "drop-target" : ""}`} key={project.id} onDragOver={(event) => { if (project.is_archived) return; event.preventDefault(); setDropTarget(project.id); }} onDragLeave={() => setDropTarget(null)} onDrop={(event) => { if (!project.is_archived) dropOnProject(event, project); }}><span className="project-dot" style={{ background: project.color || "var(--accent)" }} /><strong>{project.title}</strong><span>{projectParentID(project) ? `↳ ${projectTitleFor(displayedProjects, projectParentID(project))}` : "Top level"}</span><span>{project.currency || "USD"} {Number(project.billing_rate || 0).toFixed(2)}/h</span><small>{project.is_archived ? "Archived" : billingLabel(project.default_billing_status)}</small><span className="project-actions"><IconButton label={`Edit ${project.title}`} onClick={() => beginEdit(project)}><NotePencil size={15} /></IconButton>{project.is_archived ? <IconButton label={`Restore ${project.title}`} onClick={() => restore(project)}><ArrowsClockwise size={15} /></IconButton> : <IconButton label={`Archive ${project.title}`} onClick={() => remove(project)}><Trash size={15} /></IconButton>}</span></div>)}</div> : <div className="entries-empty"><FolderSimple size={24} /><span>{api.connected ? "Create a project to organize time and billing." : "Connect the native app to manage projects."}</span></div>}
   </section>;
 }
 

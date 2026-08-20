@@ -106,6 +106,7 @@ struct ActivitiesView: View {
     @State private var selectedBuiltinFilter: ActivityBuiltinFilter?
     @State private var timelineSelectionStart: Int?
     @State private var timelineSelectionEnd: Int?
+    @State private var showingArchivedProjects = false
     @State private var showingNewProject = false
     @State private var showingNewEntry = false
     @State private var showingTimerStart = false
@@ -802,12 +803,35 @@ struct ActivitiesView: View {
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(MetridayTheme.secondary)
                         Spacer()
+                        if !projectStore.archivedProjects.isEmpty {
+                            Button {
+                                showingArchivedProjects.toggle()
+                            } label: {
+                                Image(systemName: showingArchivedProjects ? "archivebox.fill" : "archivebox")
+                            }
+                            .buttonStyle(.borderless)
+                            .help(showingArchivedProjects ? "Hide Archived Projects" : "Show Archived Projects")
+                            .accessibilityLabel(showingArchivedProjects ? "Hide Archived Projects" : "Show Archived Projects")
+                        }
                     }
                     .padding(.horizontal, 14)
                     .padding(.bottom, 5)
 
                     ForEach(projectStore.childProjects(of: nil)) { project in
                         projectTree(project, depth: 0)
+                    }
+
+                    if showingArchivedProjects {
+                        Divider()
+                            .padding(.vertical, 8)
+                        Text("Archived Projects")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(MetridayTheme.secondary)
+                            .padding(.horizontal, 14)
+                            .padding(.bottom, 4)
+                        ForEach(projectStore.archivedProjects) { project in
+                            archivedProjectRow(project)
+                        }
                     }
 
                     projectDropZone
@@ -2041,6 +2065,36 @@ struct ActivitiesView: View {
                 }
             }
         )
+    }
+
+    private func archivedProjectRow(_ project: TrackingProject) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(color(for: project.color).opacity(0.55))
+                .frame(width: 8, height: 8)
+            Text(project.name)
+                .lineLimit(1)
+            Spacer()
+            Button {
+                projectStore.restore(project)
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+            }
+            .buttonStyle(.borderless)
+            .help("Restore \(project.name)")
+            .accessibilityLabel("Restore \(project.name)")
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(MetridayTheme.secondary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Restore Project") {
+                projectStore.restore(project)
+            }
+        }
     }
 
     private func projectButton(_ project: TrackingProject, depth: Int = 0) -> some View {
