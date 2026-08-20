@@ -120,7 +120,11 @@ enum ActivityInsights {
             .map { $0 }
     }
 
-    static func generate(from segments: [ActivitySegment], limit: Int = 3) -> [ActivityInsight] {
+    static func generate(
+        from segments: [ActivitySegment],
+        limit: Int = 3,
+        localDeviceName: String = "This Mac"
+    ) -> [ActivityInsight] {
         let active = segments.filter { $0.relevance != .idle && $0.durationSeconds > 0 }
         guard !active.isEmpty else {
             return [ActivityInsight(
@@ -144,7 +148,7 @@ enum ActivityInsights {
                 (
                     name: entry.key,
                     seconds: entry.value.reduce(0) { $0 + $1.durationSeconds },
-                    source: source(for: entry.value)
+                    source: source(for: entry.value, localDeviceName: localDeviceName)
                 )
             })
             .max(by: { $0.seconds < $1.seconds }) {
@@ -166,7 +170,7 @@ enum ActivityInsights {
                 title: String(format: "Longest focused stretch: %@", longest.appName),
                 detail: String(format: "%@ · %@", durationLabel(longest.durationSeconds), timeRange(longest)),
                 symbol: "bolt.fill",
-                source: source(for: [longest]),
+                source: source(for: [longest], localDeviceName: localDeviceName),
                 durationSeconds: longest.durationSeconds
             ))
         }
@@ -179,7 +183,7 @@ enum ActivityInsights {
                     (
                         name: entry.key,
                         seconds: entry.value.reduce(0) { $0 + $1.durationSeconds },
-                        source: source(for: entry.value)
+                        source: source(for: entry.value, localDeviceName: localDeviceName)
                     )
                 }
                 .max(by: { $0.seconds < $1.seconds })
@@ -196,7 +200,7 @@ enum ActivityInsights {
         }
 
         let mobileSeconds = active
-            .filter { $0.deviceName != "This Mac" }
+            .filter { $0.deviceName != localDeviceName }
             .reduce(0) { $0 + $1.durationSeconds }
         if mobileSeconds > 0 {
             insights.append(ActivityInsight(
@@ -251,8 +255,8 @@ enum ActivityInsights {
         return String(format: "%02d:%02d", seconds / 3600, (seconds / 60) % 60)
     }
 
-    private static func source(for segments: [ActivitySegment]) -> String {
-        let sources = Set(segments.map { $0.deviceName == "This Mac" ? "local_activity" : "screen_time" })
+    private static func source(for segments: [ActivitySegment], localDeviceName: String) -> String {
+        let sources = Set(segments.map { $0.deviceName == localDeviceName ? "local_activity" : "screen_time" })
         if sources.count == 1 { return sources.first ?? "local_activity" }
         return "mixed_sources"
     }

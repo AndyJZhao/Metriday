@@ -1462,7 +1462,7 @@ final class AppState: ObservableObject {
         if request.method == "GET", path == "/v1/insights" {
             let date = apiDate(from: request.query["date"]) ?? selectedDate
             let segments = effectiveActivitySegments(for: date, selectedDevice: request.query["device"])
-            let insights = ActivityInsights.generate(from: segments)
+            let insights = ActivityInsights.generate(from: segments, localDeviceName: syncStore.deviceName)
             let data = insights.map { insight -> [String: Any] in
                 let sourceLabel: String
                 switch insight.source {

@@ -1,17 +1,19 @@
 import SwiftUI
 
 struct ActivityInsightsPanel: View {
+    @EnvironmentObject private var appState: AppState
     let segments: [ActivitySegment]
 
     var body: some View {
-        let insights = ActivityInsights.generate(from: segments)
+        let localDeviceName = appState.syncStore.deviceName
+        let insights = ActivityInsights.generate(from: segments, localDeviceName: localDeviceName)
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Label("Smart Activity Summary", systemImage: "sparkles")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(MetridayTheme.accent)
                 Spacer()
-                Text(segments.contains { $0.deviceName != "This Mac" } ? "Local + Screen Time" : "On this Mac")
+                Text(segments.contains { $0.deviceName != localDeviceName } ? "Local + Screen Time" : "On this Mac")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(MetridayTheme.secondary)
             }

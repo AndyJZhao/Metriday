@@ -61,7 +61,9 @@ struct ReviewView: View {
                     )
                 }
 
-                ActivityInsightsPanel(segments: activitySegments(for: selectedDate))
+                ActivityInsightsPanel(
+                    segments: activitySegments(for: selectedDate)
+                )
 
                 categoryPulse
 
