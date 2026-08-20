@@ -235,6 +235,7 @@ struct MarkdownEditorPane: View {
         }
         .font(.system(size: 13, design: .monospaced))
         .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 52)
         .background(draftIsFocused ? MetridayTheme.accentSoft.opacity(0.52) : .clear)
         .contentShape(Rectangle())
@@ -416,6 +417,7 @@ struct MarkdownTaskRow: View {
         }
         .font(.system(size: 13, design: .monospaced))
         .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 52)
         .background(store.lastUpdatedTaskID == task.id ? MetridayTheme.accentSoft : .clear)
         .contentShape(Rectangle())
