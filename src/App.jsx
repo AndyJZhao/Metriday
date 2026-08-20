@@ -480,8 +480,28 @@ function useMetridayAPI(dateKey, apiBase) {
       await refresh();
     },
     createTimeEntries: async (entries) => {
+      const created = [];
       for (const entry of entries) {
-        await request("/v1/time-entries", { method: "POST", body: JSON.stringify(entry) });
+        const result = await request("/v1/time-entries", { method: "POST", body: JSON.stringify(entry) });
+        if (result?.data) created.push(result.data);
+      }
+      await refresh();
+      return created;
+    },
+    restoreTimeEntries: async (entries) => {
+      for (const entry of entries) {
+        await request("/v1/time-entries", {
+          method: "POST",
+          body: JSON.stringify({
+            title: entry.title || "Untitled",
+            notes: entry.notes || "",
+            projectID: resourceID(entry.project) || undefined,
+            billingStatus: entry.billing_status || "billable",
+            start: entry.start_date || entry.start,
+            end: entry.end_date || entry.end,
+            custom_fields: entry.custom_fields || {},
+          }),
+        });
       }
       await refresh();
     },
@@ -3755,6 +3775,7 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   const [timerMessage, setTimerMessage] = useState("");
   const [displayMessage, setDisplayMessage] = useState("");
   const [entryOMaticOpen, setEntryOMaticOpen] = useState(false);
+  const [entryOMaticUndo, setEntryOMaticUndo] = useState(null);
   const [timeEntryDialogMode, setTimeEntryDialogMode] = useState(null);
   const [timeEntryPrefill, setTimeEntryPrefill] = useState(null);
   const [selectedTimeEntry, setSelectedTimeEntry] = useState(null);
@@ -4010,18 +4031,21 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     openNewTimeEntry({ start, end, projectID: selectedProject, billingStatus: "billable" });
   };
   const createGeneratedEntries = async (intervals, configuration) => {
+    const replacedEntries = configuration.overwriteExisting
+      ? api.entries.filter((entry) => {
+        const existing = entrySecondsForDate(entry, dateKey);
+        return existing && intervals.some((interval) => existing.startSecond < interval.endSecond && existing.endSecond > interval.startSecond);
+      })
+      : [];
     const generatedRanges = intervals.map((interval) => ({
       start: localEntryDateSeconds(dateKey, interval.startSecond),
       end: localEntryDateSeconds(dateKey, interval.endSecond),
     }));
     if (configuration.overwriteExisting) {
-      const overlappingIDs = api.entries.filter((entry) => {
-        const existing = entrySecondsForDate(entry, dateKey);
-        return existing && intervals.some((interval) => existing.startSecond < interval.endSecond && existing.endSecond > interval.startSecond);
-      }).map((entry) => entryID(entry));
+      const overlappingIDs = replacedEntries.map((entry) => entryID(entry));
       if (overlappingIDs.length > 0) await api.deleteTimeEntries(overlappingIDs);
     }
-    await api.createTimeEntries(generatedRanges.map((range) => ({
+    const createdEntries = await api.createTimeEntries(generatedRanges.map((range) => ({
       title: configuration.title,
       notes: configuration.notes,
       projectID: configuration.projectID ? resourceID(configuration.projectID) : undefined,
@@ -4029,7 +4053,34 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
       start: range.start,
       end: range.end,
     })));
+    if (createdEntries.length > 0) {
+      setEntryOMaticUndo({ createdEntries, replacedEntries });
+      setDisplayMessage(`Created ${createdEntries.length} Entry-O-Matic time ${createdEntries.length === 1 ? "entry" : "entries"} · Undo available (⌘Z)`);
+    }
   };
+  const undoEntryOMatic = async () => {
+    if (!entryOMaticUndo) return;
+    try {
+      const createdIDs = entryOMaticUndo.createdEntries.map(entryID).filter(Boolean);
+      if (createdIDs.length > 0) await api.deleteTimeEntries(createdIDs);
+      if (entryOMaticUndo.replacedEntries.length > 0) await api.restoreTimeEntries(entryOMaticUndo.replacedEntries);
+      setEntryOMaticUndo(null);
+      setDisplayMessage("Entry-O-Matic changes undone.");
+    } catch (error) {
+      setDisplayMessage(error.message || "Could not undo Entry-O-Matic changes.");
+    }
+  };
+  useEffect(() => {
+    const handleUndo = (event) => {
+      if (!entryOMaticUndo || !event.metaKey || event.altKey || event.shiftKey || event.key.toLowerCase() !== "z") return;
+      const target = event.target;
+      if (target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      event.preventDefault();
+      void undoEntryOMatic();
+    };
+    window.addEventListener("keydown", handleUndo);
+    return () => window.removeEventListener("keydown", handleUndo);
+  }, [entryOMaticUndo]);
   useEffect(() => { setSelectedActivity(null); setSelectedTimeEntry(null); setTimelineSelection(null); }, [dateKey]);
   const activityHeading = dateKey === localDateKey() ? "Today’s activity" : `${planDateLabel(dateKey)} activity`;
   const activityRangeDescription = activityRangeLoading

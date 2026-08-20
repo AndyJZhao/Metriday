@@ -87,6 +87,11 @@ final class AppState: ObservableObject {
                 _ = self.timeEntryStore.stopTimer()
             }
             .store(in: &workspaceCancellables)
+        timeEntryStore.$canUndoEntryOMatic
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &workspaceCancellables)
         self.calendarStore.loadEvents(for: initialDate)
         self.reminderStore.loadCompleted(for: initialDate)
         self.phoneCallStore.loadCalls(for: initialDate)

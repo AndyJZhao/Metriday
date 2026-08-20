@@ -250,6 +250,18 @@ Task { @MainActor in
         reloadedTimeEntryStore.entries.allSatisfy { $0.billingStatus == .billed },
         "Bulk billing status update should persist to the local archive"
     )
+    let undoCreatedEntry = timeEntryStore.entries[0]
+    let undoReplacedEntry = TimeEntry(
+        id: UUID(),
+        title: "Restored Entry-O-Matic entry",
+        start: date.addingTimeInterval(10 * 60 * 60),
+        end: date.addingTimeInterval(10 * 60 * 60 + 15 * 60)
+    )
+    timeEntryStore.recordEntryOMaticCreation(created: [undoCreatedEntry], replaced: [undoReplacedEntry])
+    expect(timeEntryStore.canUndoEntryOMatic, "Entry-O-Matic creation should expose an undo action")
+    expect(timeEntryStore.undoEntryOMaticCreation(), "Entry-O-Matic undo should execute")
+    expect(!timeEntryStore.entries.contains { $0.id == undoCreatedEntry.id }, "Entry-O-Matic undo should remove generated entries")
+    expect(timeEntryStore.entries.contains { $0.id == undoReplacedEntry.id }, "Entry-O-Matic undo should restore replaced entries")
     let categoryFilterStore = ActivityFilterStore(rootDirectory: tempRoot.appendingPathComponent("CategoryFilters", isDirectory: true))
     let categoryStore = ActivityCategoryStore(rootDirectory: tempRoot.appendingPathComponent("Categories", isDirectory: true))
     _ = categoryStore.createCategory(

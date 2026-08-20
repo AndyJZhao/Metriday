@@ -243,6 +243,7 @@ struct ActivitiesView: View {
                 projects: projectStore.activeProjects,
                 initialProjectID: selectedProjectID
             ) { intervals, title, projectID, notes, billingStatus, overwriteExisting in
+                var replacedEntries: [TimeEntry] = []
                 if overwriteExisting {
                     let generatedRanges = intervals.map { interval in
                         let day = Calendar.current.startOfDay(for: selectedDate)
@@ -251,23 +252,27 @@ struct ActivitiesView: View {
                             end: day.addingTimeInterval(TimeInterval(interval.endSecond))
                         )
                     }
-                    timeEntryStore.entries(overlapping: selectedDate).filter { existing in
+                    replacedEntries = timeEntryStore.entries(overlapping: selectedDate).filter { existing in
                         generatedRanges.contains { range in
                             existing.start < range.end && existing.end > range.start
                         }
-                    }.forEach { timeEntryStore.delete($0) }
+                    }
+                    replacedEntries.forEach { timeEntryStore.delete($0) }
                 }
                 let day = Calendar.current.startOfDay(for: selectedDate)
+                var createdEntries: [TimeEntry] = []
                 for interval in intervals {
-                    _ = timeEntryStore.addEntry(
+                    guard let id = timeEntryStore.addEntry(
                         title: title,
                         projectID: projectID,
                         notes: notes,
                         start: day.addingTimeInterval(TimeInterval(interval.startSecond)),
                         end: day.addingTimeInterval(TimeInterval(interval.endSecond)),
                         billingStatus: billingStatus
-                    )
+                    ), let entry = timeEntryStore.entries.first(where: { $0.id == id }) else { continue }
+                    createdEntries.append(entry)
                 }
+                timeEntryStore.recordEntryOMaticCreation(created: createdEntries, replaced: replacedEntries)
                 showingEntryOMatic = false
             }
         }
@@ -1291,6 +1296,27 @@ struct ActivitiesView: View {
             .padding(18)
 
             Divider()
+
+            if timeEntryStore.canUndoEntryOMatic {
+                HStack(spacing: 8) {
+                    Label(
+                        "Created \(timeEntryStore.lastEntryOMaticCreationCount) Entry-O-Matic entries",
+                        systemImage: "arrow.uturn.backward.circle"
+                    )
+                    .font(.system(size: 11, weight: .medium))
+                    Spacer()
+                    Button("Undo") {
+                        _ = timeEntryStore.undoEntryOMaticCreation()
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.system(size: 11, weight: .semibold))
+                    .help("Undo Entry-O-Matic creation (⌘Z)")
+                }
+                .foregroundStyle(MetridayTheme.accent)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 9)
+                .background(MetridayTheme.accentSoft)
+            }
 
             if timeEntriesForSelectedDate.isEmpty {
                 Text("Create a manual entry for time away from the Mac, meetings, or a timer session.")

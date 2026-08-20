@@ -22,6 +22,13 @@ struct MetridayApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1440, height: 930)
         .commands {
+            CommandGroup(after: .undoRedo) {
+                Button("Undo Create Time Entries") {
+                    _ = appState.timeEntryStore.undoEntryOMaticCreation()
+                }
+                .keyboardShortcut("z", modifiers: [.command])
+                .disabled(!appState.timeEntryStore.canUndoEntryOMatic)
+            }
             CommandMenu("Navigate") {
                 Button("Today") { appState.section = .today }
                     .keyboardShortcut("1", modifiers: [.command])

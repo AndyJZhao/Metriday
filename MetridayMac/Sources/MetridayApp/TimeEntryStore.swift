@@ -158,13 +158,21 @@ struct TimeEntryArchive: Codable {
     let entries: [TimeEntry]
 }
 
+private struct EntryOMaticUndoBatch {
+    let created: [TimeEntry]
+    let replaced: [TimeEntry]
+}
+
 @MainActor
 final class TimeEntryStore: ObservableObject {
     @Published private(set) var entries: [TimeEntry]
     @Published private(set) var runningTimer: RunningTimer?
     @Published var statusMessage = "Time entries ready"
+    @Published private(set) var canUndoEntryOMatic = false
+    @Published private(set) var lastEntryOMaticCreationCount = 0
 
     private let fileURL: URL
+    private var entryOMaticUndoBatch: EntryOMaticUndoBatch?
 
     init(rootDirectory: URL? = nil) {
         let root = rootDirectory ?? Self.defaultRootDirectory()
@@ -329,6 +337,30 @@ final class TimeEntryStore: ObservableObject {
         persist()
         statusMessage = "Updated billing status for \(updatedCount) time entries"
         return updatedCount
+    }
+
+    func recordEntryOMaticCreation(created: [TimeEntry], replaced: [TimeEntry]) {
+        guard !created.isEmpty else { return }
+        entryOMaticUndoBatch = EntryOMaticUndoBatch(created: created, replaced: replaced)
+        canUndoEntryOMatic = true
+        lastEntryOMaticCreationCount = created.count
+        statusMessage = "Created \(created.count) time entries · press ⌘Z to undo"
+    }
+
+    @discardableResult
+    func undoEntryOMaticCreation() -> Bool {
+        guard let entryOMaticUndoBatch else { return false }
+        let createdIDs = Set(entryOMaticUndoBatch.created.map(\.id))
+        entries.removeAll { createdIDs.contains($0.id) }
+        let existingIDs = Set(entries.map(\.id))
+        entries.append(contentsOf: entryOMaticUndoBatch.replaced.filter { !existingIDs.contains($0.id) })
+        entries.sort { $0.start < $1.start }
+        self.entryOMaticUndoBatch = nil
+        canUndoEntryOMatic = false
+        lastEntryOMaticCreationCount = 0
+        persist()
+        statusMessage = "Undid Entry-O-Matic changes"
+        return true
     }
 
     func delete(_ entry: TimeEntry) {

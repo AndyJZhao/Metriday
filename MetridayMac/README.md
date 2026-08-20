@@ -72,7 +72,7 @@ Reports and Teams are now first-class native sections. Reports exposes Timing-st
 
 The running timer controls support Timing-style ±1/±5/±15-minute start corrections, alignment to the previous entry boundary, estimate check-ins, and visible remaining time.
 
-Activities also includes an Entry-O-Matic flow. It previews generated entries from visible app usage, merges segments across a configurable maximum gap, discards sessions shorter than the selected minimum, subtracts existing entries by default, and offers an explicit overwrite mode before writing anything.
+Activities also includes an Entry-O-Matic flow. It previews generated entries from visible app usage, merges segments across a configurable maximum gap, discards sessions shorter than the selected minimum, subtracts existing entries by default, and offers an explicit overwrite mode before writing anything. The latest batch can be undone from the visible action or `⌘Z`; when overwrite mode removed existing entries, undo restores them as part of the same operation.
 
 Review's Productivity score uses each assigned project's productivity weight; unassigned related, distracted, and other activity receive sensible local defaults.
 
