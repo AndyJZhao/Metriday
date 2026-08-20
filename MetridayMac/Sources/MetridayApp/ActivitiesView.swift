@@ -2772,8 +2772,11 @@ struct ActivitiesView: View {
         .background(filter == target ? MetridayTheme.accentSoft : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .onDrag {
+            NSItemProvider(object: NSString(string: "metriday-project:\(project.id.uuidString)"))
+        }
         .onDrop(of: [UTType.plainText], isTargeted: nil) { providers, _ in
-            handleActivityDrop(providers, onto: project)
+            handleProjectOrActivityDrop(providers, onto: project)
         }
         .contextMenu {
             Button("Edit Project") {
@@ -2789,6 +2792,54 @@ struct ActivitiesView: View {
         .accessibilityIdentifier("activities.project.\(project.id.uuidString)")
         .accessibilityLabel("Project \(project.name), \(formatMinutes(projectDurationSeconds(for: project.id)))")
     }
+
+    }
+
+    private func handleProjectOrActivityDrop(
+        _ providers: [NSItemProvider],
+        onto project: TrackingProject
+    ) -> Bool {
+        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.text.identifier) }) else {
+            return handleActivityDrop(providers, onto: project)
+        }
+        provider.loadDataRepresentation(forTypeIdentifier: UTType.text.identifier) { data, _ in
+            guard let data,
+                  let rawValue = String(data: data, encoding: .utf8) else {
+                return
+            }
+            if rawValue.hasPrefix("metriday-project:") {
+                let sourceID = String(rawValue.dropFirst("metriday-project:".count))
+                guard let sourceProjectID = UUID(uuidString: sourceID) else { return }
+                Task { @MainActor in
+                    guard sourceProjectID != project.id,
+                          !projectStore.descendantProjectIDs(including: sourceProjectID).contains(project.id),
+                          var sourceProject = projectStore.project(sourceProjectID) else { return }
+                    sourceProject.parentID = project.id
+                    projectStore.updateProject(sourceProject)
+                }
+            } else {
+                let activityIDs = rawValue
+                    .split(whereSeparator: \.isNewline)
+                    .compactMap { UUID(uuidString: String($0).trimmingCharacters(in: .whitespacesAndNewlines)) }
+                let shouldCreateRule = NSEvent.modifierFlags.contains(.option)
+                let targetProjectID = project.id
+                Task { @MainActor in
+                    self.applyActivityIDs(activityIDs, to: targetProjectID, shouldCreateRule: shouldCreateRule)
+                }
+            }
+        }
+        return true
+    }
+
+    private func applyActivityIDs(_ activityIDs: [UUID], to projectID: UUID, shouldCreateRule: Bool) {
+        for activityID in Set(activityIDs) {
+            guard let activity = allActivitySegments.first(where: { $0.id == activityID }) else { continue }
+            if shouldCreateRule {
+                _ = createRule(for: activity, projectID: projectID)
+            } else {
+                assignActivity(activityID, to: projectID)
+            }
+        }
     }
 
     private func handleActivityDrop(
@@ -2814,14 +2865,7 @@ struct ActivitiesView: View {
         }
         group.notify(queue: .main) {
             Task { @MainActor in
-                for activityID in Set(ids.snapshot) {
-                    guard let activity = self.allActivitySegments.first(where: { $0.id == activityID }) else { continue }
-                    if shouldCreateRule {
-                        _ = self.createRule(for: activity, projectID: project.id)
-                    } else {
-                        self.assignActivity(activityID, to: project.id)
-                    }
-                }
+                self.applyActivityIDs(ids.snapshot, to: project.id, shouldCreateRule: shouldCreateRule)
             }
         }
         return true
