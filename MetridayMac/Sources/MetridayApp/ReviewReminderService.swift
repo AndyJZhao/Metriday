@@ -14,14 +14,23 @@ final class ReviewReminderService: ObservableObject {
 
     private let monitor: AppActivityMonitor
     private let preferences: PreferencesStore
+    private let categoryStore: ActivityCategoryStore
+    private let filterStore: ActivityFilterStore
     private let notificationCenter = UNUserNotificationCenter.current()
     private var timer: Timer?
     private var nextReminderAt: Date?
     private var cancellables = Set<AnyCancellable>()
 
-    init(monitor: AppActivityMonitor, preferences: PreferencesStore) {
+    init(
+        monitor: AppActivityMonitor,
+        preferences: PreferencesStore,
+        categoryStore: ActivityCategoryStore,
+        filterStore: ActivityFilterStore
+    ) {
         self.monitor = monitor
         self.preferences = preferences
+        self.categoryStore = categoryStore
+        self.filterStore = filterStore
 
         preferences.$reviewReminderIntervalMinutes
             .removeDuplicates()
@@ -94,7 +103,13 @@ final class ReviewReminderService: ObservableObject {
     }
 
     private func postReminder() {
-        let summary = monitor.summary(for: .now)
+        let date = Date()
+        let segments = categoryStore.applyingCategories(
+            to: monitor.segments(for: date),
+            filterStore: filterStore,
+            date: date
+        )
+        let summary = ActivitySummary(segments: segments)
         guard summary.totalMinutes > 0 else { return }
 
         let content = UNMutableNotificationContent()

@@ -76,7 +76,9 @@ final class AppState: ObservableObject {
         )
         self.reviewReminderService = ReviewReminderService(
             monitor: activityMonitor,
-            preferences: initialPreferences
+            preferences: initialPreferences,
+            categoryStore: categoryStore,
+            filterStore: filterStore
         )
         self.syncStore = SyncStore(
             projectStore: projectStore,
