@@ -215,6 +215,66 @@ expect(
     ActivityClassifier.relevance(appName: "Firefox", bundleIdentifier: "org.mozilla.firefox", windowTitle: "") == .distracted,
     "Firefox browser activity should have a safe default classification"
 )
+let calendarProject = TrackingProject(name: "Research")
+let calendarClient = TrackingProject(name: "Client Work")
+let priorCalendarEntry = TimeEntry(
+    projectID: calendarProject.id,
+    title: "Weekly Research Sync",
+    notes: "Work calendar",
+    start: date.addingTimeInterval(-3_600),
+    end: date.addingTimeInterval(-1_800)
+)
+expect(
+    CalendarProjectSuggester.suggestedProjectID(
+        eventTitle: "Weekly Research Sync",
+        calendarTitle: "Work calendar",
+        notes: "",
+        previousEntries: [priorCalendarEntry],
+        projects: [calendarProject, calendarClient],
+        ruleProjectID: calendarClient.id
+    ) == calendarProject.id,
+    "Calendar suggestions should reuse the project from a previous event with the same title"
+)
+expect(
+    CalendarProjectSuggester.suggestedProjectID(
+        eventTitle: "Client kickoff",
+        calendarTitle: "Work calendar",
+        notes: "",
+        previousEntries: [],
+        projects: [calendarProject, calendarClient],
+        ruleProjectID: calendarClient.id
+    ) == calendarClient.id,
+    "Calendar suggestions should prefer a matching project rule after history"
+)
+let priorCalendarOnlyEntry = TimeEntry(
+    projectID: calendarProject.id,
+    title: "Different event",
+    notes: "Work calendar",
+    start: date.addingTimeInterval(-7_200),
+    end: date.addingTimeInterval(-5_400)
+)
+expect(
+    CalendarProjectSuggester.suggestedProjectID(
+        eventTitle: "Client kickoff",
+        calendarTitle: "Work calendar",
+        notes: "",
+        previousEntries: [priorCalendarOnlyEntry],
+        projects: [calendarProject, calendarClient],
+        ruleProjectID: calendarClient.id
+    ) == calendarClient.id,
+    "Calendar suggestions should prefer a project rule over same-calendar history"
+)
+expect(
+    CalendarProjectSuggester.suggestedProjectID(
+        eventTitle: "Research review",
+        calendarTitle: "Work calendar",
+        notes: "",
+        previousEntries: [],
+        projects: [calendarProject, calendarClient],
+        ruleProjectID: nil
+    ) == calendarProject.id,
+    "Calendar suggestions should fall back to project-name similarity"
+)
 expect(
     ActivityCallDetector.isCall(appName: "Zoom", bundleIdentifier: "us.zoom.xos", windowTitle: "Zoom Meeting"),
     "Known call applications should create a record prompt"

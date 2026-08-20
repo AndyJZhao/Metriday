@@ -4875,6 +4875,7 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
         : [source.calendar, source.location, source.notes].filter(Boolean).join(" · "),
       start: source.start,
       end: source.end,
+      projectID: isPhoneCall ? "" : resourceID(source.suggested_project_id || source.suggestedProjectID) || "",
       billingStatus: "billable",
     });
   };

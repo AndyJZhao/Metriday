@@ -256,6 +256,94 @@ struct ProjectRule: Identifiable, Hashable, Codable {
     }
 }
 
+/// Mirrors Timing's project suggestion order when a calendar event becomes a
+/// time entry. The caller supplies the first project-rule match so this pure
+/// helper can also be covered without constructing the application state.
+enum CalendarProjectSuggester {
+    static func suggestedProjectID(
+        eventTitle: String,
+        calendarTitle: String,
+        notes: String,
+        previousEntries: [TimeEntry],
+        projects: [TrackingProject],
+        ruleProjectID: UUID?
+    ) -> UUID? {
+        let activeProjects = projects.filter { !$0.isArchived }
+        let activeIDs = Set(activeProjects.map(\.id))
+        let normalizedEventTitle = normalized(eventTitle)
+        let normalizedCalendarTitle = normalized(calendarTitle)
+        let normalizedNotes = normalized(notes)
+
+        if let previous = previousEntries
+            .filter({
+                guard let projectID = $0.projectID, activeIDs.contains(projectID) else { return false }
+                return normalized($0.title) == normalizedEventTitle && !normalizedEventTitle.isEmpty
+            })
+            .sorted(by: { $0.end > $1.end })
+            .first {
+            return previous.projectID
+        }
+
+        if let ruleProjectID, activeIDs.contains(ruleProjectID) {
+            return ruleProjectID
+        }
+
+        if !normalizedCalendarTitle.isEmpty,
+           let previous = previousEntries
+            .filter({
+                guard let projectID = $0.projectID, activeIDs.contains(projectID) else { return false }
+                return normalized($0.notes).contains(normalizedCalendarTitle)
+            })
+            .sorted(by: { $0.end > $1.end })
+            .first {
+            return previous.projectID
+        }
+
+        if let exactCalendarProject = activeProjects.first(where: {
+            normalized($0.name) == normalizedCalendarTitle && !normalizedCalendarTitle.isEmpty
+        }) {
+            return exactCalendarProject.id
+        }
+
+        if let eventNameProject = activeProjects.first(where: {
+            let name = normalized($0.name)
+            return name.count >= 3 && !normalizedEventTitle.isEmpty && normalizedEventTitle.contains(name)
+        }) {
+            return eventNameProject.id
+        }
+
+        if let calendarNameProject = activeProjects.first(where: {
+            let name = normalized($0.name)
+            return name.count >= 3 && !normalizedCalendarTitle.isEmpty && normalizedCalendarTitle.contains(name)
+        }) {
+            return calendarNameProject.id
+        }
+
+        if let projectContainingCalendar = activeProjects.first(where: {
+            let name = normalized($0.name)
+            return name.count >= 3 && !normalizedCalendarTitle.isEmpty && name.contains(normalizedCalendarTitle)
+        }) {
+            return projectContainingCalendar.id
+        }
+
+        if let notesProject = activeProjects.first(where: {
+            let name = normalized($0.name)
+            return name.count >= 3 && !normalizedNotes.isEmpty && normalizedNotes.contains(name)
+        }) {
+            return notesProject.id
+        }
+
+        return nil
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+    }
+}
+
 struct ProjectArchive: Codable {
     let version: Int
     let projects: [TrackingProject]

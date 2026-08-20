@@ -2378,6 +2378,29 @@ final class AppState: ObservableObject {
         }
     }
 
+    func suggestedProjectID(for event: CalendarEventItem) -> UUID? {
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: event.start)
+        let startMinute = max(0, calendar.dateComponents([.minute], from: day, to: event.start).minute ?? 0)
+        let endMinute = max(startMinute + 1, calendar.dateComponents([.minute], from: day, to: event.end).minute ?? startMinute + 1)
+        let activity = ActivitySegment(
+            appName: "Calendar",
+            windowTitle: event.title,
+            resource: event.urlString.isEmpty ? event.calendarTitle : event.urlString,
+            startMinute: min(1_439, startMinute),
+            endMinute: min(1_440, endMinute),
+            relevance: .other
+        )
+        return CalendarProjectSuggester.suggestedProjectID(
+            eventTitle: event.title,
+            calendarTitle: event.calendarTitle,
+            notes: event.notes,
+            previousEntries: timeEntryStore.materializedEntries(),
+            projects: projectStore.activeProjects,
+            ruleProjectID: projectStore.matchingProjectID(for: activity, date: event.start)
+        )
+    }
+
     private func apiActivity(_ segment: ActivitySegment, date: Date) -> [String: Any] {
         let category = categoryStore.category(for: segment, filterStore: filterStore, date: date)
         return [
@@ -2642,7 +2665,8 @@ final class AppState: ObservableObject {
             "end": apiDate(event.end),
             "duration_seconds": event.durationSeconds,
             "is_editable": event.isEditable,
-            "read_only": true
+            "read_only": true,
+            "suggested_project_id": suggestedProjectID(for: event).map { $0.uuidString } ?? NSNull()
         ]
     }
 

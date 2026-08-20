@@ -3542,19 +3542,7 @@ struct ActivitiesView: View {
     }
 
     private func suggestedProjectID(for event: CalendarEventItem) -> UUID? {
-        let calendar = Calendar.current
-        let day = calendar.startOfDay(for: event.start)
-        let startMinute = max(0, calendar.dateComponents([.minute], from: day, to: event.start).minute ?? 0)
-        let endMinute = max(startMinute + 1, calendar.dateComponents([.minute], from: day, to: event.end).minute ?? startMinute + 1)
-        let activity = ActivitySegment(
-            appName: "Calendar",
-            windowTitle: event.title,
-            resource: event.urlString.isEmpty ? event.calendarTitle : event.urlString,
-            startMinute: min(1_439, startMinute),
-            endMinute: min(1_440, endMinute),
-            relevance: .other
-        )
-        return projectStore.matchingProjectID(for: activity, date: event.start)
+        appState.suggestedProjectID(for: event)
     }
 
     private func addNewEntry() {
