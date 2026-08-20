@@ -961,6 +961,10 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .project-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 3px; }
 .entry-running { color: var(--success); font-size: 11px; font-weight: 650; }
 .entry-edit-row { display: grid; grid-template-columns: minmax(150px, 1fr) 110px 110px 140px 125px 70px; align-items: center; gap: 8px; min-height: 58px; border-bottom: 1px solid #eceef1; }
+.entry-inline-title-field { display: grid; min-width: 0; gap: 6px; }
+.entry-inline-title-field .time-entry-suggestions { min-width: 0; }
+.entry-inline-title-field .time-entry-suggestions > div { overflow: hidden; flex-wrap: nowrap; }
+.entry-inline-title-field .time-entry-suggestions button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry-edit-row input, .entry-edit-row select, .project-edit-row input, .project-edit-row select { height: 34px; min-width: 0; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #2d3038; font-size: 12px; }
 .entry-edit-message { grid-column: 1 / -1; color: var(--danger); font-size: 11px; }
 .time-entry-edit-form { display: grid; gap: 13px; margin-top: 20px; }
