@@ -73,6 +73,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .date-controls { display: flex; align-items: center; gap: 8px; color: #626774; }
 .primary-button, .secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 44px; padding: 0 19px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 650; cursor: pointer; white-space: nowrap; }
 .primary-button:hover { background: #4352da; }
+.primary-button:disabled, .secondary-button:disabled, .quiet-pill:disabled { cursor: not-allowed; opacity: .55; }
+.primary-button:disabled:hover { background: var(--accent); }
 .secondary-button { min-height: 40px; border: 1px solid #d9dce7; background: #fff; color: var(--accent); font-size: 13px; }
 
 /* Today */
