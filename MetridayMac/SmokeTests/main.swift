@@ -956,6 +956,7 @@ Task { @MainActor in
     activityPreferences.includeIdle = true
     activityPreferences.selectedDevice = "Test Mac"
     activityPreferences.timelineOrientation = .vertical
+    activityPreferences.collapseActivitiesShorterThanSeconds = 15
     let reloadedActivityPreferences = ActivitiesPreferencesStore(rootDirectory: activityPreferencesRoot)
     expect(!reloadedActivityPreferences.includeTimeEntries, "Activity display preferences should persist timeline visibility")
     expect(!reloadedActivityPreferences.showWindowTitles, "Activity display preferences should persist title visibility")
@@ -966,6 +967,17 @@ Task { @MainActor in
     expect(!reloadedActivityPreferences.groupByProject && reloadedActivityPreferences.groupByDevice, "Activity grouping preferences should persist")
     expect(reloadedActivityPreferences.includeIdle && reloadedActivityPreferences.selectedDevice == "Test Mac", "Activity filter preferences should persist")
     expect(reloadedActivityPreferences.timelineOrientation == .vertical, "Timeline orientation should persist")
+    expect(reloadedActivityPreferences.collapseActivitiesShorterThanSeconds == 15, "Activity display preferences should persist short-activity collapsing")
+
+    var collapsedSummary = ActivitySegment(
+        appName: "(Entries shorter than 15s each)",
+        startMinute: 10 * 60,
+        endMinute: 10 * 60 + 1,
+        relevance: .other
+    )
+    collapsedSummary.collapsedActivityIDs = [UUID(), UUID()]
+    collapsedSummary.collapsedDurationSeconds = 23
+    expect(collapsedSummary.isCollapsedSummary && collapsedSummary.durationSeconds == 23, "Collapsed activity summaries should preserve aggregate duration")
     expect(
         projectStore.addRule(
             projectID: researchProjectID,

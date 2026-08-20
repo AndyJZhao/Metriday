@@ -152,6 +152,10 @@ struct ActivitySegment: Identifiable, Hashable, Codable {
     /// multi-day history. It is display-only and intentionally not persisted
     /// because the daily history file already provides the source of truth.
     var activityDate: Date?
+    /// Display-only metadata for Timing-style collapsed short-activity rows.
+    /// These synthetic rows are never written back to activity history.
+    var collapsedActivityIDs: [UUID] = []
+    var collapsedDurationSeconds: Int?
 
     init(
         id: UUID = UUID(),
@@ -191,7 +195,8 @@ struct ActivitySegment: Identifiable, Hashable, Codable {
         set { endSecond = newValue * 60 }
     }
 
-    var durationSeconds: Int { max(1, endSecond - startSecond) }
+    var isCollapsedSummary: Bool { !collapsedActivityIDs.isEmpty }
+    var durationSeconds: Int { max(1, collapsedDurationSeconds ?? (endSecond - startSecond)) }
     var duration: Int { max(1, Int(ceil(Double(durationSeconds) / 60.0))) }
 
     var displayTitle: String {

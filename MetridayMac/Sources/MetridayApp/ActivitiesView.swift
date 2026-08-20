@@ -1416,9 +1416,9 @@ struct ActivitiesView: View {
                 groupedActivityList
             } else {
                 LazyVStack(spacing: 0) {
-                    ForEach(filteredSegments) { segment in
+                    ForEach(activityListSegments) { segment in
                         activityRow(segment)
-                        if segment.id != filteredSegments.last?.id {
+                        if segment.id != activityListSegments.last?.id {
                             Divider().padding(.leading, 66)
                         }
                     }
@@ -1890,7 +1890,7 @@ struct ActivitiesView: View {
     }
 
     private var groupedActivityListByDevice: some View {
-        let groups = Dictionary(grouping: filteredSegments) { $0.deviceName }
+        let groups = Dictionary(grouping: activityListSegments) { $0.deviceName }
             .map { name, segments in
                 ActivityGroup(
                     name: name,
@@ -2038,7 +2038,73 @@ struct ActivitiesView: View {
         )
     }
 
+    @ViewBuilder
     private func activityRow(_ segment: ActivitySegment) -> some View {
+        if segment.isCollapsedSummary {
+            collapsedActivityRow(segment)
+        } else {
+            normalActivityRow(segment)
+        }
+    }
+
+    private func collapsedActivityRow(_ segment: ActivitySegment) -> some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: "rectangle.3.group")
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(width: 30, height: 30)
+                    .background(MetridayTheme.canvas)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(segment.appName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                    Text("\(segment.collapsedActivityIDs.count) activities · Display-only summary")
+                        .font(.system(size: 10))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(width: 220, alignment: .leading)
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(MetridayTheme.secondary)
+                    .frame(width: 7, height: 7)
+                Text("Collapsed")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(MetridayTheme.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 8)
+            .frame(width: 112, height: 24, alignment: .leading)
+            .background(MetridayTheme.canvas)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+            Spacer(minLength: 10)
+
+            Text(formatMinutes(segment.durationSeconds))
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(MetridayTheme.graphite)
+                .frame(width: 52, alignment: .trailing)
+
+            Label(projectStore.name(for: segment.projectID), systemImage: "folder")
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
+                .frame(width: 122, alignment: .leading)
+                .foregroundStyle(MetridayTheme.secondary)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .background(MetridayTheme.canvas.opacity(0.45))
+        .help("Collapsed short activities; change the threshold in Activity Display Settings")
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Collapsed short activities, \(segment.collapsedActivityIDs.count) activities, \(formatMinutes(segment.durationSeconds))")
+    }
+
+    private func normalActivityRow(_ segment: ActivitySegment) -> some View {
         let category = category(for: segment)
         return HStack(spacing: 12) {
             HStack(spacing: 9) {
@@ -2595,6 +2661,56 @@ struct ActivitiesView: View {
         }
     }
 
+    private struct CollapsedActivityKey: Hashable {
+        let projectID: UUID?
+        let activityDate: Date?
+        let deviceName: String
+    }
+
+    private var activityListSegments: [ActivitySegment] {
+        let threshold = preferences.collapseActivitiesShorterThanSeconds
+        guard threshold > 0 else { return filteredSegments }
+
+        let shortSegments = filteredSegments.filter { $0.durationSeconds < threshold }
+        guard shortSegments.count > 1 else { return filteredSegments }
+        let longSegments = filteredSegments.filter { $0.durationSeconds >= threshold }
+        let groups = Dictionary(grouping: shortSegments) { segment in
+            CollapsedActivityKey(
+                projectID: segment.projectID,
+                activityDate: segment.activityDate.map { Calendar.current.startOfDay(for: $0) },
+                deviceName: segment.deviceName
+            )
+        }
+        let displaySegments = groups.values.flatMap { segments -> [ActivitySegment] in
+            let ordered = segments.sorted { $0.startSecond < $1.startSecond }
+            guard ordered.count > 1, let first = ordered.first else { return ordered }
+            var summary = ActivitySegment(
+                id: first.id,
+                appName: "(Entries shorter than \(shortActivityThresholdLabel(threshold)) each)",
+                deviceName: first.deviceName,
+                windowTitle: "\(ordered.count) activities",
+                startMinute: first.startMinute,
+                endMinute: first.endMinute,
+                startSecond: first.startSecond,
+                endSecond: first.endSecond,
+                relevance: .other,
+                projectID: first.projectID,
+                activityDate: first.activityDate
+            )
+            summary.collapsedActivityIDs = ordered.map(\.id)
+            summary.collapsedDurationSeconds = ordered.reduce(0) { $0 + $1.durationSeconds }
+            return [summary]
+        }
+        return (longSegments + displaySegments).sorted {
+            if $0.startSecond == $1.startSecond { return $0.endSecond < $1.endSecond }
+            return $0.startSecond < $1.startSecond
+        }
+    }
+
+    private func shortActivityThresholdLabel(_ seconds: Int) -> String {
+        seconds >= 60 ? "\(seconds / 60)m" : "\(seconds)s"
+    }
+
     private var filterScopedSegments: [ActivitySegment] {
         let scoped = scopedSegments(from: segmentsForSelectedRange)
         guard let selectedBuiltinFilter else { return scoped }
@@ -2788,7 +2904,7 @@ struct ActivitiesView: View {
     }
 
     private var activityGroups: [ActivityGroup] {
-        let grouped = Dictionary(grouping: filteredSegments) { projectStore.name(for: $0.projectID) }
+        let grouped = Dictionary(grouping: activityListSegments) { projectStore.name(for: $0.projectID) }
         return grouped.map { name, segments in
             ActivityGroup(
                 name: name,
@@ -3589,6 +3705,19 @@ private struct ActivityDisplaySettingsSheet: View {
                 .toggleStyle(.checkbox)
             Toggle("Show website hosts and file paths", isOn: $preferences.showResourcePaths)
                 .toggleStyle(.checkbox)
+
+            Picker("Collapse activities shorter than", selection: $preferences.collapseActivitiesShorterThanSeconds) {
+                Text("Never").tag(0)
+                Text("5 seconds").tag(5)
+                Text("15 seconds").tag(15)
+                Text("30 seconds").tag(30)
+                Text("1 minute").tag(60)
+            }
+            .pickerStyle(.menu)
+            Text("Short app-usage rows are summarized in the activity list; the timeline keeps the original evidence.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             Toggle("Group websites independently of their browser", isOn: $preferences.groupWebsitesIndependently)
                 .toggleStyle(.checkbox)

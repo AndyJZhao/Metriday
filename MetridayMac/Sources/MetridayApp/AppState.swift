@@ -344,6 +344,9 @@ final class AppState: ObservableObject {
                let orientation = ActivityTimelineOrientation(rawValue: value) {
                 activitiesPreferences.timelineOrientation = orientation
             }
+            if let value = body["collapse_activities_shorter_than_seconds"] as? Int {
+                activitiesPreferences.collapseActivitiesShorterThanSeconds = max(0, value)
+            }
             return .jsonObject(activityPreferencesAPI())
         }
 
@@ -2390,6 +2393,7 @@ final class AppState: ObservableObject {
             "include_idle": activitiesPreferences.includeIdle,
             "selected_device": activitiesPreferences.selectedDevice,
             "timeline_orientation": activitiesPreferences.timelineOrientation.rawValue,
+            "collapse_activities_shorter_than_seconds": activitiesPreferences.collapseActivitiesShorterThanSeconds,
         ]
     }
 

@@ -56,6 +56,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
     @Published var includeIdle: Bool { didSet { persist() } }
     @Published var selectedDevice: String { didSet { persist() } }
     @Published var timelineOrientation: ActivityTimelineOrientation { didSet { persist() } }
+    @Published var collapseActivitiesShorterThanSeconds: Int { didSet { persist() } }
 
     private let fileURL: URL
 
@@ -76,6 +77,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeIdle = payload.includeIdle
             selectedDevice = payload.selectedDevice
             timelineOrientation = payload.timelineOrientation
+            collapseActivitiesShorterThanSeconds = max(0, payload.collapseActivitiesShorterThanSeconds)
         } else {
             includeTimeEntries = true
             showWindowTitles = true
@@ -89,6 +91,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeIdle = false
             selectedDevice = "All Devices"
             timelineOrientation = .vertical
+            collapseActivitiesShorterThanSeconds = 0
             persist()
         }
     }
@@ -111,7 +114,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
                 groupByDevice: groupByDevice,
                 includeIdle: includeIdle,
                 selectedDevice: selectedDevice,
-                timelineOrientation: timelineOrientation
+                timelineOrientation: timelineOrientation,
+                collapseActivitiesShorterThanSeconds: collapseActivitiesShorterThanSeconds
             )
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -142,6 +146,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
         let includeIdle: Bool
         let selectedDevice: String
         let timelineOrientation: ActivityTimelineOrientation
+        let collapseActivitiesShorterThanSeconds: Int
 
         init(
             includeTimeEntries: Bool,
@@ -155,7 +160,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
             groupByDevice: Bool,
             includeIdle: Bool,
             selectedDevice: String,
-            timelineOrientation: ActivityTimelineOrientation
+            timelineOrientation: ActivityTimelineOrientation,
+            collapseActivitiesShorterThanSeconds: Int
         ) {
             self.includeTimeEntries = includeTimeEntries
             self.showWindowTitles = showWindowTitles
@@ -169,6 +175,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             self.includeIdle = includeIdle
             self.selectedDevice = selectedDevice
             self.timelineOrientation = timelineOrientation
+            self.collapseActivitiesShorterThanSeconds = max(0, collapseActivitiesShorterThanSeconds)
         }
 
         init(from decoder: Decoder) throws {
@@ -185,6 +192,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeIdle = try container.decodeIfPresent(Bool.self, forKey: .includeIdle) ?? false
             selectedDevice = try container.decodeIfPresent(String.self, forKey: .selectedDevice) ?? "All Devices"
             timelineOrientation = try container.decodeIfPresent(ActivityTimelineOrientation.self, forKey: .timelineOrientation) ?? .vertical
+            collapseActivitiesShorterThanSeconds = max(0, try container.decodeIfPresent(Int.self, forKey: .collapseActivitiesShorterThanSeconds) ?? 0)
         }
     }
 }

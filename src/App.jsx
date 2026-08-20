@@ -3037,13 +3037,75 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
   return <section className="web-activity-timeline" aria-label="Activities timeline"><div className="web-activity-timeline-heading"><div><h2>Timeline</h2><p>Click for details · double-click to create a time entry · right-click for actions · drag across a gap to select time.</p><div className="web-activity-timeline-legend" aria-label="Timeline color legend"><span><i className="focused" />Focused</span><span><i className="distracting" />Distracting</span><span><i className="other" />Other</span><span><i className="idle" />Idle</span></div></div><div className="web-activity-timeline-actions"><button type="button" className="timeline-orientation-toggle" onClick={toggleOrientation} aria-label={"Switch to " + (vertical ? "horizontal" : "vertical") + " timeline"} title={"Switch to " + (vertical ? "horizontal" : "vertical") + " timeline"}><ArrowsClockwise size={14} />{vertical ? "Vertical" : "Horizontal"}</button>{selection ? <><span>{formatRange(selection.start, selection.end)}</span><button type="button" onClick={recordSelection} disabled={!api.connected}>{onCreateSelection ? "Create Time Entry" : "Record time"}</button><button type="button" className="timeline-clear" onClick={() => updateSelection(null)}>Clear</button></> : <span>{timelineHours.length ? `${String(Math.floor((timelineHours[0] % 1440) / 60)).padStart(2, "0")}:00–${String(Math.floor((timelineHours[timelineHours.length - 1] % 1440) / 60)).padStart(2, "0")}:00` : "00:00–24:00"}</span>}{message ? <small role="status">{message}</small> : null}</div></div><div className={"web-activity-timeline-track " + (vertical ? "vertical" : "horizontal")} ref={trackRef} onPointerDown={startSelection}>{timelineHours.map((minute) => { const hour = Math.floor((minute % 1440) / 60); const label = `${String(hour).padStart(2, "0")}:00`; const position = minutePercent(minute); return <span className="web-activity-timeline-label" key={minute} style={vertical ? { top: `${position}%` } : { left: `${position}%` }}>{label}</span>; })}<div className="web-activity-timeline-grid" aria-hidden="true">{timelineHours.map((minute) => <i key={minute} style={vertical ? { top: `${minutePercent(minute)}%` } : { left: `${minutePercent(minute)}%` }} />)}</div>{currentTimeSecond !== null && clippedMinuteRange(currentTimeSecond, currentTimeSecond + 60) ? <div className={"web-activity-timeline-current-time " + (vertical ? "vertical" : "horizontal")} style={vertical ? { top: `${minutePercent(absoluteMinuteForSecond(currentTimeSecond))}%` } : { left: `${minutePercent(absoluteMinuteForSecond(currentTimeSecond))}%` }} aria-hidden="true"><span /></div> : null}{activities.map((activity) => { const startSecond = Math.max(0, Number(activity.startSecond || 0)); const endSecond = Math.min(totalSeconds, Number(activity.endSecond || 0)); const range = clippedMinuteRange(startSecond, endSecond); if (!range) return null; const category = activityCategory(activity); const categoryStyle = activityCategoryStyle(category); const startPercent = minutePercent(range.start); const durationPercent = Math.max(minutePercent(range.end) - startPercent, 0.18); const hitDurationPercent = Math.max(durationPercent, 1.6); const hitStartPercent = Math.max(0, Math.min(100 - hitDurationPercent, startPercent - ((hitDurationPercent - durationPercent) / 2))); const blockStyle = vertical ? { top: `${hitStartPercent}%`, height: `${hitDurationPercent}%`, color: categoryStyle.color } : { left: `${hitStartPercent}%`, width: `${hitDurationPercent}%`, color: categoryStyle.color }; const visualStyle = vertical ? { left: "0%", width: "100%", top: `${((startPercent - hitStartPercent) / hitDurationPercent) * 100}%`, height: `${(durationPercent / hitDurationPercent) * 100}%` } : { top: "0%", height: "100%", left: `${((startPercent - hitStartPercent) / hitDurationPercent) * 100}%`, width: `${(durationPercent / hitDurationPercent) * 100}%` }; return <button type="button" key={activity.id} className={"web-activity-timeline-block " + category.key} style={blockStyle} aria-label={activityLabel(activity) + " · " + category.label + " · " + preciseClock(startSecond) + "–" + preciseClock(endSecond)} title={activityLabel(activity) + " · " + category.label + " · " + preciseClock(startSecond) + "–" + preciseClock(endSecond)} onPointerDown={(event) => event.stopPropagation()} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if (activityClickTimer.current) window.clearTimeout(activityClickTimer.current); activityClickTimer.current = null; setContextMenu({ activity, x: event.clientX, y: event.clientY }); }} onClick={() => openActivityDetails(activity)} onDoubleClick={(event) => createActivityTimeEntry(event, activity)}><span className="web-activity-timeline-visual" style={visualStyle} /></button>; })}{timeEntries.map(({ entry, range }) => { const timelineRange = rangeStyle(range.startSecond, range.endSecond, "#d77b22"); if (!timelineRange) return null; return <button type="button" key={"entry-" + entryID(entry)} className="web-activity-timeline-overlay time-entry" style={timelineRange.outer} aria-label={"Edit time entry " + (entry.title || "Untitled") + " " + entryRange(entry)} title={"Edit time entry · " + (entry.title || "Untitled") + " · " + entryRange(entry)} onPointerDown={(event) => event.stopPropagation()} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setOverlayContextMenu({ kind: "time-entry", entry, x: event.clientX, y: event.clientY }); }} onClick={() => onEditTimeEntry ? onEditTimeEntry(entry) : setMessage("Time entry · " + (entry.title || "Untitled"))}><span style={timelineRange.visual} /></button>; })}{calendarEvents.map(({ event, startSecond, endSecond }) => { const timelineRange = rangeStyle(startSecond, endSecond, "#4e5ff2"); if (!timelineRange) return null; return <button type="button" key={"calendar-" + (event.id || event.title)} className="web-activity-timeline-overlay calendar-event" style={timelineRange.outer} aria-label={"Record calendar event " + (event.title || "Untitled event")} title={"Calendar · " + (event.title || "Untitled event")} onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setOverlayContextMenu({ kind: "calendar-event", event, x: event.clientX, y: event.clientY }); }} onClick={() => recordCalendarEvent(event)}><span style={timelineRange.visual} /></button>; })}{selection ? <div className="web-activity-timeline-selection" style={selectionStyle} aria-label={"Selected " + formatRange(selection.start, selection.end)} /> : null}</div>{contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} /> : null}{overlayContextMenu?.kind === "time-entry" ? <TimelineContextMenu title={overlayContextMenu.entry.title || "Untitled time entry"} subtitle={entryRange(overlayContextMenu.entry)} actionLabel="Edit time entry" actionIcon={Clock} x={overlayContextMenu.x} y={overlayContextMenu.y} onClose={() => setOverlayContextMenu(null)} onAction={() => onEditTimeEntry?.(overlayContextMenu.entry)} onDelete={() => deleteTimeEntry(overlayContextMenu.entry)} /> : null}{overlayContextMenu?.kind === "calendar-event" ? <TimelineContextMenu title={overlayContextMenu.event.title || "Untitled event"} subtitle={overlayContextMenu.event.calendar || "Calendar event"} actionLabel="Record time entry" actionIcon={CalendarBlank} x={overlayContextMenu.x} y={overlayContextMenu.y} onClose={() => setOverlayContextMenu(null)} onAction={() => recordCalendarEvent(overlayContextMenu.event)} /> : null}</section>;
 }
 
+function activityDurationSeconds(activity) {
+  const collapsed = Number(activity?.collapsed_duration_seconds);
+  if (Number.isFinite(collapsed) && collapsed > 0) return collapsed;
+  return Math.max(0, Number(activity?.endSecond || 0) - Number(activity?.startSecond || 0));
+}
+
+function collapseShortActivities(activities, thresholdSeconds) {
+  const threshold = Math.max(0, Number(thresholdSeconds || 0));
+  if (!threshold) return activities;
+  const shortActivities = activities.filter((activity) => activityDurationSeconds(activity) < threshold);
+  if (shortActivities.length <= 1) return activities;
+  const longActivities = activities.filter((activity) => activityDurationSeconds(activity) >= threshold);
+  const groups = new Map();
+  shortActivities.forEach((activity) => {
+    const key = `${resourceID(activity.projectID) || "unassigned"}:${activity.date || ""}:${activity.deviceName || "This Mac"}`;
+    const current = groups.get(key) || [];
+    current.push(activity);
+    groups.set(key, current);
+  });
+  const label = threshold >= 60 ? `${Math.floor(threshold / 60)}m` : `${threshold}s`;
+  const summaries = [...groups.values()].flatMap((group) => {
+    if (group.length <= 1) return group;
+    const ordered = [...group].sort((left, right) => Number(left.startSecond || 0) - Number(right.startSecond || 0));
+    const first = ordered[0];
+    return [{
+      ...first,
+      appName: `(Entries shorter than ${label} each)`,
+      bundleIdentifier: "",
+      windowTitle: `${ordered.length} activities`,
+      resource: "",
+      startSecond: Number(first.startSecond || 0),
+      endSecond: Number(first.endSecond || first.startSecond || 0),
+      relevance: "other",
+      categoryRole: "other",
+      categoryName: "Other",
+      categoryColor: "graphite",
+      collapsed_activity_ids: ordered.map((activity) => activity.id),
+      collapsed_duration_seconds: ordered.reduce((total, activity) => total + activityDurationSeconds(activity), 0),
+      is_collapsed_summary: true,
+    }];
+  });
+  return [...longActivities, ...summaries].sort((left, right) => String(left.date || "").localeCompare(String(right.date || "")) || Number(left.startSecond || 0) - Number(right.startSecond || 0));
+}
+
 function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode = "none", projects = [], displayPreferences = null, dateKey = "", api = null, onCreateTimeEntry }) {
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
   const [contextMenu, setContextMenu] = useState(null);
   const rowClickTimer = useRef(null);
   useEffect(() => () => { if (rowClickTimer.current) window.clearTimeout(rowClickTimer.current); }, []);
-  const rows = [...activities].sort((left, right) => String(left.date || dateKey).localeCompare(String(right.date || dateKey)) || Number(left.startSecond || 0) - Number(right.startSecond || 0));
+  const displayActivities = viewMode === "category"
+    ? activities
+    : collapseShortActivities(activities, displayPreferences?.collapse_activities_shorter_than_seconds);
+  const rows = [...displayActivities].sort((left, right) => String(left.date || dateKey).localeCompare(String(right.date || dateKey)) || Number(left.startSecond || 0) - Number(right.startSecond || 0));
   const activityRow = (activity) => {
+    if (activity.is_collapsed_summary) {
+      const count = Array.isArray(activity.collapsed_activity_ids) ? activity.collapsed_activity_ids.length : 0;
+      const duration = activityDurationSeconds(activity);
+      const project = projectTitleFor(projects, activity.projectID);
+      return <div className="activity-table-row activity-table-row-collapsed" key={activity.id} role="status" aria-label={`Collapsed short activities, ${count} activities, ${formatDurationSeconds(duration)}`} title="Collapsed short activities; change the threshold in Display settings">
+        <div className="activity-app-cell">
+          <span className="activity-table-icon"><Waveform size={18} /></span>
+          <span className="activity-app-copy"><strong>{activity.appName}</strong><small>{count} activities · Display-only summary</small></span>
+        </div>
+        <span className="activity-category other"><i />Collapsed</span>
+        <span>—</span>
+        <small>{formatDurationSeconds(duration)} · {activity.deviceName || "This Mac"}</small>
+        <span className="activity-row-project activity-row-project-static"><FolderSimple size={14} />{project}</span>
+      </div>;
+    }
     const category = activityCategory(activity);
     const Icon = activityIcon(activity);
     const app = activity.appName || activity.deviceName || "Unknown App";
@@ -3053,7 +3115,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     });
     const start = Math.floor(Number(activity.startSecond || 0) / 60);
     const end = Math.ceil(Number(activity.endSecond || 0) / 60);
-    const duration = Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
+    const duration = activityDurationSeconds(activity);
     const activityAPI = () => api;
     const assignProject = async (event) => {
       event.stopPropagation();
@@ -3139,7 +3201,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     const existing = groups.get(key) || { key, label, category, categories: new Map(), activities: [], seconds: 0 };
     existing.categories.set(`${category.key}:${category.label}:${category.color}`, category);
     existing.activities.push(activity);
-    existing.seconds += Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
+    existing.seconds += activityDurationSeconds(activity);
     groups.set(key, existing);
     return groups;
   }, new Map()).values()].sort((left, right) => right.seconds - left.seconds || left.label.localeCompare(right.label));
@@ -3200,7 +3262,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
 }
 
 function WebActivityCategoryCards({ activities, dateKey, onSelect, onCreateTimeEntry }) {
-  const durationFor = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
+  const durationFor = (activity) => activityDurationSeconds(activity);
   const websiteName = (activity) => {
     try {
       return new URL(activity.resource || "").host || "";
@@ -3586,8 +3648,9 @@ function WebActivityDisplayMenu({ open, onToggle, preferences, devices, onChange
     group_paths_independently: false,
     activity_time_range: "selectedDay",
     selected_device: "All Devices",
+    collapse_activities_shorter_than_seconds: 0,
   };
-  return <div className="activity-display-menu"><button type="button" className={`quiet-pill activity-display-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />Display</button>{open ? <div className="activity-display-popover" role="dialog" aria-label="Activity display settings"><strong>Display settings</strong><label><input type="checkbox" checked={Boolean(values.include_time_entries)} onChange={(event) => onChange({ include_time_entries: event.target.checked })} />Include time entries</label><label><input type="checkbox" checked={Boolean(values.show_window_titles)} onChange={(event) => onChange({ show_window_titles: event.target.checked })} />Show window titles</label><label><input type="checkbox" checked={Boolean(values.show_resource_paths)} onChange={(event) => onChange({ show_resource_paths: event.target.checked })} />Show website paths</label><label><input type="checkbox" checked={Boolean(values.group_websites_independently)} onChange={(event) => onChange({ group_websites_independently: event.target.checked })} />Group websites independently of browser</label><label><input type="checkbox" checked={Boolean(values.group_paths_independently)} onChange={(event) => onChange({ group_paths_independently: event.target.checked })} />Group paths independently of app</label><label className="activity-display-select">Activity range<select value={values.activity_time_range || "selectedDay"} onChange={(event) => onChange({ activity_time_range: event.target.value })}><option value="selectedDay">Selected day</option><option value="lastSevenDays">Last 7 days</option><option value="lastThirtyDays">Last 30 days</option><option value="lastNinetyDays">Last 90 days</option></select></label></div> : null}</div>;
+  return <div className="activity-display-menu"><button type="button" className={`quiet-pill activity-display-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />Display</button>{open ? <div className="activity-display-popover" role="dialog" aria-label="Activity display settings"><strong>Display settings</strong><label><input type="checkbox" checked={Boolean(values.include_time_entries)} onChange={(event) => onChange({ include_time_entries: event.target.checked })} />Include time entries</label><label><input type="checkbox" checked={Boolean(values.show_window_titles)} onChange={(event) => onChange({ show_window_titles: event.target.checked })} />Show window titles</label><label><input type="checkbox" checked={Boolean(values.show_resource_paths)} onChange={(event) => onChange({ show_resource_paths: event.target.checked })} />Show website paths</label><label className="activity-display-select">Collapse activities shorter than<select value={Number(values.collapse_activities_shorter_than_seconds || 0)} onChange={(event) => onChange({ collapse_activities_shorter_than_seconds: Number(event.target.value) })}><option value="0">Never</option><option value="5">5 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option></select></label><label><input type="checkbox" checked={Boolean(values.group_websites_independently)} onChange={(event) => onChange({ group_websites_independently: event.target.checked })} />Group websites independently of browser</label><label><input type="checkbox" checked={Boolean(values.group_paths_independently)} onChange={(event) => onChange({ group_paths_independently: event.target.checked })} />Group paths independently of app</label><label className="activity-display-select">Activity range<select value={values.activity_time_range || "selectedDay"} onChange={(event) => onChange({ activity_time_range: event.target.value })}><option value="selectedDay">Selected day</option><option value="lastSevenDays">Last 7 days</option><option value="lastThirtyDays">Last 30 days</option><option value="lastNinetyDays">Last 90 days</option></select></label></div> : null}</div>;
 }
 
 function WebActivityDevicesMenu({ open, devices, selectedDevice, hideDevicesWithoutTime, onToggle, onSelect, onToggleHide }) {
