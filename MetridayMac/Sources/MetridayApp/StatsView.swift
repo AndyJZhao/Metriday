@@ -10,6 +10,7 @@ private enum StatsPeriod: String, CaseIterable, Identifiable {
     case lastMonth
     case year
     case lastYear
+    case custom
 
     var id: String { rawValue }
 
@@ -23,6 +24,7 @@ private enum StatsPeriod: String, CaseIterable, Identifiable {
         case .lastMonth: return "Last Month"
         case .year: return "This Year"
         case .lastYear: return "Last Year"
+        case .custom: return "Custom Range"
         }
     }
 
@@ -30,6 +32,7 @@ private enum StatsPeriod: String, CaseIterable, Identifiable {
         switch self {
         case .day, .yesterday, .week, .lastWeek: return "Time by Day"
         case .month, .lastMonth, .year, .lastYear: return "Time by Week"
+        case .custom: return "Time by Day"
         }
     }
 }
@@ -46,6 +49,29 @@ struct StatsView: View {
 
     @State private var projectUnit: StatsProjectUnit = .hour
     @State private var statsPeriod: StatsPeriod = .week
+    @State private var customStartDate: Date
+    @State private var customEndDate: Date
+
+    init(
+        monitor: AppActivityMonitor,
+        filterStore: ActivityFilterStore,
+        categoryStore: ActivityCategoryStore,
+        screenTimeStore: ScreenTimeStore,
+        projectStore: ProjectStore,
+        timeEntryStore: TimeEntryStore,
+        selectedDate: Date
+    ) {
+        self.monitor = monitor
+        self.filterStore = filterStore
+        self.categoryStore = categoryStore
+        self.screenTimeStore = screenTimeStore
+        self.projectStore = projectStore
+        self.timeEntryStore = timeEntryStore
+        self.selectedDate = selectedDate
+        let day = Calendar.current.startOfDay(for: selectedDate)
+        _customStartDate = State(initialValue: day)
+        _customEndDate = State(initialValue: day)
+    }
 
     private var projectScope: StatsProjectScope {
         StatsProjectScope(appState.activityScope)
@@ -88,6 +114,19 @@ struct StatsView: View {
                             .pickerStyle(.menu)
                             .frame(minWidth: 130)
                             .accessibilityIdentifier("stats.period-picker")
+                            if statsPeriod == .custom {
+                                HStack(spacing: 5) {
+                                    DatePicker("From", selection: $customStartDate, displayedComponents: .date)
+                                        .labelsHidden()
+                                        .frame(width: 118)
+                                    Text("–")
+                                        .foregroundStyle(MetridayTheme.secondary)
+                                    DatePicker("To", selection: $customEndDate, displayedComponents: .date)
+                                        .labelsHidden()
+                                        .frame(width: 118)
+                                }
+                                .accessibilityIdentifier("stats.custom-range")
+                            }
                             ShareLink(
                                 item: statsShareText,
                                 subject: Text("Metriday Stats"),
@@ -144,7 +183,7 @@ struct StatsView: View {
 
                         HStack(alignment: .top, spacing: 16) {
                             weekdayCategoryChart(
-                                title: statsPeriod.chartTitle,
+                                title: periodChartTitle,
                                 subtitle: "Active minutes by Category",
                                 points: periodPoints,
                                 identifier: "stats.active-weekdays"
@@ -190,6 +229,12 @@ struct StatsView: View {
                 }
             }
             .padding(28)
+        }
+        .onChange(of: customStartDate) { _, newDate in
+            if newDate > customEndDate { customEndDate = newDate }
+        }
+        .onChange(of: customEndDate) { _, newDate in
+            if newDate < customStartDate { customStartDate = newDate }
         }
     }
 
@@ -744,6 +789,10 @@ struct StatsView: View {
         .accessibilityIdentifier("stats.projects-and-time-entries")
     }
 
+    private var periodChartTitle: String {
+        statsPeriod == .custom && periodDates.count > 7 ? "Time by Week" : statsPeriod.chartTitle
+    }
+
     private var periodSummary: ActivitySummary {
         ActivitySummary(segments: periodDates.flatMap(activitySegments(for:)))
     }
@@ -806,6 +855,11 @@ struct StatsView: View {
                 return [selectedDate]
             }
             return dates(in: previous)
+        case .custom:
+            let first = calendar.startOfDay(for: min(customStartDate, customEndDate))
+            let last = calendar.startOfDay(for: max(customStartDate, customEndDate))
+            let end = calendar.date(byAdding: .day, value: 1, to: last) ?? last
+            return dates(in: DateInterval(start: first, end: end))
         }
     }
 
@@ -897,6 +951,15 @@ struct StatsView: View {
             buckets = stride(from: 0, to: periodDates.count, by: 7).map { start in
                 let dates = Array(periodDates[start..<min(start + 7, periodDates.count)])
                 return StatsPeriodBucket(label: shortDateLabel(dates[0]), dates: dates)
+            }
+        case .custom:
+            if periodDates.count <= 7 {
+                buckets = periodDates.map { StatsPeriodBucket(label: dayLabel($0), dates: [$0]) }
+            } else {
+                buckets = stride(from: 0, to: periodDates.count, by: 7).map { start in
+                    let dates = Array(periodDates[start..<min(start + 7, periodDates.count)])
+                    return StatsPeriodBucket(label: shortDateLabel(dates[0]), dates: dates)
+                }
             }
         }
         return buckets.map { bucket in

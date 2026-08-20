@@ -343,6 +343,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .supporting-header h1 { margin: 6px 0 0; font-size: 30px; letter-spacing: -0.04em; }
 .activities-page-header { align-items: center; }
 .activities-page-actions { display: flex; align-items: center; gap: 12px; }
+.stats-page .activities-page-actions { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .activities-timer { min-height: 34px; }
 .activities-timer:disabled { cursor: not-allowed; opacity: 0.55; }
 .activities-timer-message { max-width: 1120px; margin: -10px auto 16px; }
@@ -460,6 +461,10 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-unit-picker select { min-height: 26px; padding: 3px 22px 3px 7px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--ink); font: inherit; }
 .stats-period-picker { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
 .stats-period-picker select { min-height: 30px; padding: 4px 24px 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--ink); font: inherit; }
+.stats-custom-range { display: inline-flex; align-items: end; gap: 5px; color: var(--muted); font-size: 10px; }
+.stats-custom-range label { display: grid; gap: 3px; }
+.stats-custom-range input { width: 90px; min-width: 0; min-height: 30px; padding: 4px 4px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--ink); font: inherit; }
+.stats-custom-range > span { padding-bottom: 8px; }
 .stats-share-button { display: inline-flex; align-items: center; gap: 6px; }
 .stats-share-status { color: var(--success); font-size: 10px; font-weight: 650; }
 .stats-bars { display: flex; align-items: end; justify-content: space-between; gap: 12px; min-height: 215px; padding-top: 20px; }
@@ -467,8 +472,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-bar-column strong { color: #454a55; font-size: 10px; }
 .stats-bar-track { display: flex; align-items: end; width: min(38px, 100%); height: 145px; border-radius: 6px 6px 2px 2px; background: #f1f2f5; }
 .stats-bar-track i { display: block; width: 100%; min-height: 3px; border-radius: 6px 6px 2px 2px; background: var(--accent); }
-.stats-period-bars-month, .stats-period-bars-lastMonth, .stats-period-bars-year, .stats-period-bars-lastYear { justify-content: flex-start; overflow-x: auto; padding-bottom: 6px; }
-.stats-period-bars-month .stats-bar-column, .stats-period-bars-lastMonth .stats-bar-column, .stats-period-bars-year .stats-bar-column, .stats-period-bars-lastYear .stats-bar-column { flex: 0 0 32px; }
+.stats-period-bars-month, .stats-period-bars-lastMonth, .stats-period-bars-year, .stats-period-bars-lastYear, .stats-period-bars-custom-long { justify-content: flex-start; overflow-x: auto; padding-bottom: 6px; }
+.stats-period-bars-month .stats-bar-column, .stats-period-bars-lastMonth .stats-bar-column, .stats-period-bars-year .stats-bar-column, .stats-period-bars-lastYear .stats-bar-column, .stats-period-bars-custom-long .stats-bar-column { flex: 0 0 32px; }
 .stats-category-legend { max-width: 58%; flex-wrap: wrap; justify-content: flex-end; gap: 5px 9px; }
 .stats-category-legend span { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stats-category-legend i { flex: 0 0 auto; border-radius: 50%; }
