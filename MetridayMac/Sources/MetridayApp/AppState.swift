@@ -47,7 +47,11 @@ final class AppState: ObservableObject {
     private var workspaceCancellables = Set<AnyCancellable>()
 
     init() {
-        let initialDate = Calendar.current.startOfDay(for: .now)
+        let initialPreferences = PreferencesStore()
+        let initialDate = TrackingDay.logicalDayLabel(
+            for: .now,
+            wrapAtMinute: initialPreferences.wrapDaysAtMinute
+        )
         self.selectedDate = initialDate
         self.markdownStore = MarkdownStore(date: initialDate)
         self.projectStore = ProjectStore()
@@ -55,7 +59,7 @@ final class AppState: ObservableObject {
         self.categoryStore = ActivityCategoryStore()
         self.activitiesPreferences = ActivitiesPreferencesStore()
         self.timeEntryStore = TimeEntryStore()
-        self.preferences = PreferencesStore()
+        self.preferences = initialPreferences
         self.exclusionStore = ExclusionStore()
         self.calendarStore = CalendarEventStore()
         self.reminderStore = ReminderStore()
@@ -67,12 +71,12 @@ final class AppState: ObservableObject {
         self.teamStore = TeamStore()
         self.activityMonitor = AppActivityMonitor(
             projectStore: projectStore,
-            preferences: preferences,
+            preferences: initialPreferences,
             exclusionStore: exclusionStore
         )
         self.reviewReminderService = ReviewReminderService(
             monitor: activityMonitor,
-            preferences: preferences
+            preferences: initialPreferences
         )
         self.syncStore = SyncStore(
             projectStore: projectStore,
@@ -97,16 +101,33 @@ final class AppState: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &workspaceCancellables)
+        initialPreferences.$wrapDaysAtMinute
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    let logicalDate = TrackingDay.logicalDayLabel(
+                        for: .now,
+                        wrapAtMinute: self.preferences.wrapDaysAtMinute
+                    )
+                    if Calendar.current.isDate(logicalDate, inSameDayAs: self.selectedDate) {
+                        self.reloadDateSources(for: self.selectedDate)
+                    } else {
+                        self.selectDate(logicalDate)
+                    }
+                }
+            }
+            .store(in: &workspaceCancellables)
         self.calendarStore.loadEvents(for: initialDate)
         self.reminderStore.loadCompleted(for: initialDate)
         self.phoneCallStore.loadCalls(for: initialDate)
-        self.screenTimeStore.load(for: initialDate)
+        self.screenTimeStore.load(for: initialDate, wrapAtMinute: initialPreferences.wrapDaysAtMinute)
         self.localAPIServer.start(handler: { [weak self] request in
             guard let self else {
                 return .error("Metriday is unavailable", statusCode: 503)
             }
             return self.handle(localAPI: request)
-        }, allowLAN: preferences.allowLocalNetworkAPI)
+        }, allowLAN: initialPreferences.allowLocalNetworkAPI)
         self.syncStore.start()
         if preferences.startTrackingWhenAppOpens {
             self.activityMonitor.start()
@@ -145,11 +166,15 @@ final class AppState: ObservableObject {
         pendingTimelineDrop = nil
         draggingTaskID = nil
         _ = markdownStore.load(date: normalized)
-        activityMonitor.selectDate(normalized)
-        calendarStore.loadEvents(for: normalized)
-        reminderStore.loadCompleted(for: normalized)
-        phoneCallStore.loadCalls(for: normalized)
-        screenTimeStore.load(for: normalized)
+        reloadDateSources(for: normalized)
+    }
+
+    private func reloadDateSources(for date: Date) {
+        activityMonitor.selectDate(date)
+        calendarStore.loadEvents(for: date)
+        reminderStore.loadCompleted(for: date)
+        phoneCallStore.loadCalls(for: date)
+        screenTimeStore.load(for: date, wrapAtMinute: preferences.wrapDaysAtMinute)
     }
 
     /// Mirrors Timing's quick-start timer workflow used from the tracker and
@@ -280,6 +305,9 @@ final class AppState: ObservableObject {
             }
             if let value = body["automatically_zoom_timeline_to_working_hours"] as? Bool {
                 preferences.automaticallyZoomTimelineToWorkingHours = value
+            }
+            if let value = body["wrap_days_at_minute"] as? Int {
+                preferences.wrapDaysAtMinute = TrackingDay.clampedWrapMinute(value)
             }
             if let value = body["start_tracking_when_app_opens"] as? Bool {
                 preferences.startTrackingWhenAppOpens = value
@@ -1383,7 +1411,7 @@ final class AppState: ObservableObject {
 
         if request.method == "GET", path == "/v1/screen-time" {
             let date = apiDate(from: request.query["date"]) ?? selectedDate
-            screenTimeStore.load(for: date)
+            screenTimeStore.load(for: date, wrapAtMinute: preferences.wrapDaysAtMinute)
             let segments = screenTimeStore.segments(for: date)
             return .jsonObject([
                 "date": apiDayKey(date),
@@ -2380,6 +2408,7 @@ final class AppState: ObservableObject {
             "working_hours_start_minute": preferences.workingHoursStartMinute,
             "working_hours_end_minute": preferences.workingHoursEndMinute,
             "automatically_zoom_timeline_to_working_hours": preferences.automaticallyZoomTimelineToWorkingHours,
+            "wrap_days_at_minute": preferences.wrapDaysAtMinute,
             "start_tracking_when_app_opens": preferences.startTrackingWhenAppOpens,
             "auto_stop_timer_on_sleep": preferences.autoStopTimerOnSleep,
             "review_reminder_interval_minutes": preferences.reviewReminderIntervalMinutes,
@@ -2866,7 +2895,12 @@ final class AppState: ObservableObject {
     }
 
     func goToToday() {
-        selectDate(.now)
+        selectDate(
+            TrackingDay.logicalDayLabel(
+                for: .now,
+                wrapAtMinute: preferences.wrapDaysAtMinute
+            )
+        )
     }
 
     func moveSelectedDate(byDays offset: Int) {
@@ -3024,10 +3058,16 @@ final class AppState: ObservableObject {
 
     private func addCalendarEvent(_ drop: PendingTimelineDrop) {
         guard let task = markdownStore.task(drop.taskID) else { return }
-        let calendar = Calendar.current
-        let day = calendar.startOfDay(for: selectedDate)
-        let start = day.addingTimeInterval(TimeInterval(drop.startMinute * 60))
-        let end = day.addingTimeInterval(TimeInterval(drop.endMinute * 60))
+        let start = TrackingDay.date(
+            forAxisSeconds: drop.startMinute * 60,
+            logicalDayLabel: selectedDate,
+            wrapAtMinute: preferences.wrapDaysAtMinute
+        )
+        let end = TrackingDay.date(
+            forAxisSeconds: drop.endMinute * 60,
+            logicalDayLabel: selectedDate,
+            wrapAtMinute: preferences.wrapDaysAtMinute
+        )
         let range = TimeFormat.range(start: drop.startMinute, end: drop.endMinute)
         guard calendarStore.createEvent(title: task.title, start: start, end: end) else {
             markdownStore.statusMessage = calendarStore.statusMessage

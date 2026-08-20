@@ -31,6 +31,29 @@ expect(TimeFormat.parseRange("09:30-10:15")?.start == 570, "ASCII time range sho
 expect(TimeFormat.parseRange("14:00–16:00")?.end == 960, "En dash time range should parse")
 expect(TimeFormat.parseRange("16:00–14:00") == nil, "Reverse range should be rejected")
 
+let wrapCalendar = Calendar.current
+let wrapDay = wrapCalendar.date(from: DateComponents(year: 2026, month: 8, day: 20))!
+let beforeWrap = wrapCalendar.date(from: DateComponents(year: 2026, month: 8, day: 20, hour: 4, minute: 30))!
+let afterWrap = wrapCalendar.date(from: DateComponents(year: 2026, month: 8, day: 20, hour: 5))!
+expect(
+    TrackingDay.logicalDayLabel(for: beforeWrap, wrapAtMinute: 5 * 60) == wrapDay.addingTimeInterval(-86_400),
+    "Wrap days should assign pre-boundary time to the previous logical day"
+)
+expect(
+    TrackingDay.logicalDayLabel(for: afterWrap, wrapAtMinute: 5 * 60) == wrapDay,
+    "Wrap days should start the new logical day at the configured boundary"
+)
+let beforeWrapAxis = TrackingDay.axisSeconds(
+    for: beforeWrap,
+    logicalDayLabel: wrapDay.addingTimeInterval(-86_400),
+    wrapAtMinute: 5 * 60
+)
+expect(beforeWrapAxis == 23 * 3_600 + 30 * 60, "Wrapped axis should place 04:30 at the end of a 05:00 workday")
+expect(
+    Calendar.current.component(.hour, from: TrackingDay.date(forAxisSeconds: beforeWrapAxis, logicalDayLabel: wrapDay.addingTimeInterval(-86_400), wrapAtMinute: 5 * 60)) == 4,
+    "Wrapped axis should convert back to the original wall-clock time"
+)
+
 let rules = [
     WebRule(domain: "youtube.com"),
     WebRule(domain: "studio.youtube.com", isAllowed: true)
@@ -259,6 +282,34 @@ let activityRoot = FileManager.default.temporaryDirectory.appendingPathComponent
 let activityHistory = ActivityHistoryStore(rootDirectory: activityRoot)
 try! activityHistory.save(trackedActivities, date: date)
 expect(activityHistory.load(date: date) == trackedActivities, "Activity history should round-trip through local JSON")
+let wrappedActivity = ActivitySegment(
+    appName: "Night Editor",
+    bundleIdentifier: "com.example.night-editor",
+    startMinute: 4 * 60,
+    endMinute: 4 * 60 + 30,
+    relevance: .related
+)
+try! activityHistory.save([wrappedActivity], date: wrapDay)
+let wrappedLoaded = activityHistory.load(date: wrapDay.addingTimeInterval(-86_400), wrapAtMinute: 5 * 60)
+expect(
+    wrappedLoaded.contains { $0.id == wrappedActivity.id && $0.startSecond == 23 * 3_600 && $0.endSecond == 23 * 3_600 + 30 * 60 },
+    "Wrapped history should load pre-boundary civil activity on the previous logical day axis"
+)
+let wrappedLogicalActivity = ActivitySegment(
+    appName: "Morning Editor",
+    bundleIdentifier: "com.example.morning-editor",
+    startMinute: 0,
+    endMinute: 30,
+    startSecond: 0,
+    endSecond: 30 * 60,
+    relevance: .related
+)
+try! activityHistory.save([wrappedLogicalActivity], date: wrapDay, wrapAtMinute: 5 * 60)
+let wrappedRoundTrip = activityHistory.load(date: wrapDay, wrapAtMinute: 5 * 60)
+expect(
+    wrappedRoundTrip.contains { $0.id == wrappedLogicalActivity.id && $0.startSecond == 0 && $0.endSecond == 30 * 60 },
+    "Wrapped logical activity should round-trip through split civil-day storage"
+)
 let overlappingDeviceActivities = [
     ActivitySegment(
         appName: "Editor",
@@ -513,6 +564,7 @@ Task { @MainActor in
     preferences.workingHoursStartMinute = 9 * 60
     preferences.workingHoursEndMinute = 18 * 60
     preferences.automaticallyZoomTimelineToWorkingHours = true
+    preferences.wrapDaysAtMinute = 5 * 60
     let calendar = Calendar.current
     let weekdayWorkTime = calendar.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 10))!
     let weekdayEvening = calendar.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 20))!
@@ -534,6 +586,7 @@ Task { @MainActor in
     expect(reloadedPreferences.autoStopTimerOnSleep, "Preferences should default to stopping timers on sleep")
     expect(reloadedPreferences.reviewReminderIntervalMinutes == 30, "Review reminder frequency should round-trip through local JSON")
     expect(!reloadedPreferences.includeSubprojectsWhenSelectingProject, "Project selection preference should round-trip through local JSON")
+    expect(reloadedPreferences.wrapDaysAtMinute == 5 * 60, "Wrap-days preference should round-trip through local JSON")
 
     let reminderPreferencesRoot = tempRoot.appendingPathComponent("ReminderPreferences", isDirectory: true)
     let reminderStore = ReminderStore(rootDirectory: reminderPreferencesRoot)

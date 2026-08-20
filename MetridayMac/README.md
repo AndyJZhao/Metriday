@@ -101,7 +101,7 @@ Screen Time is an optional, read-only integration for Apple's local `knowledgeC.
 
 Rules can be created from an activity or manually from Rules. Manual rules support application, bundle identifier, title, path, domain, full URL, keyword, start-time, and day-of-week matching; operators include contains, exact, prefix, suffix, wildcard, not-equal, and regular expression. A pattern can combine simple terms with `||` and `&&`; the priority arrows change first-match order, and Reapply to Today applies the current order to stored activity segments.
 
-Settings persist tracker behavior in ~/Library/Application Support/Metriday/Preferences.json, including idle threshold, weekend tracking, overnight-capable working-hour limits, automatic timeline zoom to the configured working-hours window, whether tracking starts when Metriday opens, and whether running timers stop when the Mac sleeps. The activity monitor closes its active segment before system sleep and resumes after wake when tracking was active. The Settings sheet can also register Metriday as a macOS login item through ServiceManagement.
+Settings persist tracker behavior in ~/Library/Application Support/Metriday/Preferences.json, including idle threshold, weekend tracking, overnight-capable working-hour limits, automatic timeline zoom to the configured working-hours window, the Timing-style `Wrap days at` logical workday boundary, whether tracking starts when Metriday opens, and whether running timers stop when the Mac sleeps. A non-midnight boundary assigns post-midnight activity to the previous logical workday and keeps the timeline axis consistent across native and Web views. The activity monitor closes its active segment before system sleep and resumes after wake when tracking was active. The Settings sheet can also register Metriday as a macOS login item through ServiceManagement.
 
 The Settings sheet also maintains activity exclusion rules at ~/Library/Application Support/Metriday/Exclusions.json. Rules can match an application, bundle identifier, window title, URL/path, domain, full URL, or device with the same string comparisons used by project automation. Matching activity is filtered before an activity segment is created; the legacy bare bundle-ID JSON format remains readable.
 
@@ -138,7 +138,7 @@ The native app also exposes a localhost-only HTTP API at `http://127.0.0.1:8765/
 
 `POST /v1/timer/estimate` sets the active timer estimate in seconds or minutes; `/v1/status` includes the current estimate and remaining seconds.
 
-`GET/PATCH /v1/preferences` exposes `review_reminder_interval_minutes`, notification authorization status, and `include_subprojects_when_selecting_project` so the Web companion can edit the same local preferences.
+`GET/PATCH /v1/preferences` exposes `review_reminder_interval_minutes`, notification authorization status, `include_subprojects_when_selecting_project`, and `wrap_days_at_minute` so the Web companion can edit the same local preferences.
 
 Captured App Usage can be removed through `DELETE /v1/activities/{id}?date=YYYY-MM-DD`; the local history tombstone keeps the deletion stable across Screen Time refreshes and sync imports.
 

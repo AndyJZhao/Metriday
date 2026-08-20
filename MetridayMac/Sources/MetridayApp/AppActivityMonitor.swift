@@ -27,6 +27,7 @@ final class AppActivityMonitor: ObservableObject {
     private var timer: Timer?
     private var trackedDate: Date
     private var visibleDate: Date
+    private var activeWrapAtMinute: Int
     private var dailySegments: [ActivitySegment] = []
     private var currentObservation: ActivityObservation?
     private var currentStart: Date?
@@ -44,10 +45,15 @@ final class AppActivityMonitor: ObservableObject {
         self.projectStore = projectStore ?? ProjectStore()
         self.preferences = preferences ?? PreferencesStore()
         self.exclusionStore = exclusionStore ?? ExclusionStore()
-        let today = calendar.startOfDay(for: .now)
+        self.activeWrapAtMinute = TrackingDay.clampedWrapMinute(self.preferences.wrapDaysAtMinute)
+        let today = TrackingDay.logicalDayLabel(
+            for: .now,
+            wrapAtMinute: self.activeWrapAtMinute,
+            calendar: calendar
+        )
         self.trackedDate = today
         self.visibleDate = today
-        self.dailySegments = history.load(date: today)
+        self.dailySegments = history.load(date: today, wrapAtMinute: self.activeWrapAtMinute)
         self.accessibilityTrusted = AXIsProcessTrusted()
         self.observedSegments = dailySegments
         self.pendingIdleInterval = nil
@@ -63,6 +69,14 @@ final class AppActivityMonitor: ObservableObject {
             .sink { [weak self] _ in
                 Task { @MainActor in
                     self?.resumeAfterWake()
+                }
+            }
+            .store(in: &workspaceCancellables)
+        self.preferences.$wrapDaysAtMinute
+            .dropFirst()
+            .sink { [weak self] newValue in
+                Task { @MainActor in
+                    self?.applyWrapDayPreference(TrackingDay.clampedWrapMinute(newValue))
                 }
             }
             .store(in: &workspaceCancellables)
@@ -87,7 +101,7 @@ final class AppActivityMonitor: ObservableObject {
             let liveSegments = currentSegment(at: .now).map { [$0] } ?? []
             return dailySegments + liveSegments
         }
-        return history.load(date: normalized)
+        return loadHistory(normalized)
     }
 
     func exportHistoryArchiveData() throws -> Data {
@@ -97,7 +111,7 @@ final class AppActivityMonitor: ObservableObject {
     @discardableResult
     func importHistoryArchiveData(_ data: Data) throws -> Int {
         let imported = try history.importArchiveData(data)
-        dailySegments = history.load(date: trackedDate)
+        dailySegments = loadHistory(trackedDate)
         refreshObservedSegments()
         return imported
     }
@@ -184,10 +198,10 @@ final class AppActivityMonitor: ObservableObject {
             return
         }
 
-        var historicalSegments = history.load(date: targetDate)
+        var historicalSegments = loadHistory(targetDate)
         guard let index = historicalSegments.firstIndex(where: { $0.id == id }) else { return }
         historicalSegments[index].projectID = projectID
-        try? history.save(historicalSegments, date: targetDate)
+        try? saveHistory(historicalSegments, date: targetDate)
         if targetDate == visibleDate { refreshObservedSegments() }
     }
 
@@ -213,12 +227,12 @@ final class AppActivityMonitor: ObservableObject {
             return deleted
         }
 
-        let historicalSegments = history.load(date: targetDate)
+        let historicalSegments = loadHistory(targetDate)
         let deleted = historicalSegments.filter { ids.contains($0.id) }
         guard !deleted.isEmpty else { return [] }
         let deletedIDs = Set(deleted.map(\.id))
         history.markDeleted(deletedIDs, date: targetDate)
-        try? history.save(historicalSegments.filter { !deletedIDs.contains($0.id) }, date: targetDate)
+        try? saveHistory(historicalSegments.filter { !deletedIDs.contains($0.id) }, date: targetDate)
         if targetDate == visibleDate { refreshObservedSegments() }
         return deleted
     }
@@ -233,12 +247,12 @@ final class AppActivityMonitor: ObservableObject {
         if targetDate == trackedDate {
             restored = Dictionary(uniqueKeysWithValues: dailySegments.map { ($0.id, $0) })
         } else {
-            restored = Dictionary(uniqueKeysWithValues: history.load(date: targetDate).map { ($0.id, $0) })
+            restored = Dictionary(uniqueKeysWithValues: loadHistory(targetDate).map { ($0.id, $0) })
         }
         for segment in segments { restored[segment.id] = segment }
-        try? history.save(Array(restored.values), date: targetDate)
+        try? saveHistory(Array(restored.values), date: targetDate)
         if targetDate == trackedDate {
-            dailySegments = history.load(date: targetDate)
+            dailySegments = loadHistory(targetDate)
         }
         if targetDate == visibleDate { refreshObservedSegments() }
     }
@@ -287,11 +301,11 @@ final class AppActivityMonitor: ObservableObject {
             return
         }
 
-        var segments = history.load(date: normalized)
+        var segments = loadHistory(normalized)
         var changed = false
         changed = applyRules(to: &segments, date: normalized)
         guard changed else { return }
-        try? history.save(segments, date: normalized)
+        try? saveHistory(segments, date: normalized)
         if normalized == visibleDate {
             observedSegments = segments
         }
@@ -315,7 +329,7 @@ final class AppActivityMonitor: ObservableObject {
     }
 
     func reapplyRulesForAllStoredDays() {
-        var dates = Set(history.storedDates())
+        var dates = Set(history.logicalStoredDates(wrapAtMinute: activeWrapAtMinute))
         // The current day can contain a live in-memory segment before the
         // next persistence tick, so it must participate even without a file.
         dates.insert(trackedDate)
@@ -571,12 +585,16 @@ final class AppActivityMonitor: ObservableObject {
     }
 
     private func rotateDayIfNeeded(at date: Date) {
-        let normalized = calendar.startOfDay(for: date)
+        let normalized = TrackingDay.logicalDayLabel(
+            for: date,
+            wrapAtMinute: activeWrapAtMinute,
+            calendar: calendar
+        )
         guard normalized != trackedDate else { return }
         finishCurrentSegment(at: date)
         persistDailySegments()
         trackedDate = normalized
-        dailySegments = history.load(date: normalized)
+        dailySegments = loadHistory(normalized)
         currentObservation = nil
         currentStart = nil
         refreshObservedSegments()
@@ -584,14 +602,27 @@ final class AppActivityMonitor: ObservableObject {
 
     private func finishCurrentSegment(at end: Date) {
         guard let observation = currentObservation, let start = currentStart else { return }
-        let startSecond = second(of: start)
-        let endSecond: Int
-        if calendar.isDate(start, inSameDayAs: end) {
-            endSecond = max(startSecond + 1, second(of: end))
-        } else {
-            endSecond = 24 * 60 * 60
-        }
-        guard endSecond > startSecond else { return }
+        let startSecond = TrackingDay.axisSeconds(
+            for: start,
+            logicalDayLabel: trackedDate,
+            wrapAtMinute: activeWrapAtMinute,
+            calendar: calendar
+        )
+        let endLogicalDay = TrackingDay.logicalDayLabel(
+            for: end,
+            wrapAtMinute: activeWrapAtMinute,
+            calendar: calendar
+        )
+        let endSecond = endLogicalDay == trackedDate
+            ? TrackingDay.axisSeconds(
+                for: end,
+                logicalDayLabel: trackedDate,
+                wrapAtMinute: activeWrapAtMinute,
+                calendar: calendar
+            )
+            : TrackingDay.secondsPerDay
+        let boundedEndSecond = max(startSecond + 1, min(TrackingDay.secondsPerDay, endSecond))
+        guard boundedEndSecond > startSecond else { return }
 
         let segment = ActivitySegment(
             id: currentSegmentID,
@@ -601,9 +632,9 @@ final class AppActivityMonitor: ObservableObject {
             windowTitle: observation.windowTitle,
             resource: observation.resource,
             startMinute: startSecond / 60,
-            endMinute: Int(ceil(Double(endSecond) / 60.0)),
+            endMinute: Int(ceil(Double(boundedEndSecond) / 60.0)),
             startSecond: startSecond,
-            endSecond: endSecond,
+            endSecond: boundedEndSecond,
             relevance: observation.relevance,
             projectID: observation.projectID
         )
@@ -638,7 +669,7 @@ final class AppActivityMonitor: ObservableObject {
     }
 
     private func persistDailySegments() {
-        try? history.save(dailySegments, date: trackedDate)
+        try? saveHistory(dailySegments, date: trackedDate)
     }
 
     private func persistSnapshot(at date: Date) {
@@ -646,7 +677,7 @@ final class AppActivityMonitor: ObservableObject {
         if let current = currentSegment(at: date) {
             snapshot.append(current)
         }
-        try? history.save(snapshot, date: trackedDate)
+        try? saveHistory(snapshot, date: trackedDate)
     }
 
     private func refreshObservedSegments() {
@@ -657,14 +688,33 @@ final class AppActivityMonitor: ObservableObject {
             }
             observedSegments = segments
         } else {
-            observedSegments = history.load(date: visibleDate)
+            observedSegments = loadHistory(visibleDate)
         }
     }
 
     private func currentSegment(at date: Date) -> ActivitySegment? {
         guard let observation = currentObservation,
               let start = currentStart,
-              calendar.isDate(start, inSameDayAs: date) else { return nil }
+              TrackingDay.logicalDayLabel(
+                  for: date,
+                  wrapAtMinute: activeWrapAtMinute,
+                  calendar: calendar
+              ) == trackedDate else { return nil }
+        let startSecond = TrackingDay.axisSeconds(
+            for: start,
+            logicalDayLabel: trackedDate,
+            wrapAtMinute: activeWrapAtMinute,
+            calendar: calendar
+        )
+        let endSecond = max(
+            startSecond + 1,
+            TrackingDay.axisSeconds(
+                for: date,
+                logicalDayLabel: trackedDate,
+                wrapAtMinute: activeWrapAtMinute,
+                calendar: calendar
+            )
+        )
         return ActivitySegment(
             id: currentSegmentID,
             appName: observation.appName,
@@ -672,19 +722,45 @@ final class AppActivityMonitor: ObservableObject {
             deviceName: observation.deviceName,
             windowTitle: observation.windowTitle,
             resource: observation.resource,
-            startMinute: second(of: start) / 60,
-            endMinute: Int(ceil(Double(max(second(of: start) + 1, second(of: date))) / 60.0)),
-            startSecond: second(of: start),
-            endSecond: max(second(of: start) + 1, second(of: date)),
+            startMinute: startSecond / 60,
+            endMinute: Int(ceil(Double(endSecond) / 60.0)),
+            startSecond: startSecond,
+            endSecond: endSecond,
             relevance: observation.relevance,
             projectID: observation.projectID
         )
     }
 
-    private func second(of date: Date) -> Int {
-        calendar.component(.hour, from: date) * 60 * 60
-            + calendar.component(.minute, from: date) * 60
-            + calendar.component(.second, from: date)
+    private func loadHistory(_ date: Date) -> [ActivitySegment] {
+        history.load(date: date, wrapAtMinute: activeWrapAtMinute)
+    }
+
+    private func saveHistory(_ segments: [ActivitySegment], date: Date) throws {
+        try history.save(segments, date: date, wrapAtMinute: activeWrapAtMinute)
+    }
+
+    private func applyWrapDayPreference(_ newWrapAtMinute: Int) {
+        guard newWrapAtMinute != activeWrapAtMinute else { return }
+        let wasTracking = isTracking
+        if wasTracking {
+            finishCurrentSegment(at: .now)
+            persistDailySegments()
+        }
+        activeWrapAtMinute = newWrapAtMinute
+        trackedDate = TrackingDay.logicalDayLabel(
+            for: .now,
+            wrapAtMinute: activeWrapAtMinute,
+            calendar: calendar
+        )
+        visibleDate = calendar.startOfDay(for: visibleDate)
+        dailySegments = loadHistory(trackedDate)
+        currentObservation = nil
+        currentStart = nil
+        if wasTracking {
+            sample()
+        } else {
+            refreshObservedSegments()
+        }
     }
 }
 

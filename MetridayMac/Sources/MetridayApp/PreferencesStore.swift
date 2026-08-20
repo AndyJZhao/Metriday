@@ -21,6 +21,9 @@ final class PreferencesStore: ObservableObject {
     @Published var automaticallyZoomTimelineToWorkingHours: Bool {
         didSet { persist() }
     }
+    @Published var wrapDaysAtMinute: Int {
+        didSet { persist() }
+    }
     @Published var startTrackingWhenAppOpens: Bool {
         didSet { persist() }
     }
@@ -51,6 +54,7 @@ final class PreferencesStore: ObservableObject {
             self.workingHoursStartMinute = payload.workingHoursStartMinute
             self.workingHoursEndMinute = payload.workingHoursEndMinute
             self.automaticallyZoomTimelineToWorkingHours = payload.automaticallyZoomTimelineToWorkingHours
+            self.wrapDaysAtMinute = payload.wrapDaysAtMinute
             self.startTrackingWhenAppOpens = payload.startTrackingWhenAppOpens
             self.autoStopTimerOnSleep = payload.autoStopTimerOnSleep
             self.reviewReminderIntervalMinutes = payload.reviewReminderIntervalMinutes
@@ -63,6 +67,7 @@ final class PreferencesStore: ObservableObject {
             self.workingHoursStartMinute = 9 * 60
             self.workingHoursEndMinute = 18 * 60
             self.automaticallyZoomTimelineToWorkingHours = false
+            self.wrapDaysAtMinute = 0
             self.startTrackingWhenAppOpens = true
             self.autoStopTimerOnSleep = true
             self.reviewReminderIntervalMinutes = 0
@@ -106,6 +111,7 @@ final class PreferencesStore: ObservableObject {
                 workingHoursStartMinute: workingHoursStartMinute,
                 workingHoursEndMinute: workingHoursEndMinute,
                 automaticallyZoomTimelineToWorkingHours: automaticallyZoomTimelineToWorkingHours,
+                wrapDaysAtMinute: wrapDaysAtMinute,
                 startTrackingWhenAppOpens: startTrackingWhenAppOpens,
                 autoStopTimerOnSleep: autoStopTimerOnSleep,
                 reviewReminderIntervalMinutes: reviewReminderIntervalMinutes,
@@ -135,6 +141,7 @@ final class PreferencesStore: ObservableObject {
         let workingHoursStartMinute: Int
         let workingHoursEndMinute: Int
         let automaticallyZoomTimelineToWorkingHours: Bool
+        let wrapDaysAtMinute: Int
         let startTrackingWhenAppOpens: Bool
         let autoStopTimerOnSleep: Bool
         let reviewReminderIntervalMinutes: Int
@@ -148,6 +155,7 @@ final class PreferencesStore: ObservableObject {
             workingHoursStartMinute: Int,
             workingHoursEndMinute: Int,
             automaticallyZoomTimelineToWorkingHours: Bool,
+            wrapDaysAtMinute: Int,
             startTrackingWhenAppOpens: Bool,
             autoStopTimerOnSleep: Bool,
             reviewReminderIntervalMinutes: Int,
@@ -160,6 +168,7 @@ final class PreferencesStore: ObservableObject {
             self.workingHoursStartMinute = workingHoursStartMinute
             self.workingHoursEndMinute = workingHoursEndMinute
             self.automaticallyZoomTimelineToWorkingHours = automaticallyZoomTimelineToWorkingHours
+            self.wrapDaysAtMinute = TrackingDay.clampedWrapMinute(wrapDaysAtMinute)
             self.startTrackingWhenAppOpens = startTrackingWhenAppOpens
             self.autoStopTimerOnSleep = autoStopTimerOnSleep
             self.reviewReminderIntervalMinutes = reviewReminderIntervalMinutes
@@ -175,6 +184,7 @@ final class PreferencesStore: ObservableObject {
             workingHoursStartMinute = try container.decode(Int.self, forKey: .workingHoursStartMinute)
             workingHoursEndMinute = try container.decode(Int.self, forKey: .workingHoursEndMinute)
             automaticallyZoomTimelineToWorkingHours = try container.decodeIfPresent(Bool.self, forKey: .automaticallyZoomTimelineToWorkingHours) ?? false
+            wrapDaysAtMinute = TrackingDay.clampedWrapMinute(try container.decodeIfPresent(Int.self, forKey: .wrapDaysAtMinute) ?? 0)
             startTrackingWhenAppOpens = try container.decode(Bool.self, forKey: .startTrackingWhenAppOpens)
             autoStopTimerOnSleep = try container.decodeIfPresent(Bool.self, forKey: .autoStopTimerOnSleep) ?? true
             reviewReminderIntervalMinutes = max(0, min(24 * 60, try container.decodeIfPresent(Int.self, forKey: .reviewReminderIntervalMinutes) ?? 0))

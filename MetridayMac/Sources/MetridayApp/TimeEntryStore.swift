@@ -252,6 +252,13 @@ final class TimeEntryStore: ObservableObject {
             .sorted { $0.start < $1.start }
     }
 
+    func entries(overlapping date: Date, wrapAtMinute: Int) -> [TimeEntry] {
+        let range = TrackingDay.range(for: date, wrapAtMinute: wrapAtMinute)
+        return entries
+            .filter { $0.start < range.end && $0.end > range.start }
+            .sorted { $0.start < $1.start }
+    }
+
     func entries(overlapping start: Date, end: Date, excluding id: UUID? = nil) -> [TimeEntry] {
         entries
             .filter { entry in

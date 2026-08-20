@@ -56,15 +56,28 @@ private enum ActivityCategoryKind: String, CaseIterable, Hashable, Identifiable 
 private struct ActivityTimelineWindow: Equatable {
     let startMinute: Int
     let endMinute: Int
+    let wrapAtMinute: Int
 
-    init(zoomed: Bool, workingHoursStartMinute: Int, workingHoursEndMinute: Int) {
+    init(
+        zoomed: Bool,
+        workingHoursStartMinute: Int,
+        workingHoursEndMinute: Int,
+        wrapAtMinute rawWrapAtMinute: Int = 0
+    ) {
+        wrapAtMinute = TrackingDay.clampedWrapMinute(rawWrapAtMinute)
         guard zoomed else {
             startMinute = 0
             endMinute = 1_440
             return
         }
-        let start = min(1_439, max(0, workingHoursStartMinute))
-        var end = min(1_439, max(0, workingHoursEndMinute))
+        let startWall = min(1_439, max(0, workingHoursStartMinute))
+        let endWall = min(1_439, max(0, workingHoursEndMinute))
+        let start = startWall >= wrapAtMinute
+            ? startWall - wrapAtMinute
+            : startWall - wrapAtMinute + 1_440
+        var end = endWall >= wrapAtMinute
+            ? endWall - wrapAtMinute
+            : endWall - wrapAtMinute + 1_440
         if end <= start { end += 1_440 }
         startMinute = start
         endMinute = max(start + 15, end)
@@ -110,7 +123,8 @@ private struct ActivityTimelineWindow: Equatable {
     }
 
     func label(for minute: Int) -> String {
-        String(format: "%02d", (minute % 1_440) / 60)
+        let wallMinute = (minute + wrapAtMinute) % 1_440
+        return String(format: "%02d", wallMinute / 60)
     }
 }
 
@@ -233,6 +247,7 @@ struct ActivitiesView: View {
                             timeEntries: preferences.includeTimeEntries ? timelineTimeEntries : [],
                             suggestions: timelineSuggestions,
                             selectedDate: selectedDate,
+                            wrapAtMinute: appState.preferences.wrapDaysAtMinute,
                             project: { projectStore.project($0) },
                             orientation: timelineOrientation,
                             timelineWindow: activityTimelineWindow,
@@ -333,7 +348,11 @@ struct ActivitiesView: View {
                 selectedDate: selectedDate,
                 segments: entryOMaticSegments,
                 sourceDescription: selectedActivityIDs.isEmpty ? "visible app usage" : "the selected activities",
-                existingEntries: timeEntryStore.entries(overlapping: selectedDate),
+                existingEntries: timeEntryStore.entries(
+                    overlapping: selectedDate,
+                    wrapAtMinute: appState.preferences.wrapDaysAtMinute
+                ),
+                wrapAtMinute: appState.preferences.wrapDaysAtMinute,
                 projects: projectStore.activeProjects,
                 initialProjectID: selectedProjectID
             ) { intervals, title, projectID, notes, billingStatus, overwriteExisting in
@@ -341,13 +360,23 @@ struct ActivitiesView: View {
                 var splitFragments: [TimeEntry] = []
                 if overwriteExisting {
                     let generatedRanges = intervals.map { interval in
-                        let day = Calendar.current.startOfDay(for: selectedDate)
                         return (
-                            start: day.addingTimeInterval(TimeInterval(interval.startSecond)),
-                            end: day.addingTimeInterval(TimeInterval(interval.endSecond))
+                            start: TrackingDay.date(
+                                forAxisSeconds: interval.startSecond,
+                                logicalDayLabel: selectedDate,
+                                wrapAtMinute: appState.preferences.wrapDaysAtMinute
+                            ),
+                            end: TrackingDay.date(
+                                forAxisSeconds: interval.endSecond,
+                                logicalDayLabel: selectedDate,
+                                wrapAtMinute: appState.preferences.wrapDaysAtMinute
+                            )
                         )
                     }
-                    let existingEntries = timeEntryStore.entries(overlapping: selectedDate)
+                    let existingEntries = timeEntryStore.entries(
+                        overlapping: selectedDate,
+                        wrapAtMinute: appState.preferences.wrapDaysAtMinute
+                    )
                     replacedEntries = existingEntries.filter { existing in
                         generatedRanges.contains { range in
                             existing.start < range.end && existing.end > range.start
@@ -358,11 +387,18 @@ struct ActivitiesView: View {
                         excluding: generatedRanges
                     )
                 }
-                let day = Calendar.current.startOfDay(for: selectedDate)
                 var createdEntries: [TimeEntry] = []
                 for interval in intervals {
-                    let start = day.addingTimeInterval(TimeInterval(interval.startSecond))
-                    let end = day.addingTimeInterval(TimeInterval(interval.endSecond))
+                    let start = TrackingDay.date(
+                        forAxisSeconds: interval.startSecond,
+                        logicalDayLabel: selectedDate,
+                        wrapAtMinute: appState.preferences.wrapDaysAtMinute
+                    )
+                    let end = TrackingDay.date(
+                        forAxisSeconds: interval.endSecond,
+                        logicalDayLabel: selectedDate,
+                        wrapAtMinute: appState.preferences.wrapDaysAtMinute
+                    )
                     guard let id = timeEntryStore.addEntry(
                         title: title,
                         projectID: projectID,
@@ -2597,7 +2633,8 @@ struct ActivitiesView: View {
         ActivityTimelineWindow(
             zoomed: appState.preferences.automaticallyZoomTimelineToWorkingHours,
             workingHoursStartMinute: appState.preferences.workingHoursStartMinute,
-            workingHoursEndMinute: appState.preferences.workingHoursEndMinute
+            workingHoursEndMinute: appState.preferences.workingHoursEndMinute,
+            wrapAtMinute: appState.preferences.wrapDaysAtMinute
         )
     }
 
@@ -2881,7 +2918,10 @@ struct ActivitiesView: View {
     private var entryOMaticPreview: [EntryOMaticInterval] {
         EntryOMaticGenerator.intervals(
             from: entryOMaticSegments,
-            dayStart: Calendar.current.startOfDay(for: selectedDate),
+            dayStart: TrackingDay.startDate(
+                for: selectedDate,
+                wrapAtMinute: appState.preferences.wrapDaysAtMinute
+            ),
             existingEntries: timeEntriesForSelectedDate,
             minimumDurationSeconds: 5 * 60,
             maximumGapSeconds: 60
@@ -2933,15 +2973,19 @@ struct ActivitiesView: View {
     }
 
     private var timeEntriesForSelectedDate: [TimeEntry] {
-        timeEntryStore.entries(overlapping: selectedDate)
+        timeEntryStore.entries(
+            overlapping: selectedDate,
+            wrapAtMinute: appState.preferences.wrapDaysAtMinute
+        )
     }
 
     private var timelineTimeEntries: [TimeEntry] {
-        let calendar = Calendar.current
-        let dayStart = calendar.startOfDay(for: selectedDate)
-        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
+        let range = TrackingDay.range(
+            for: selectedDate,
+            wrapAtMinute: appState.preferences.wrapDaysAtMinute
+        )
         return timeEntryStore.materializedEntries().filter {
-            $0.start < dayEnd && $0.end > dayStart
+            $0.start < range.end && $0.end > range.start
         }
     }
 
@@ -3108,22 +3152,43 @@ struct ActivitiesView: View {
             newEntryEnd = event.end
             return
         }
-        let calendar = Calendar.current
         if let startMinute, let endMinute, endMinute > startMinute {
-            let day = calendar.startOfDay(for: date ?? selectedDate)
-            newEntryStart = day.addingTimeInterval(TimeInterval(startMinute * 60))
-            newEntryEnd = day.addingTimeInterval(TimeInterval(endMinute * 60))
+            let day = Calendar.current.startOfDay(for: date ?? selectedDate)
+            let wrapAtMinute = appState.preferences.wrapDaysAtMinute
+            newEntryStart = TrackingDay.date(
+                forAxisSeconds: startMinute * 60,
+                logicalDayLabel: day,
+                wrapAtMinute: wrapAtMinute
+            )
+            newEntryEnd = TrackingDay.date(
+                forAxisSeconds: endMinute * 60,
+                logicalDayLabel: day,
+                wrapAtMinute: wrapAtMinute
+            )
             return
         }
         if let timelineSelectionStart, let timelineSelectionEnd,
            timelineSelectionEnd > timelineSelectionStart {
-            let day = calendar.startOfDay(for: selectedDate)
-            newEntryStart = day.addingTimeInterval(TimeInterval(timelineSelectionStart * 60))
-            newEntryEnd = day.addingTimeInterval(TimeInterval(timelineSelectionEnd * 60))
+            let wrapAtMinute = appState.preferences.wrapDaysAtMinute
+            newEntryStart = TrackingDay.date(
+                forAxisSeconds: timelineSelectionStart * 60,
+                logicalDayLabel: selectedDate,
+                wrapAtMinute: wrapAtMinute
+            )
+            newEntryEnd = TrackingDay.date(
+                forAxisSeconds: timelineSelectionEnd * 60,
+                logicalDayLabel: selectedDate,
+                wrapAtMinute: wrapAtMinute
+            )
             return
         }
+        let calendar = Calendar.current
         let baseDate: Date
-        if calendar.isDateInToday(selectedDate) {
+        let logicalToday = TrackingDay.logicalDayLabel(
+            for: .now,
+            wrapAtMinute: appState.preferences.wrapDaysAtMinute
+        )
+        if calendar.isDate(selectedDate, inSameDayAs: logicalToday) {
             baseDate = Date()
         } else {
             baseDate = calendar.date(
@@ -4648,6 +4713,7 @@ private struct CalendarEventEditorSheet: View {
 private struct EntryOMaticSheet: View {
     @Environment(\.dismiss) private var dismiss
     let selectedDate: Date
+    let wrapAtMinute: Int
     let segments: [ActivitySegment]
     let sourceDescription: String
     let existingEntries: [TimeEntry]
@@ -4668,11 +4734,13 @@ private struct EntryOMaticSheet: View {
         segments: [ActivitySegment],
         sourceDescription: String,
         existingEntries: [TimeEntry],
+        wrapAtMinute: Int = 0,
         projects: [TrackingProject],
         initialProjectID: UUID?,
         onCreate: @escaping ([EntryOMaticInterval], String, UUID?, String, BillingStatus, Bool) -> Void
     ) {
         self.selectedDate = selectedDate
+        self.wrapAtMinute = wrapAtMinute
         self.segments = segments
         self.sourceDescription = sourceDescription
         self.existingEntries = existingEntries
@@ -4784,7 +4852,7 @@ private struct EntryOMaticSheet: View {
         } ?? segments
         return EntryOMaticGenerator.intervals(
             from: scopedSegments,
-            dayStart: Calendar.current.startOfDay(for: selectedDate),
+            dayStart: TrackingDay.startDate(for: selectedDate, wrapAtMinute: wrapAtMinute),
             existingEntries: existingEntries,
             minimumDurationSeconds: minimumDurationMinutes * 60,
             maximumGapSeconds: maximumGapSeconds,
@@ -5162,6 +5230,7 @@ private struct ActivityTimelinePanel: View {
     let timeEntries: [TimeEntry]
     let suggestions: [ActivityTimelineSuggestion]
     let selectedDate: Date
+    let wrapAtMinute: Int
     let project: (UUID?) -> TrackingProject?
     let orientation: ActivityTimelineOrientation
     let timelineWindow: ActivityTimelineWindow
@@ -5332,8 +5401,22 @@ private struct ActivityTimelinePanel: View {
                         }
 
                     ForEach(calendarEvents) { event in
-                        let startSecond = max(0, min(86_400, second(of: event.start)))
-                        let endSecond = max(startSecond + 900, min(86_400, second(of: event.end)))
+                        let startSecond = TrackingDay.axisSeconds(
+                            for: event.start,
+                            logicalDayLabel: selectedDate,
+                            wrapAtMinute: wrapAtMinute
+                        )
+                        let endSecond = max(
+                            startSecond + 900,
+                            min(
+                                86_400,
+                                TrackingDay.axisSeconds(
+                                    for: event.end,
+                                    logicalDayLabel: selectedDate,
+                                    wrapAtMinute: wrapAtMinute
+                                )
+                            )
+                        )
                         if let range = timelineWindow.clippedRange(startSecond: startSecond, endSecond: endSecond) {
                         let left = timelineWindow.x(for: range.start, width: proxy.size.width)
                         let width = max(4, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
@@ -5638,8 +5721,22 @@ private struct ActivityTimelinePanel: View {
                         }
                     }
                     ForEach(calendarEvents) { event in
-                        let start = max(0, min(86_400, second(of: event.start)))
-                        let end = max(start + 900, min(86_400, second(of: event.end)))
+                        let start = TrackingDay.axisSeconds(
+                            for: event.start,
+                            logicalDayLabel: selectedDate,
+                            wrapAtMinute: wrapAtMinute
+                        )
+                        let end = max(
+                            start + 900,
+                            min(
+                                86_400,
+                                TrackingDay.axisSeconds(
+                                    for: event.end,
+                                    logicalDayLabel: selectedDate,
+                                    wrapAtMinute: wrapAtMinute
+                                )
+                            )
+                        )
                         if let clipped = timelineWindow.clippedRange(startSecond: start, endSecond: end) {
                         let left = timelineWindow.x(for: clipped.start, width: chartWidth)
                         let width = max(2, timelineWindow.x(for: clipped.end, width: chartWidth) - left)
@@ -5783,23 +5880,36 @@ private struct ActivityTimelinePanel: View {
         let entries = timeEntries.filter {
             $0.start < endOfSelection && $0.end > startOfSelection
         }.count
-        return "Selected \(TimeFormat.range(start: selectionStart, end: selectionEnd)) · \(segmentsInSelection) activities · \(entries) entries"
+        return "Selected \(secondRange(start: selectionStart * 60, end: selectionEnd * 60)) · \(segmentsInSelection) activities · \(entries) entries"
     }
 
     private func currentTimeSecond(at date: Date) -> Int? {
-        guard Calendar.current.isDate(selectedDate, inSameDayAs: date) else { return nil }
-        let start = Calendar.current.startOfDay(for: date)
-        return max(0, min(86_400, Int(date.timeIntervalSince(start))))
+        let logicalToday = TrackingDay.logicalDayLabel(
+            for: date,
+            wrapAtMinute: wrapAtMinute
+        )
+        guard Calendar.current.isDate(selectedDate, inSameDayAs: logicalToday) else { return nil }
+        return TrackingDay.axisSeconds(
+            for: date,
+            logicalDayLabel: selectedDate,
+            wrapAtMinute: wrapAtMinute
+        )
     }
 
     private var startOfSelection: Date {
-        Calendar.current.startOfDay(for: selectedDate)
-            .addingTimeInterval(TimeInterval((selectionStart ?? 0) * 60))
+        TrackingDay.date(
+            forAxisSeconds: (selectionStart ?? 0) * 60,
+            logicalDayLabel: selectedDate,
+            wrapAtMinute: wrapAtMinute
+        )
     }
 
     private var endOfSelection: Date {
-        Calendar.current.startOfDay(for: selectedDate)
-            .addingTimeInterval(TimeInterval((selectionEnd ?? 0) * 60))
+        TrackingDay.date(
+            forAxisSeconds: (selectionEnd ?? 0) * 60,
+            logicalDayLabel: selectedDate,
+            wrapAtMinute: wrapAtMinute
+        )
     }
 
     private var segmentsInSelection: Int {
@@ -5861,8 +5971,19 @@ private struct ActivityTimelinePanel: View {
 
         if let hoveredCalendarEventID,
            let event = calendarEvents.first(where: { $0.id == hoveredCalendarEventID }) {
-            let start = second(of: event.start)
-            let end = max(start + 900, second(of: event.end))
+            let start = TrackingDay.axisSeconds(
+                for: event.start,
+                logicalDayLabel: selectedDate,
+                wrapAtMinute: wrapAtMinute
+            )
+            let end = max(
+                start + 900,
+                TrackingDay.axisSeconds(
+                    for: event.end,
+                    logicalDayLabel: selectedDate,
+                    wrapAtMinute: wrapAtMinute
+                )
+            )
             return TimelineHoverDetail(
                 id: "calendar-\(event.id)",
                 sourceLabel: "Calendar",
@@ -5899,11 +6020,12 @@ private struct ActivityTimelinePanel: View {
     private func clock(_ second: Int) -> String {
         let clamped = max(0, min(86_400, second))
         if clamped == 86_400 { return "24:00:00" }
+        let wallSecond = (wrapAtMinute * 60 + clamped) % 86_400
         return String(
             format: "%02d:%02d:%02d",
-            clamped / 3_600,
-            (clamped % 3_600) / 60,
-            clamped % 60
+            wallSecond / 3_600,
+            (wallSecond % 3_600) / 60,
+            wallSecond % 60
         )
     }
 
@@ -5922,16 +6044,30 @@ private struct ActivityTimelinePanel: View {
     }
 
     private func clippedRange(for entry: TimeEntry) -> (start: Int, end: Int)? {
-        let calendar = Calendar.current
-        let dayStart = calendar.startOfDay(for: selectedDate)
-        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return nil }
+        let dayRange = TrackingDay.range(for: selectedDate, wrapAtMinute: wrapAtMinute)
+        let dayStart = dayRange.start
+        let dayEnd = dayRange.end
         let start = max(entry.start, dayStart)
         let end = min(entry.end, dayEnd)
         guard end > start else { return nil }
-        let startSecond = max(0, min(86_400, second(of: start)))
+        let startSecond = TrackingDay.axisSeconds(
+            for: start,
+            logicalDayLabel: selectedDate,
+            wrapAtMinute: wrapAtMinute
+        )
         let endSecond = end >= dayEnd
             ? 86_400
-            : max(startSecond + 900, min(86_400, second(of: end)))
+            : max(
+                startSecond + 900,
+                min(
+                    86_400,
+                    TrackingDay.axisSeconds(
+                        for: end,
+                        logicalDayLabel: selectedDate,
+                        wrapAtMinute: wrapAtMinute
+                    )
+                )
+            )
         guard endSecond > startSecond else { return nil }
         return (startSecond, endSecond)
     }

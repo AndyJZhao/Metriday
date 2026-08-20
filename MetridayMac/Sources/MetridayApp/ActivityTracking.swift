@@ -280,6 +280,39 @@ struct ActivityHistoryStore {
     }
 
     func load(date: Date) -> [ActivitySegment] {
+        loadCivil(date)
+    }
+
+    /// Loads a logical workday. With a non-midnight wrap, the logical day is
+    /// assembled from the post-wrap portion of its civil date and the
+    /// pre-wrap portion of the following civil date.
+    func load(date: Date, wrapAtMinute rawWrapAtMinute: Int) -> [ActivitySegment] {
+        let wrapAtMinute = TrackingDay.clampedWrapMinute(rawWrapAtMinute)
+        guard wrapAtMinute > 0 else { return loadCivil(date) }
+        let logicalDay = Calendar.current.startOfDay(for: date)
+        let wrapSeconds = wrapAtMinute * 60
+        let nextCivilDay = Calendar.current.date(byAdding: .day, value: 1, to: logicalDay) ?? logicalDay
+        let deleted = deletedIDs(for: logicalDay)
+
+        let first = loadCivil(logicalDay).compactMap { segment -> ActivitySegment? in
+            guard segment.endSecond > wrapSeconds else { return nil }
+            var shifted = segment
+            shifted.startSecond = max(0, segment.startSecond - wrapSeconds)
+            shifted.endSecond = min(TrackingDay.secondsPerDay, segment.endSecond - wrapSeconds)
+            return shifted.endSecond > shifted.startSecond ? shifted : nil
+        }
+        let second = loadCivil(nextCivilDay).compactMap { segment -> ActivitySegment? in
+            guard segment.startSecond < wrapSeconds else { return nil }
+            var shifted = segment
+            shifted.startSecond = TrackingDay.secondsPerDay - wrapSeconds + segment.startSecond
+            shifted.endSecond = TrackingDay.secondsPerDay - wrapSeconds
+                + min(wrapSeconds, segment.endSecond)
+            return shifted.endSecond > shifted.startSecond ? shifted : nil
+        }
+        return Self.normalized(first + second).filter { !deleted.contains($0.id) }
+    }
+
+    private func loadCivil(_ date: Date) -> [ActivitySegment] {
         let url = fileURL(for: date)
         guard let data = try? Data(contentsOf: url),
               let payload = try? JSONDecoder().decode(ActivityHistoryPayload.self, from: data) else {
@@ -290,6 +323,57 @@ struct ActivityHistoryStore {
     }
 
     func save(_ segments: [ActivitySegment], date: Date) throws {
+        try saveCivil(segments, date: date)
+    }
+
+    /// Saves logical-day axis values back into the two civil-day files that
+    /// contain them. Portions belonging to neighboring logical days are
+    /// preserved, so changing the wrap preference never erases data.
+    func save(_ segments: [ActivitySegment], date: Date, wrapAtMinute rawWrapAtMinute: Int) throws {
+        let wrapAtMinute = TrackingDay.clampedWrapMinute(rawWrapAtMinute)
+        guard wrapAtMinute > 0 else {
+            try saveCivil(segments, date: date)
+            return
+        }
+        let logicalDay = Calendar.current.startOfDay(for: date)
+        let nextCivilDay = Calendar.current.date(byAdding: .day, value: 1, to: logicalDay) ?? logicalDay
+        let wrapSeconds = wrapAtMinute * 60
+
+        let currentPreserved = outside(
+            loadCivil(logicalDay),
+            lowerBound: wrapSeconds,
+            upperBound: TrackingDay.secondsPerDay
+        )
+        let nextPreserved = outside(
+            loadCivil(nextCivilDay),
+            lowerBound: 0,
+            upperBound: wrapSeconds
+        )
+        var current = currentPreserved
+        var next = nextPreserved
+        for segment in segments {
+            let absoluteStart = wrapSeconds + max(0, min(TrackingDay.secondsPerDay, segment.startSecond))
+            let absoluteEnd = wrapSeconds + max(0, min(TrackingDay.secondsPerDay, segment.endSecond))
+            guard absoluteEnd > absoluteStart else { continue }
+
+            if absoluteStart < TrackingDay.secondsPerDay {
+                var first = segment
+                first.startSecond = absoluteStart
+                first.endSecond = min(TrackingDay.secondsPerDay, absoluteEnd)
+                if first.endSecond > first.startSecond { current.append(first) }
+            }
+            if absoluteEnd > TrackingDay.secondsPerDay {
+                var second = segment
+                second.startSecond = max(0, absoluteStart - TrackingDay.secondsPerDay)
+                second.endSecond = absoluteEnd - TrackingDay.secondsPerDay
+                if second.endSecond > second.startSecond { next.append(second) }
+            }
+        }
+        try saveCivil(current, date: logicalDay)
+        try saveCivil(next, date: nextCivilDay)
+    }
+
+    private func saveCivil(_ segments: [ActivitySegment], date: Date) throws {
         try FileManager.default.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
         let payload = ActivityHistoryPayload(
             version: 1,
@@ -300,6 +384,29 @@ struct ActivityHistoryStore {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(payload)
         try data.write(to: fileURL(for: date), options: .atomic)
+    }
+
+    private func outside(
+        _ segments: [ActivitySegment],
+        lowerBound: Int,
+        upperBound: Int
+    ) -> [ActivitySegment] {
+        segments.flatMap { segment -> [ActivitySegment] in
+            var result: [ActivitySegment] = []
+            if segment.startSecond < lowerBound {
+                var before = segment
+                before.startSecond = segment.startSecond
+                before.endSecond = min(segment.endSecond, lowerBound)
+                if before.endSecond > before.startSecond { result.append(before) }
+            }
+            if segment.endSecond > upperBound {
+                var after = segment
+                after.startSecond = max(segment.startSecond, upperBound)
+                after.endSecond = segment.endSecond
+                if after.endSecond > after.startSecond { result.append(after) }
+            }
+            return result
+        }
     }
 
     func fileURL(for date: Date) -> URL {
@@ -348,6 +455,22 @@ struct ActivityHistoryStore {
             guard url.pathExtension == "json" else { return nil }
             return formatter.date(from: url.deletingPathExtension().lastPathComponent)
         }.sorted()
+    }
+
+    func logicalStoredDates(wrapAtMinute: Int) -> [Date] {
+        let calendar = Calendar.current
+        let rawDates = storedDates()
+        guard TrackingDay.clampedWrapMinute(wrapAtMinute) > 0 else { return rawDates }
+        return Set(rawDates.flatMap { date in
+            [
+                TrackingDay.logicalDayLabel(
+                    for: date.addingTimeInterval(TimeInterval(TrackingDay.clampedWrapMinute(wrapAtMinute) * 60)),
+                    wrapAtMinute: wrapAtMinute,
+                    calendar: calendar
+                ),
+                calendar.date(byAdding: .day, value: -1, to: date) ?? date
+            ]
+        }).sorted()
     }
 
     private static func dateKey(for date: Date) -> String {

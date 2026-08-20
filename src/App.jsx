@@ -1140,6 +1140,7 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
     working_hours_start_minute: 540,
     working_hours_end_minute: 1080,
     automatically_zoom_timeline_to_working_hours: false,
+    wrap_days_at_minute: 0,
     start_tracking_when_app_opens: true,
     auto_stop_timer_on_sleep: true,
     review_reminder_interval_minutes: 0,
@@ -1270,6 +1271,8 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
         <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.track_only_during_working_hours)} onChange={(event) => updatePreference("track_only_during_working_hours", event.target.checked)} disabled={!connected || saving} />Track only during working hours</span></label>
         <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.automatically_zoom_timeline_to_working_hours)} onChange={(event) => updatePreference("automatically_zoom_timeline_to_working_hours", event.target.checked)} disabled={!connected || saving} />Automatically zoom timeline to working hours</span><small>Keep the Activities timeline focused on the configured work window</small></label>
         <div className="settings-time-row"><label>From<input type="time" value={preferenceTime(preferences.working_hours_start_minute)} onChange={(event) => updatePreference("working_hours_start_minute", Math.max(0, Math.min(1439, Number(event.target.value.split(":")[0]) * 60 + Number(event.target.value.split(":")[1] || 0))))} disabled={!connected || saving} /></label><span>to</span><label>To<input type="time" value={preferenceTime(preferences.working_hours_end_minute)} onChange={(event) => updatePreference("working_hours_end_minute", Math.max(0, Math.min(1439, Number(event.target.value.split(":")[0]) * 60 + Number(event.target.value.split(":")[1] || 0))))} disabled={!connected || saving} /></label></div>
+        <label className="settings-field-row"><span>Wrap days at</span><input type="time" value={preferenceTime(preferences.wrap_days_at_minute)} onChange={(event) => updatePreference("wrap_days_at_minute", Math.max(0, Math.min(1439, Number(event.target.value.split(":")[0]) * 60 + Number(event.target.value.split(":")[1] || 0))))} disabled={!connected || saving} /></label>
+        <small className="settings-help-text">Activity after midnight stays with the previous workday until this time. Set 00:00 for ordinary calendar days.</small>
       </div>
       <div className="settings-section"><div className="settings-section-heading"><strong>Activity review reminders</strong><span className={`settings-state-dot ${preferences.review_reminder_notifications_authorized ? "connected" : ""}`} /></div>
         <label className="settings-field-row"><span>Remind to review activities</span><select value={Number(preferences.review_reminder_interval_minutes || 0)} onChange={(event) => updatePreference("review_reminder_interval_minutes", Number(event.target.value))} disabled={!connected || saving}><option value={0}>Never</option><option value={15}>Every 15 minutes</option><option value={30}>Every 30 minutes</option><option value={60}>Every hour</option><option value={120}>Every 2 hours</option></select></label>
@@ -1937,8 +1940,14 @@ function formatDurationSeconds(seconds) {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
-function entrySecondsForDate(entry, dateKey) {
+function trackingDayStart(dateKey, wrapAtMinute = 0) {
   const dayStart = new Date(`${dateKey}T00:00:00`);
+  if (!Number.isNaN(dayStart.getTime())) dayStart.setMinutes(Math.max(0, Math.min(1439, Number(wrapAtMinute || 0))));
+  return dayStart;
+}
+
+function entrySecondsForDate(entry, dateKey, wrapAtMinute = 0) {
+  const dayStart = trackingDayStart(dateKey, wrapAtMinute);
   const startValue = entry?.start_date || entry?.start;
   const endValue = entry?.end_date || entry?.end;
   const startDate = new Date(startValue || "");
@@ -1968,7 +1977,7 @@ function entryOMaticIntervals(activities, entries, dateKey, options = {}) {
   });
   const longEnough = merged.filter((interval) => interval.endSecond - interval.startSecond >= minimumDurationSeconds);
   if (options.overwriteExisting || longEnough.length === 0) return longEnough;
-  const covered = entries.map((entry) => entrySecondsForDate(entry, dateKey)).filter(Boolean);
+  const covered = entries.map((entry) => entrySecondsForDate(entry, dateKey, options.wrapAtMinute)).filter(Boolean);
   if (covered.length === 0) return longEnough;
   const remaining = [];
   longEnough.forEach((interval) => {
@@ -2018,8 +2027,8 @@ function localEntryDate(dateKey, time) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function localEntryDateSeconds(dateKey, seconds) {
-  const date = new Date(`${dateKey}T00:00:00`);
+function localEntryDateSeconds(dateKey, seconds, wrapAtMinute = 0) {
+  const date = trackingDayStart(dateKey, wrapAtMinute);
   if (Number.isNaN(date.getTime())) return null;
   date.setSeconds(Math.round(Number(seconds || 0)));
   return date.toISOString();
@@ -2893,7 +2902,8 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
  const [overlayContextMenu, setOverlayContextMenu] = useState(null);
  const [message, setMessage] = useState("");
  const timelineMessageInteracted = useRef(false);
- const automaticEntryIntervals = useMemo(() => entryOMaticIntervals(activities, api.entries || [], dateKey, { minimumDurationMinutes: 5, maximumGapSeconds: 60 }), [activities, api.entries, dateKey]);
+ const wrapAtMinute = Math.max(0, Math.min(1439, Number(api.preferences?.wrap_days_at_minute ?? 0)));
+ const automaticEntryIntervals = useMemo(() => entryOMaticIntervals(activities, api.entries || [], dateKey, { minimumDurationMinutes: 5, maximumGapSeconds: 60, wrapAtMinute }), [activities, api.entries, dateKey, wrapAtMinute]);
  const automaticEntryDuration = automaticEntryIntervals.reduce((total, interval) => total + interval.endSecond - interval.startSecond, 0);
  const activityClickTimer = useRef(null);
  useEffect(() => () => { if (activityClickTimer.current) window.clearTimeout(activityClickTimer.current); }, []);
@@ -2939,10 +2949,26 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
   });
  const totalSeconds = 24 * 60 * 60;
  const zoomToWorkingHours = Boolean(api.preferences?.automatically_zoom_timeline_to_working_hours);
- const workingHoursStart = Math.max(0, Math.min(1439, Number(api.preferences?.working_hours_start_minute ?? 9 * 60)));
- let workingHoursEnd = Math.max(0, Math.min(1439, Number(api.preferences?.working_hours_end_minute ?? 18 * 60)));
+ const axisMinuteForWallMinute = (minute) => {
+   const bounded = Math.max(0, Math.min(1439, Number(minute || 0)));
+   const shifted = bounded - wrapAtMinute;
+   return shifted < 0 ? shifted + 1440 : shifted;
+ };
+ const wallMinuteForAxisMinute = (minute) => (Math.max(0, Number(minute || 0)) + wrapAtMinute) % 1440;
+ const clockForAxisSecond = (second) => {
+   const value = Math.max(0, Math.round((wrapAtMinute * 60 + Math.max(0, Number(second || 0))) % totalSeconds));
+   const hours = Math.floor(value / 3600) % 24;
+   const minutes = Math.floor((value % 3600) / 60);
+   const seconds = value % 60;
+   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+ };
+ const formatAxisRange = (start, end) => `${clockForAxisSecond(Number(start || 0) * 60)}–${clockForAxisSecond(Number(end || 0) * 60)}`;
+ const formatRange = (start, end) => formatAxisRange(start, end);
+ const preciseClock = clockForAxisSecond;
+ const workingHoursStart = zoomToWorkingHours ? axisMinuteForWallMinute(Number(api.preferences?.working_hours_start_minute ?? 9 * 60)) : 0;
+ let workingHoursEnd = zoomToWorkingHours ? axisMinuteForWallMinute(Number(api.preferences?.working_hours_end_minute ?? 18 * 60)) : 24 * 60;
  if (zoomToWorkingHours && workingHoursEnd <= workingHoursStart) workingHoursEnd += 24 * 60;
- const timelineStartMinute = zoomToWorkingHours ? workingHoursStart : 0;
+ const timelineStartMinute = workingHoursStart;
  const timelineEndMinute = zoomToWorkingHours ? Math.max(workingHoursStart + 15, workingHoursEnd) : 24 * 60;
  const timelineSpanMinutes = Math.max(15, timelineEndMinute - timelineStartMinute);
  const absoluteMinuteForSecond = (second, roundUp = false) => {
@@ -2966,8 +2992,13 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
     const interval = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(interval);
   }, []);
-  const currentTimeSecond = dateKey === localDateKey()
-    ? Math.max(0, Math.min(totalSeconds, Math.floor((now.getHours() * 3_600) + (now.getMinutes() * 60) + now.getSeconds())))
+  const todayLogicalDateKey = (() => {
+    const civil = localDateKey();
+    const wallMinute = now.getHours() * 60 + now.getMinutes();
+    return wallMinute < wrapAtMinute && wrapAtMinute > 0 ? offsetDateKey(civil, -1) : civil;
+  })();
+  const currentTimeSecond = dateKey === todayLogicalDateKey
+    ? Math.max(0, Math.min(totalSeconds, Math.floor(axisMinuteForWallMinute(now.getHours() * 60 + now.getMinutes()) * 60 + now.getSeconds())))
     : null;
   const minuteAt = (clientPosition, rect) => {
     const offset = orientation === "vertical" ? clientPosition - rect.top : clientPosition - rect.left;
@@ -3004,14 +3035,14 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
       updateSelection(null);
       return;
     }
-    const start = localEntryDateSeconds(dateKey, selection.start * 60);
-    const end = localEntryDateSeconds(dateKey, selection.end * 60);
+    const start = localEntryDateSeconds(dateKey, selection.start * 60, wrapAtMinute);
+    const end = localEntryDateSeconds(dateKey, selection.end * 60, wrapAtMinute);
     if (!start || !end) return;
     setTimelineMessage("Recording…");
     try {
       await api.addTimeEntry({ title: "Activity time", start, end, billingStatus: "billable" });
       updateSelection(null);
-      setTimelineMessage("Recorded " + formatRange(selection.start, selection.end));
+      setTimelineMessage("Recorded " + formatAxisRange(selection.start, selection.end));
     } catch (error) {
       setTimelineMessage(error.message || "Could not record the selected range.");
     }
@@ -3021,12 +3052,19 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
   const timelineStep = timelineSpanMinutes <= 12 * 60 ? 60 : 120;
   for (let minute = timelineStartMinute; minute <= timelineEndMinute; minute += timelineStep) timelineHours.push(minute);
   if (timelineHours[timelineHours.length - 1] !== timelineEndMinute) timelineHours.push(timelineEndMinute);
-  const timeEntries = api.activityPreferences?.include_time_entries !== false ? (api.entries || []).map((entry) => ({ entry, range: entrySecondsForDate(entry, dateKey) })).filter((item) => item.range) : [];
+  useEffect(() => {
+    const labels = trackRef.current?.querySelectorAll(".web-activity-timeline-label");
+    labels?.forEach((label, index) => {
+      const minute = timelineHours[index];
+      if (minute != null) label.textContent = formatTime(wallMinuteForAxisMinute(minute));
+    });
+  }, [orientation, timelineEndMinute, timelineSpanMinutes, timelineStartMinute, wrapAtMinute]);
+  const timeEntries = api.activityPreferences?.include_time_entries !== false ? (api.entries || []).map((entry) => ({ entry, range: entrySecondsForDate(entry, dateKey, wrapAtMinute) })).filter((item) => item.range) : [];
   const calendarEvents = Array.isArray(api.calendarEvents?.data) ? api.calendarEvents.data.map((event) => {
     const startDate = new Date(event.start || "");
     const endDate = new Date(event.end || "");
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
-    const dayStart = new Date(`${dateKey}T00:00:00`);
+    const dayStart = trackingDayStart(dateKey, wrapAtMinute);
     const startSecond = Math.max(0, Math.min(totalSeconds, Math.floor((startDate.getTime() - dayStart.getTime()) / 1000)));
     const endSecond = Math.max(0, Math.min(totalSeconds, Math.ceil((endDate.getTime() - dayStart.getTime()) / 1000)));
     return endSecond > startSecond ? { event, startSecond, endSecond } : null;
@@ -3384,6 +3422,7 @@ function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = nul
   const [message, setMessage] = useState("");
   const [overlapEntries, setOverlapEntries] = useState([]);
   const projectLabel = projectTitleFor(api.projects, activity.projectID);
+  const wrapAtMinute = Math.max(0, Math.min(1439, Number(api.preferences?.wrap_days_at_minute ?? 0)));
   const category = activityCategory(activity);
   const Icon = activityIcon(activity);
   const app = activity.appName || activity.deviceName || "Unknown App";
@@ -3398,7 +3437,7 @@ function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = nul
     const activityDateKey = activity.date || dateKey;
     if (overlapDecision === null && overlapEntries.length === 0) {
       const overlaps = api.entries.filter((entry) => {
-        const range = entrySecondsForDate(entry, activityDateKey);
+        const range = entrySecondsForDate(entry, activityDateKey, wrapAtMinute);
         return range && range.startSecond < endSecond && range.endSecond > startSecond;
       });
       if (overlaps.length > 0) {
@@ -3410,8 +3449,8 @@ function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = nul
     setBusy(true);
     setMessage("");
     try {
-      const start = localEntryDateSeconds(activityDateKey, startSecond);
-      const end = localEntryDateSeconds(activityDateKey, endSecond);
+      const start = localEntryDateSeconds(activityDateKey, startSecond, wrapAtMinute);
+      const end = localEntryDateSeconds(activityDateKey, endSecond, wrapAtMinute);
       await api.addTimeEntry({
         title: activity.appName || activity.deviceName || "App activity",
         notes: activity.displayTitle || activityLabel(activity),
@@ -3789,7 +3828,7 @@ function TrayIcon() {
   return <span className="tray-icon" aria-hidden="true" />;
 }
 
-function WebEntryOMaticDialog({ open, activities, entries, projects, dateKey, onClose, onCreate }) {
+function WebEntryOMaticDialog({ open, activities, entries, projects, dateKey, wrapAtMinute = 0, onClose, onCreate }) {
   const [projectID, setProjectID] = useState("");
   const [minimumDurationMinutes, setMinimumDurationMinutes] = useState(5);
   const [maximumGapSeconds, setMaximumGapSeconds] = useState(60);
@@ -3799,8 +3838,9 @@ function WebEntryOMaticDialog({ open, activities, entries, projects, dateKey, on
   const [billingStatus, setBillingStatus] = useState("billable");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const effectiveWrapAtMinute = Math.max(0, Math.min(1439, Number(wrapAtMinute || activities?.[0]?._wrapAtMinute || 0)));
   const scopedActivities = projectID ? activities.filter((activity) => resourceID(activity.projectID) === projectID) : activities;
-  const previewIntervals = useMemo(() => entryOMaticIntervals(scopedActivities, entries, dateKey, { minimumDurationMinutes, maximumGapSeconds, overwriteExisting }), [dateKey, entries, maximumGapSeconds, minimumDurationMinutes, overwriteExisting, scopedActivities]);
+  const previewIntervals = useMemo(() => entryOMaticIntervals(scopedActivities, entries, dateKey, { minimumDurationMinutes, maximumGapSeconds, overwriteExisting, wrapAtMinute: effectiveWrapAtMinute }), [dateKey, effectiveWrapAtMinute, entries, maximumGapSeconds, minimumDurationMinutes, overwriteExisting, scopedActivities]);
   const previewDuration = previewIntervals.reduce((total, interval) => total + interval.endSecond - interval.startSecond, 0);
   useEffect(() => {
     if (!open) return;
@@ -3965,6 +4005,7 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   const [timelineSelection, setTimelineSelection] = useState(null);
   const [editProjectID, setEditProjectID] = useState(null);
   const timerRunning = Boolean(api.status?.timer);
+  const wrapAtMinute = Math.max(0, Math.min(1439, Number(api.preferences?.wrap_days_at_minute ?? 0)));
   useEffect(() => {
     const preferences = api.activityPreferences;
     if (!preferences) return;
@@ -4031,7 +4072,9 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   };
   const recordedActivities = allActivities.filter((activity) => includeIdle || activityCategory(activity).key !== "idle");
   const activities = recordedActivities.filter(filterActivity).filter(activityMatchesTimelineSelection);
-  const timelineActivities = currentActivities.filter((activity) => (includeIdle || activityCategory(activity).key !== "idle") && filterActivity(activity));
+  const timelineActivities = currentActivities
+    .filter((activity) => (includeIdle || activityCategory(activity).key !== "idle") && filterActivity(activity))
+    .map((activity) => ({ ...activity, _wrapAtMinute: wrapAtMinute }));
   const hasFilters = Boolean(normalizedQuery || categoryFilter !== "all" || deviceFilter !== "all" || projectFilterID !== "all" || savedFilterID !== "all" || timelineSelection);
   const resetFilters = () => {
     setQuery("");
@@ -4192,8 +4235,8 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   };
   const openActivityTimeEntry = (activity) => {
     const activityDateKey = activity?.date || dateKey;
-    const start = localEntryDateSeconds(activityDateKey, activity?.startSecond);
-    const end = localEntryDateSeconds(activityDateKey, activity?.endSecond);
+    const start = localEntryDateSeconds(activityDateKey, activity?.startSecond, wrapAtMinute);
+    const end = localEntryDateSeconds(activityDateKey, activity?.endSecond, wrapAtMinute);
     if (!start || !end || new Date(end) <= new Date(start)) return;
     openNewTimeEntry({
       title: activityLabel(activity),
@@ -4205,8 +4248,8 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   };
   const openSelectedRangeTimeEntry = (selection) => {
     if (!selection || selection.end <= selection.start) return;
-    const start = localEntryDateSeconds(dateKey, selection.start * 60);
-    const end = localEntryDateSeconds(dateKey, selection.end * 60);
+    const start = localEntryDateSeconds(dateKey, selection.start * 60, wrapAtMinute);
+    const end = localEntryDateSeconds(dateKey, selection.end * 60, wrapAtMinute);
     if (!start || !end || new Date(end) <= new Date(start)) return;
     const selectedProject = projectFilterID !== "all" && projectFilterID !== "unassigned"
       && api.projects.some((project) => resourceID(project.id) === resourceID(projectFilterID))
@@ -4217,13 +4260,13 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   const createGeneratedEntries = async (intervals, configuration) => {
     const replacedEntries = configuration.overwriteExisting
       ? api.entries.filter((entry) => {
-        const existing = entrySecondsForDate(entry, dateKey);
+        const existing = entrySecondsForDate(entry, dateKey, wrapAtMinute);
         return existing && intervals.some((interval) => existing.startSecond < interval.endSecond && existing.endSecond > interval.startSecond);
       })
       : [];
     const generatedRanges = intervals.map((interval) => ({
-      start: localEntryDateSeconds(dateKey, interval.startSecond),
-      end: localEntryDateSeconds(dateKey, interval.endSecond),
+      start: localEntryDateSeconds(dateKey, interval.startSecond, wrapAtMinute),
+      end: localEntryDateSeconds(dateKey, interval.endSecond, wrapAtMinute),
     }));
     const { createdEntries, splitFragments } = await api.createTimeEntries(generatedRanges.map((range) => ({
       title: configuration.title,

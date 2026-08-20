@@ -8,6 +8,7 @@ output_dir="$project_dir/.build/smoke-tests"
 mkdir -p "$output_dir"
 swiftc \
   "$project_dir/Sources/MetridayApp/Models.swift" \
+  "$project_dir/Sources/MetridayApp/TrackingDay.swift" \
   "$project_dir/Sources/MetridayApp/ProjectTracking.swift" \
   "$project_dir/Sources/MetridayApp/TeamStore.swift" \
   "$project_dir/Sources/MetridayApp/TimeEntryStore.swift" \

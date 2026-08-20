@@ -16,6 +16,7 @@ final class ScreenTimeStore: ObservableObject {
     private let databaseURL: URL
     private let history: ActivityHistoryStore
     private var selectedDate = Calendar.current.startOfDay(for: .now)
+    private var wrapAtMinute = 0
 
     init(databaseURL: URL? = nil, archiveRootDirectory: URL? = nil) {
         self.databaseURL = databaseURL ?? Self.defaultDatabaseURL()
@@ -23,9 +24,10 @@ final class ScreenTimeStore: ObservableObject {
         self.history = ActivityHistoryStore(rootDirectory: archiveRoot)
     }
 
-    func load(for date: Date) {
+    func load(for date: Date, wrapAtMinute: Int = 0) {
         selectedDate = Calendar.current.startOfDay(for: date)
-        let archived = history.load(date: selectedDate)
+        self.wrapAtMinute = TrackingDay.clampedWrapMinute(wrapAtMinute)
+        let archived = history.load(date: selectedDate, wrapAtMinute: self.wrapAtMinute)
 
         guard FileManager.default.fileExists(atPath: databaseURL.path) else {
             databaseAvailable = false
@@ -90,8 +92,13 @@ final class ScreenTimeStore: ObservableObject {
         defer { sqlite3_finalize(statement) }
 
         let calendar = Calendar.current
-        let dayStart = calendar.startOfDay(for: date)
-        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return }
+        let dayRange = TrackingDay.range(
+            for: selectedDate,
+            wrapAtMinute: self.wrapAtMinute,
+            calendar: calendar
+        )
+        let dayStart = dayRange.start
+        let dayEnd = dayRange.end
         var imported: [ActivitySegment] = []
 
         while sqlite3_step(statement) == SQLITE_ROW {
@@ -105,8 +112,18 @@ final class ScreenTimeStore: ObservableObject {
 
             let clippedStart = max(start, dayStart)
             let clippedEnd = min(end, dayEnd)
-            let startSecond = max(0, Int(floor(clippedStart.timeIntervalSince(dayStart))))
-            let endSecond = min(86_400, Int(ceil(clippedEnd.timeIntervalSince(dayStart))))
+            let startSecond = TrackingDay.axisSeconds(
+                for: clippedStart,
+                logicalDayLabel: selectedDate,
+                wrapAtMinute: self.wrapAtMinute,
+                calendar: calendar
+            )
+            let endSecond = TrackingDay.axisSeconds(
+                for: clippedEnd,
+                logicalDayLabel: selectedDate,
+                wrapAtMinute: self.wrapAtMinute,
+                calendar: calendar
+            )
             guard endSecond > startSecond else { continue }
 
             let value = textValue(statement, index: 3)
@@ -142,7 +159,7 @@ final class ScreenTimeStore: ObservableObject {
         databaseAvailable = true
         segments = merged(archived: archived, imported: imported)
             .filter { !history.isDeleted($0.id, date: selectedDate) }
-        try? history.save(segments, date: selectedDate)
+        try? history.save(segments, date: selectedDate, wrapAtMinute: self.wrapAtMinute)
         statusMessage = imported.isEmpty
             ? (segments.isEmpty ? "No Screen Time activities for this day" : "Showing \(segments.count) archived Screen Time activities")
             : "Imported \(imported.count) Screen Time activities"
@@ -154,7 +171,7 @@ final class ScreenTimeStore: ObservableObject {
 
     func segments(for date: Date) -> [ActivitySegment] {
         let normalized = Calendar.current.startOfDay(for: date)
-        return normalized == selectedDate ? segments : history.load(date: normalized)
+        return normalized == selectedDate ? segments : history.load(date: normalized, wrapAtMinute: self.wrapAtMinute)
     }
 
     func exportArchiveData() throws -> Data {
@@ -164,7 +181,7 @@ final class ScreenTimeStore: ObservableObject {
     @discardableResult
     func importArchiveData(_ data: Data) throws -> Int {
         let imported = try history.importArchiveData(data)
-        segments = history.load(date: selectedDate)
+        segments = history.load(date: selectedDate, wrapAtMinute: self.wrapAtMinute)
         return imported
     }
 
@@ -173,25 +190,25 @@ final class ScreenTimeStore: ObservableObject {
         if targetDate == selectedDate {
             guard let index = segments.firstIndex(where: { $0.id == id }) else { return }
             segments[index].projectID = projectID
-            try? history.save(segments, date: selectedDate)
+            try? history.save(segments, date: selectedDate, wrapAtMinute: self.wrapAtMinute)
             return
         }
-        var historicalSegments = history.load(date: targetDate)
+        var historicalSegments = history.load(date: targetDate, wrapAtMinute: self.wrapAtMinute)
         guard let index = historicalSegments.firstIndex(where: { $0.id == id }) else { return }
         historicalSegments[index].projectID = projectID
-        try? history.save(historicalSegments, date: targetDate)
+        try? history.save(historicalSegments, date: targetDate, wrapAtMinute: self.wrapAtMinute)
     }
 
     @discardableResult
     func deleteActivities(_ ids: Set<UUID>, date: Date? = nil) -> [ActivitySegment] {
         guard !ids.isEmpty else { return [] }
         let targetDate = Calendar.current.startOfDay(for: date ?? selectedDate)
-        let historicalSegments = history.load(date: targetDate)
+        let historicalSegments = history.load(date: targetDate, wrapAtMinute: self.wrapAtMinute)
         let deleted = historicalSegments.filter { ids.contains($0.id) }
         guard !deleted.isEmpty else { return [] }
         let deletedIDs = Set(deleted.map(\.id))
         history.markDeleted(deletedIDs, date: targetDate)
-        try? history.save(historicalSegments.filter { !deletedIDs.contains($0.id) }, date: targetDate)
+        try? history.save(historicalSegments.filter { !deletedIDs.contains($0.id) }, date: targetDate, wrapAtMinute: self.wrapAtMinute)
         if targetDate == selectedDate {
             segments.removeAll { deletedIDs.contains($0.id) }
         }
@@ -203,11 +220,11 @@ final class ScreenTimeStore: ObservableObject {
         let targetDate = Calendar.current.startOfDay(for: date ?? selectedDate)
         let ids = Set(restored.map(\.id))
         history.restore(ids, date: targetDate)
-        var merged = Dictionary(uniqueKeysWithValues: history.load(date: targetDate).map { ($0.id, $0) })
+        var merged = Dictionary(uniqueKeysWithValues: history.load(date: targetDate, wrapAtMinute: self.wrapAtMinute).map { ($0.id, $0) })
         for segment in restored { merged[segment.id] = segment }
-        try? history.save(Array(merged.values), date: targetDate)
+        try? history.save(Array(merged.values), date: targetDate, wrapAtMinute: self.wrapAtMinute)
         if targetDate == selectedDate {
-            segments = history.load(date: targetDate)
+            segments = history.load(date: targetDate, wrapAtMinute: self.wrapAtMinute)
         }
     }
 

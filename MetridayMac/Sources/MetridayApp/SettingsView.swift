@@ -161,6 +161,19 @@ struct SettingsSheet: View {
                 }
             }
             .disabled(!preferences.trackOnlyDuringWorkingHours)
+
+            HStack(spacing: 8) {
+                Text("Wrap days at")
+                    .font(.system(size: 12))
+                timePicker(hour: wrapDayHour, minute: wrapDayMinute, label: "Wrap days") { hour, minute in
+                    preferences.wrapDaysAtMinute = hour * 60 + minute
+                }
+            }
+
+            Text("Activity after midnight stays with the previous workday until this time. Set 00:00 for ordinary calendar days.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .lineSpacing(2)
         }
         .settingsPanel()
     }
@@ -805,6 +818,14 @@ struct SettingsSheet: View {
 
     private var endMinute: Int {
         preferences.workingHoursEndMinute % 60
+    }
+
+    private var wrapDayHour: Int {
+        preferences.wrapDaysAtMinute / 60
+    }
+
+    private var wrapDayMinute: Int {
+        preferences.wrapDaysAtMinute % 60
     }
 
     private func timePicker(
