@@ -662,6 +662,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-activity-timeline-actions button:disabled { cursor: not-allowed; opacity: 0.5; }
 .web-activity-timeline-actions .timeline-clear { border-color: var(--border); background: #fff; color: #555b66; }
 .web-activity-timeline-actions small { width: 100%; color: var(--muted); text-align: right; }
+.timeline-entry-suggestion { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.timeline-entry-suggestion > span { color: var(--muted); }
+.timeline-entry-suggestion button { flex: 0 0 auto; }
 .web-activity-timeline-track { position: relative; height: 96px; margin-top: 35px; border-top: 1px solid #dfe2e8; border-bottom: 1px solid #dfe2e8; background: linear-gradient(to bottom, #fbfcff 0%, #fff 100%); cursor: crosshair; }
 .web-activity-timeline-label { position: absolute; top: -24px; transform: translateX(-50%); color: var(--muted); font-size: 10px; }
 .web-activity-timeline-label:first-of-type { transform: none; }

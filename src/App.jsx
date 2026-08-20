@@ -2631,8 +2631,26 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
  const [contextMenu, setContextMenu] = useState(null);
  const [overlayContextMenu, setOverlayContextMenu] = useState(null);
  const [message, setMessage] = useState("");
+ const timelineMessageInteracted = useRef(false);
+ const automaticEntryIntervals = useMemo(() => entryOMaticIntervals(activities, api.entries || [], dateKey, { minimumDurationMinutes: 5, maximumGapSeconds: 60 }), [activities, api.entries, dateKey]);
+ const automaticEntryDuration = automaticEntryIntervals.reduce((total, interval) => total + interval.endSecond - interval.startSecond, 0);
  const activityClickTimer = useRef(null);
  useEffect(() => () => { if (activityClickTimer.current) window.clearTimeout(activityClickTimer.current); }, []);
+ useEffect(() => {
+   timelineMessageInteracted.current = false;
+ }, [dateKey]);
+ useEffect(() => {
+   if (timelineMessageInteracted.current) return;
+   if (!automaticEntryIntervals.length) {
+     setMessage("");
+     return;
+   }
+   setMessage(<span className="timeline-entry-suggestion"><span>Metriday can automatically create {automaticEntryIntervals.length} time entries with a total duration of {formatDurationSeconds(automaticEntryDuration)} to cover this app usage.</span><button type="button" onClick={() => { timelineMessageInteracted.current = true; window.dispatchEvent(new CustomEvent("metriday:open-entry-omatic")); }}>Create Time Entries</button></span>);
+ }, [automaticEntryDuration, automaticEntryIntervals]);
+ const setTimelineMessage = (value) => {
+   timelineMessageInteracted.current = true;
+   setMessage(value);
+ };
  const openActivityDetails = (activity) => {
    if (activityClickTimer.current) window.clearTimeout(activityClickTimer.current);
    activityClickTimer.current = window.setTimeout(() => {
@@ -2704,13 +2722,13 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
     const start = localEntryDateSeconds(dateKey, selection.start * 60);
     const end = localEntryDateSeconds(dateKey, selection.end * 60);
     if (!start || !end) return;
-    setMessage("Recording…");
+    setTimelineMessage("Recording…");
     try {
       await api.addTimeEntry({ title: "Activity time", start, end, billingStatus: "billable" });
       updateSelection(null);
-      setMessage("Recorded " + formatRange(selection.start, selection.end));
+      setTimelineMessage("Recorded " + formatRange(selection.start, selection.end));
     } catch (error) {
-      setMessage(error.message || "Could not record the selected range.");
+      setTimelineMessage(error.message || "Could not record the selected range.");
     }
   };
   const vertical = orientation === "vertical";
@@ -2733,9 +2751,9 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
     if (!api.connected) return;
     try {
       await api.addTimeEntry({ title: calendarEvent.title || "Calendar event", start: calendarEvent.start, end: calendarEvent.end, billingStatus: "billable" });
-      setMessage("Recorded calendar event.");
+      setTimelineMessage("Recorded calendar event.");
     } catch (error) {
-      setMessage(error.message || "Could not record the calendar event.");
+      setTimelineMessage(error.message || "Could not record the calendar event.");
     }
   };
   const rangeStyle = (startSecond, endSecond, color) => {
@@ -3737,8 +3755,13 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   };
   useEffect(() => {
     const handleOpenNewTimeEntry = () => openNewTimeEntry();
+    const handleOpenEntryOMatic = () => setEntryOMaticOpen(true);
     window.addEventListener("metriday:open-new-time-entry", handleOpenNewTimeEntry);
-    return () => window.removeEventListener("metriday:open-new-time-entry", handleOpenNewTimeEntry);
+    window.addEventListener("metriday:open-entry-omatic", handleOpenEntryOMatic);
+    return () => {
+      window.removeEventListener("metriday:open-new-time-entry", handleOpenNewTimeEntry);
+      window.removeEventListener("metriday:open-entry-omatic", handleOpenEntryOMatic);
+    };
   }, []);
   const openSourceTimeEntry = (source) => {
     if (source?.completed_at) {
