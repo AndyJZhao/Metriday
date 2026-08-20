@@ -523,6 +523,50 @@ final class ProjectStore: ObservableObject {
         statusMessage = "Project restored · \(project.name)"
     }
 
+    /// Reorders the active direct children of a project without changing the
+    /// hierarchy or any activity assignment. The project array is the local
+    /// sibling-order store, so replacing only the existing sibling slots keeps
+    /// archived projects and descendants stable.
+    func orderSubprojectsAlphabetically(of project: TrackingProject) {
+        let siblingIndices = projects.indices.filter {
+            projects[$0].parentID == project.id && !projects[$0].isArchived
+        }
+        guard siblingIndices.count > 1 else {
+            statusMessage = "Subprojects already ordered · \(project.name)"
+            return
+        }
+        let sortedProjects = siblingIndices
+            .map { projects[$0] }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        for (index, projectIndex) in siblingIndices.enumerated() {
+            projects[projectIndex] = sortedProjects[index]
+        }
+        persist()
+        statusMessage = "Subprojects ordered alphabetically · \(project.name)"
+    }
+
+    /// Applies the same deterministic palette to all active descendants. This
+    /// only changes project identity dots; App / Website / Item activity still
+    /// gets its visual color from the matched Activity Category.
+    func reassignSubprojectColors(of project: TrackingProject) {
+        let descendantIDs = descendantProjectIDs(including: project.id)
+        let targets = projects.indices.filter {
+            descendantIDs.contains(projects[$0].id)
+                && projects[$0].id != project.id
+                && !projects[$0].isArchived
+        }
+        guard !targets.isEmpty else {
+            statusMessage = "No active subprojects to recolor · \(project.name)"
+            return
+        }
+        let palette = ProjectColor.allCases
+        for (offset, projectIndex) in targets.enumerated() {
+            projects[projectIndex].color = palette[offset % palette.count]
+        }
+        persist()
+        statusMessage = "Subproject colors reassigned · \(project.name)"
+    }
+
     @discardableResult
     func addRule(
         projectID: UUID,

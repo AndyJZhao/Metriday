@@ -2823,6 +2823,13 @@ struct ActivitiesView: View {
             Button("Edit Project") {
                 editingProject = project
             }
+            Divider()
+            Button("Order Subprojects Alphabetically") {
+                projectStore.orderSubprojectsAlphabetically(of: project)
+            }
+            Button("Reassign Subproject Colors") {
+                projectStore.reassignSubprojectColors(of: project)
+            }
             Button("Archive Project", role: .destructive) {
                 projectStore.archive(project)
                 if filter == target {

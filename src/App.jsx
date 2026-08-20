@@ -2423,6 +2423,32 @@ function ProjectPanel({ api, activities = [], onAssignActivity, onDropActivity, 
       setMessage(error.message || "Could not restore the project.");
     }
   };
+  const activeSubprojects = (project) => {
+    const ids = descendantProjectIDs(api.projects, project.id);
+    ids.delete(resourceID(project.id));
+    return projects.filter((candidate) => ids.has(resourceID(candidate.id)) && !candidate.is_archived);
+  };
+  const orderSubprojectsAlphabetically = (project) => {
+    const children = projects.filter((candidate) => projectParentID(candidate) === resourceID(project.id));
+    setMessage(children.length > 1
+      ? `Subprojects of ${project.title} are displayed alphabetically.`
+      : `No sibling order to change for ${project.title}.`);
+  };
+  const reassignSubprojectColors = async (project) => {
+    const children = activeSubprojects(project);
+    if (!children.length) {
+      setMessage(`No active subprojects to recolor for ${project.title}.`);
+      return;
+    }
+    try {
+      for (const [index, child] of children.entries()) {
+        await api.updateProject(child.id, { color: projectColorOptions[index % projectColorOptions.length][0] });
+      }
+      setMessage(`Subproject colors reassigned for ${project.title}.`);
+    } catch (error) {
+      setMessage(error.message || "Could not reassign subproject colors.");
+    }
+  };
   const dropOnProject = async (event, project) => {
     event.preventDefault();
     setDropTarget(null);
@@ -2502,7 +2528,7 @@ function ProjectPanel({ api, activities = [], onAssignActivity, onDropActivity, 
         <label className="project-edit-notes">Notes<textarea value={editing.notes} onChange={(event) => setEditing((value) => ({ ...value, notes: event.target.value }))} rows={2} aria-label={`Edit ${project.title} notes`} /></label>
       </div>
       <div className="project-edit-card-actions"><button type="submit" aria-label="Save project"><Check size={16} />Save</button><button type="button" className="secondary-button" onClick={() => setEditing(null)}>Cancel</button></div>
-    </form> : <div className={`project-row ${project.is_archived ? "archived" : ""} ${dropTarget === project.id ? "drop-target" : ""}`} key={project.id} draggable={!project.is_archived} onDragStart={(event) => handleProjectDragStart(event, project)} onDragOver={(event) => { if (project.is_archived) return; event.preventDefault(); setDropTarget(project.id); }} onDragLeave={() => setDropTarget(null)} onDrop={(event) => { if (!project.is_archived) dropOnProject(event, project); }} title="Drag this project onto another project to make it a subproject"><span className="project-dot" style={{ background: project.color || "var(--accent)" }} /><strong>{project.title}</strong><span>{projectParentID(project) ? `↳ ${projectTitleFor(displayedProjects, projectParentID(project))}` : "Top level"}</span><span>{project.currency || "USD"} {Number(project.billing_rate || 0).toFixed(2)}/h</span><small>{project.is_archived ? "Archived" : billingLabel(project.default_billing_status)}</small><span className="project-actions"><IconButton label={`Edit ${project.title}`} onClick={() => beginEdit(project)}><NotePencil size={15} /></IconButton>{project.is_archived ? <IconButton label={`Restore ${project.title}`} onClick={() => restore(project)}><ArrowsClockwise size={15} /></IconButton> : <IconButton label={`Archive ${project.title}`} onClick={() => remove(project)}><Trash size={15} /></IconButton>}</span></div>)}</div></> : <div className="entries-empty"><FolderSimple size={24} /><span>{api.connected ? "Create a project to organize time and billing." : "Connect the native Metriday app to manage projects."}</span></div>}
+    </form> : <div className={`project-row ${project.is_archived ? "archived" : ""} ${dropTarget === project.id ? "drop-target" : ""}`} key={project.id} draggable={!project.is_archived} onDragStart={(event) => handleProjectDragStart(event, project)} onDragOver={(event) => { if (project.is_archived) return; event.preventDefault(); setDropTarget(project.id); }} onDragLeave={() => setDropTarget(null)} onDrop={(event) => { if (!project.is_archived) dropOnProject(event, project); }} title="Drag this project onto another project to make it a subproject"><span className="project-dot" style={{ background: project.color || "var(--accent)" }} /><strong>{project.title}</strong><span>{projectParentID(project) ? `↳ ${projectTitleFor(displayedProjects, projectParentID(project))}` : "Top level"}</span><span>{project.currency || "USD"} {Number(project.billing_rate || 0).toFixed(2)}/h</span><small>{project.is_archived ? "Archived" : billingLabel(project.default_billing_status)}</small><span className="project-actions"><IconButton label={`Edit ${project.title}`} onClick={() => beginEdit(project)}><NotePencil size={15} /></IconButton>{project.is_archived ? <IconButton label={`Restore ${project.title}`} onClick={() => restore(project)}><ArrowsClockwise size={15} /></IconButton> : <IconButton label={`Archive ${project.title}`} onClick={() => remove(project)}><Trash size={15} /></IconButton>}{!project.is_archived && projects.some((candidate) => projectParentID(candidate) === resourceID(project.id)) ? <ActionMenu label={`More actions for ${project.title}`} items={[{ label: "Order Subprojects Alphabetically", onSelect: () => orderSubprojectsAlphabetically(project) }, { label: "Reassign Subproject Colors", onSelect: () => reassignSubprojectColors(project) }]}><DotsThree size={17} /></ActionMenu> : null}</span></div>)}</div></> : <div className="entries-empty"><FolderSimple size={24} /><span>{api.connected ? "Create a project to organize time and billing." : "Connect the native Metriday app to manage projects."}</span></div>}
   </section>;
 }
 
