@@ -1358,8 +1358,8 @@ function ActualHoverCard({ block, onRecord }) {
     setBusy(true);
     setMessage("");
     try {
-      await onRecord({ ...block, startSecond, endSecond });
-      setMessage("Recorded");
+      const result = await onRecord({ ...block, startSecond, endSecond });
+      setMessage(result?.opened ? "Editor opened" : "Recorded");
     } catch (error) {
       setMessage(error.message || "Could not record");
     } finally {
@@ -1392,17 +1392,19 @@ function ActualTrack({ activities, connected, onRecord, onSelect, projects = [],
 
 function TodayPage({ setPage, api, dateKey, setDateKey }) {
   const [selectedActivity, setSelectedActivity] = useState(null);
- const recordActivity = async (block) => {
+  const [timeEntryPrefill, setTimeEntryPrefill] = useState(null);
+  const recordActivity = async (block) => {
     const start = localEntryDateSeconds(dateKey, block.startSecond);
     const end = localEntryDateSeconds(dateKey, block.endSecond);
     if (!start || !end || end <= start) throw new Error("Activity range is not available");
-    await api.addTimeEntry({
+    setTimeEntryPrefill({
       title: block.rows?.[0]?.label || block.label || "App activity",
       start,
       end,
       projectID: block.projectID || undefined,
       billingStatus: "billable",
     });
+    return { opened: true };
   };
   const now = currentMinuteAndLabel();
   const showNow = dateKey === localDateKey();
@@ -1411,7 +1413,7 @@ function TodayPage({ setPage, api, dateKey, setDateKey }) {
     <main className="page today-page">
       <div className="today-comparison"><div className="timeline-label-column"><HourLabels /></div><PlannedTrack tasks={api.plan?.tasks} connected={api.connected} onSelect={() => setPage("plan")} /><ActualTrack activities={api.activities} connected={api.connected} onRecord={recordActivity} onSelect={setSelectedActivity} projects={api.projects} api={api} /><div className="now-marker" style={nowStyle} aria-label={`Current time ${now.label}`}><span /></div></div>
       <TodayInsightBar api={api} setPage={setPage} />
-      {api.connected ? <WebActivityInsights insights={api.insights} dateKey={dateKey} /> : null}{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} displayPreferences={api.activityPreferences} onClose={() => setSelectedActivity(null)} /> : null}
+      {api.connected ? <WebActivityInsights insights={api.insights} dateKey={dateKey} /> : null}{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} displayPreferences={api.activityPreferences} onClose={() => setSelectedActivity(null)} /> : null}<WebTimeEntryDialog mode="new" open={Boolean(timeEntryPrefill)} api={api} projects={api.projects} recentEntries={api.entries} dateKey={dateKey} initialEntry={timeEntryPrefill} onClose={() => setTimeEntryPrefill(null)} />
     </main>
   );
 }
