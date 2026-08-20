@@ -2667,6 +2667,7 @@ function WebReportPanel({ api, dateKey }) {
   const [message, setMessage] = useState("");
   const controlsRef = useRef(null);
   const selectedDevice = api.activityPreferences?.selected_device || "All Devices";
+  const localDeviceName = api.sync?.deviceName || api.status?.deviceName || "This Mac";
   useEffect(() => {
     const weekStart = weekStartDateKey(dateKey);
     setRangeStart(weekStart);
@@ -2751,7 +2752,7 @@ function WebReportPanel({ api, dateKey }) {
       const rawSeconds = Math.max(0, (clippedEnd - clippedStart) / 1000);
       const seconds = roundIndividualEntries ? reportRoundSeconds(rawSeconds, rounding, Number(roundingInterval)) : rawSeconds;
       const details = projectDetails(entry.project);
-      rows.push({ kind: "Time entry", type: entry.is_manual ? "Time Entry" : "Timer", title: entry.title || "Untitled", project: projectFor(entry.project), group: "", application: "", device: "This Mac", resource: entry.notes || "", billing: billingLabel(entry.billing_status), currency: details.currency, start: clippedStart, end: clippedEnd, seconds, amount: seconds / 3600 * details.rate, notes: entry.notes || "" });
+      rows.push({ kind: "Time entry", type: entry.is_manual ? "Time Entry" : "Timer", title: entry.title || "Untitled", project: projectFor(entry.project), group: "", application: "", device: localDeviceName, resource: entry.notes || "", billing: billingLabel(entry.billing_status), currency: details.currency, start: clippedStart, end: clippedEnd, seconds, amount: seconds / 3600 * details.rate, notes: entry.notes || "" });
     });
     if (includeMode !== "time" && billingFilter === "all") {
       dataset.activities.forEach((activity) => {
@@ -2796,7 +2797,7 @@ function WebReportPanel({ api, dateKey }) {
       ? groupedRows
       : groupedRows.map((row) => ({ ...row, seconds: reportRoundSeconds(row.seconds, rounding, Number(roundingInterval)) }));
     return { rows: finalRows, totalSeconds: finalRows.reduce((sum, row) => sum + row.seconds, 0), billableSeconds: finalRows.reduce((sum, row) => sum + row.billableSeconds, 0), amount: finalRows.reduce((sum, row) => sum + row.amount, 0), currencies: [...new Set(finalRows.map((row) => row.currency).filter(Boolean))] };
-  }, [api.projects, billingFilter, dataset, groupBy, includeCoveredAppUsage, includeMode, includeShortEntries, projectIDs, rangeEnd, rangeStart, roundIndividualEntries, rounding, roundingInterval, selectedDevice]);
+  }, [api.projects, billingFilter, dataset, groupBy, includeCoveredAppUsage, includeMode, includeShortEntries, localDeviceName, projectIDs, rangeEnd, rangeStart, roundIndividualEntries, rounding, roundingInterval, selectedDevice]);
   const setDatePreset = (preset) => {
     if (preset === "today") {
       setRangeStart(dateKey);

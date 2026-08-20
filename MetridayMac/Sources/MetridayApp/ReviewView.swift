@@ -635,11 +635,14 @@ struct ReviewView: View {
         let entries = timeEntryStore.materializedEntries().filter {
             $0.start < rangeEnd && $0.end > rangeStart
         }
+        var options = ReportOptions()
+        options.deviceName = appState.syncStore.deviceName
         try? ReportExporter.write(
             to: url,
             activityDays: activityDays,
             timeEntries: entries,
-            projectStore: projectStore
+            projectStore: projectStore,
+            options: options
         )
     }
 

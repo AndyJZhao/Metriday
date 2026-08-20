@@ -89,6 +89,13 @@ final class AppState: ObservableObject {
             exclusionStore: exclusionStore,
             teamStore: teamStore
         )
+        activityMonitor.setDeviceName(syncStore.deviceName)
+        syncStore.$deviceName
+            .removeDuplicates()
+            .sink { [weak activityMonitor] value in
+                activityMonitor?.setDeviceName(value)
+            }
+            .store(in: &workspaceCancellables)
         self.integrationStore = IntegrationStore()
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
             .sink { [weak self] _ in
@@ -252,6 +259,7 @@ final class AppState: ObservableObject {
                 "selectedDate": apiDate(selectedDate),
                 "currentApplication": activityMonitor.currentApplication,
                 "currentWindowTitle": activityMonitor.currentWindowTitle,
+                "deviceName": syncStore.deviceName,
                 "api": localAPIServer.endpoint
             ]
             if let task = currentTask {
@@ -1494,7 +1502,8 @@ final class AppState: ObservableObject {
             let startDate = calendar.startOfDay(for: min(requestedStart, requestedEnd))
             let endDate = calendar.startOfDay(for: max(requestedStart, requestedEnd))
             let dates = reportDates(from: startDate, through: endDate)
-            let options = reportOptions(from: request.query)
+            var options = reportOptions(from: request.query)
+            options.deviceName = syncStore.deviceName
             let activityDays = dates.map { date in
                 (
                     date: date,

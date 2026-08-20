@@ -271,6 +271,7 @@ enum ReportPreset: String, CaseIterable, Identifiable {
 }
 
 struct ReportOptions: Hashable {
+    var deviceName = "This Mac"
     var include: ReportIncludeMode = .both
     var groupBy: ReportGroupBy = .none
     var billingFilter: ReportBillingFilter = .all
@@ -549,7 +550,7 @@ enum ReportExporter {
                     let durationSeconds = max(1, Int(entryEnd.timeIntervalSince(entryStart)))
                     raw.append(ReportRecord(
                         date: dateKey,
-                        device: "This Mac",
+                        device: options.deviceName,
                         type: entry.isManual ? "Time Entry" : "Timer",
                         group: "",
                         project: projectStore.hierarchyPath(for: entry.projectID),

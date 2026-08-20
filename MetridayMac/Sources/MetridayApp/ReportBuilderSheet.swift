@@ -100,6 +100,7 @@ struct ReportBuilderSheet: View {
         .padding(24)
         .frame(width: 620, height: 660)
         .onAppear {
+            options.deviceName = appState.syncStore.deviceName
             if preset != .custom, options.groupBy == .none {
                 applyPreset(preset)
             }

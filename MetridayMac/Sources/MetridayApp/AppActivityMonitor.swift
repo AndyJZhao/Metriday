@@ -16,6 +16,7 @@ final class AppActivityMonitor: ObservableObject {
     @Published private(set) var lastSampleAt: Date?
     @Published private(set) var pendingIdleInterval: IdleInterval?
     @Published private(set) var pendingCallInterval: CallInterval?
+    private(set) var deviceName: String
 
     private let history: ActivityHistoryStore
     let projectStore: ProjectStore
@@ -39,13 +40,18 @@ final class AppActivityMonitor: ObservableObject {
         rootDirectory: URL? = nil,
         projectStore: ProjectStore? = nil,
         preferences: PreferencesStore? = nil,
-        exclusionStore: ExclusionStore? = nil
+        exclusionStore: ExclusionStore? = nil,
+        deviceName: String? = nil
     ) {
         self.history = ActivityHistoryStore(rootDirectory: rootDirectory)
         self.projectStore = projectStore ?? ProjectStore()
         self.preferences = preferences ?? PreferencesStore()
         self.exclusionStore = exclusionStore ?? ExclusionStore()
         self.activeWrapAtMinute = TrackingDay.clampedWrapMinute(self.preferences.wrapDaysAtMinute)
+        let configuredDeviceName = deviceName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.deviceName = configuredDeviceName?.isEmpty == false
+            ? configuredDeviceName!
+            : (Host.current().localizedName ?? "This Mac")
         let today = TrackingDay.logicalDayLabel(
             for: .now,
             wrapAtMinute: self.activeWrapAtMinute,
@@ -80,6 +86,18 @@ final class AppActivityMonitor: ObservableObject {
                 }
             }
             .store(in: &workspaceCancellables)
+    }
+
+    func setDeviceName(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolved = trimmed.isEmpty ? "This Mac" : trimmed
+        guard resolved != deviceName else { return }
+        deviceName = resolved
+        if isTracking {
+            sample()
+        } else {
+            refreshObservedSegments()
+        }
     }
 
     var visibleSummary: ActivitySummary {
@@ -410,7 +428,6 @@ final class AppActivityMonitor: ObservableObject {
     private func currentObservationSnapshot(at date: Date) -> ActivityObservation? {
         guard preferences.shouldTrack(at: date) else { return nil }
         let idle = secondsSinceLastInput >= TimeInterval(preferences.idleThresholdSeconds)
-        let deviceName = Host.current().localizedName ?? "This Mac"
         if idle {
             return ActivityObservation(
                 appName: "Idle",

@@ -232,13 +232,15 @@ final class MetridayExportReportCommand: NSScriptCommand {
                     .appendingPathExtension(format.fileExtension)
             }
             do {
+                var options = ReportOptions()
+                options.deviceName = state.syncStore.deviceName
                 try ReportExporter.write(
                     to: destination,
                     format: format,
                     activityDays: activityDays,
                     timeEntries: entries,
                     projectStore: state.projectStore,
-                    options: ReportOptions()
+                    options: options
                 )
                 return destination.path
             } catch {
