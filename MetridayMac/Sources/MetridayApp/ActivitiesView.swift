@@ -5488,6 +5488,39 @@ private struct ActivityTimelinePanel: View {
     @State private var hoveredCalendarEventID: String?
     @State private var hoveredSuggestionID: String?
 
+    private var timelineGaps: [(start: Int, end: Int)] {
+        let ranges = segments.compactMap { segment -> (start: Int, end: Int)? in
+            guard let range = timelineWindow.clippedRange(
+                startSecond: segment.startSecond,
+                endSecond: segment.endSecond
+            ) else { return nil }
+            return range
+        }
+        .sorted { left, right in
+            left.start == right.start ? left.end < right.end : left.start < right.start
+        }
+        var merged: [(start: Int, end: Int)] = []
+        for range in ranges {
+            if let last = merged.last, range.start <= last.end {
+                merged[merged.count - 1].end = max(last.end, range.end)
+            } else {
+                merged.append(range)
+            }
+        }
+        var gaps: [(start: Int, end: Int)] = []
+        var cursor = timelineWindow.startMinute
+        for range in merged {
+            if range.start - cursor >= 15 {
+                gaps.append((start: cursor, end: range.start))
+            }
+            cursor = max(cursor, range.end)
+        }
+        if timelineWindow.endMinute - cursor >= 15 {
+            gaps.append((start: cursor, end: timelineWindow.endMinute))
+        }
+        return gaps
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -5560,6 +5593,30 @@ private struct ActivityTimelinePanel: View {
                             .allowsHitTesting(false)
                             .accessibilityHidden(true)
                         }
+                    }
+
+                    ForEach(Array(timelineGaps.enumerated()), id: \.offset) { _, gap in
+                        Button {
+                            onCreateTimeEntry(gap.start, gap.end)
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 11, weight: .bold))
+                                .frame(width: 28, height: 22)
+                                .background(MetridayTheme.canvas)
+                                .foregroundStyle(MetridayTheme.secondary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .stroke(MetridayTheme.line, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .position(
+                            x: timelineWindow.x(for: (gap.start + gap.end) / 2, width: proxy.size.width),
+                            y: 53
+                        )
+                        .accessibilityLabel("Create time entry for \(TimeFormat.range(start: gap.start, end: gap.end))")
+                        .accessibilityIdentifier("activities.timeline.gap.\(gap.start)-\(gap.end)")
+                        .help("Create time entry · \(TimeFormat.range(start: gap.start, end: gap.end))")
                     }
 
                     ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
@@ -5819,6 +5876,27 @@ private struct ActivityTimelinePanel: View {
             let chartWidth = max(1, proxy.size.width - labelWidth - 16)
             VStack(alignment: .leading, spacing: 5) {
                 verticalLane(label: "MACOS", chartWidth: chartWidth) {
+                    ForEach(Array(timelineGaps.enumerated()), id: \.offset) { _, gap in
+                        Button {
+                            onCreateTimeEntry(gap.start, gap.end)
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 9, weight: .bold))
+                                .frame(width: 28, height: 18)
+                                .background(MetridayTheme.canvas)
+                                .foregroundStyle(MetridayTheme.secondary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .stroke(MetridayTheme.line, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .offset(x: timelineWindow.x(for: (gap.start + gap.end) / 2, width: chartWidth) - 14)
+                        .accessibilityLabel("Create time entry for \(TimeFormat.range(start: gap.start, end: gap.end))")
+                        .accessibilityIdentifier("activities.vertical-timeline.gap.\(gap.start)-\(gap.end)")
+                        .help("Create time entry · \(TimeFormat.range(start: gap.start, end: gap.end))")
+                    }
+
                     ForEach(segments) { segment in
                         if let range = timelineWindow.clippedRange(startSecond: segment.startSecond, endSecond: segment.endSecond) {
                         let left = timelineWindow.x(for: range.start, width: chartWidth)
