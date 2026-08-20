@@ -1306,6 +1306,38 @@ final class AppState: ObservableObject {
             ])
         }
 
+        if request.method == "POST", path == "/v1/activities/restore" {
+            guard let body = apiBody(request), let rawActivities = body["activities"] as? [[String: Any]] else {
+                return .error("Activity restore body is invalid", statusCode: 400)
+            }
+            var records: [(segment: ActivitySegment, date: Date, source: String?)] = []
+            for rawActivity in rawActivities {
+                let source = rawActivity["source"] as? String
+                let date = apiDate(from: rawActivity["date"] as? String) ?? selectedDate
+                let encodedActivity = rawActivity["activity"] as? [String: Any] ?? rawActivity
+                guard let data = try? JSONSerialization.data(withJSONObject: encodedActivity),
+                      let segment = try? JSONDecoder().decode(ActivitySegment.self, from: data) else {
+                    continue
+                }
+                records.append((segment: segment, date: date, source: source))
+            }
+            guard !records.isEmpty else {
+                return .error("No restorable activities were provided", statusCode: 400)
+            }
+            let grouped = Dictionary(grouping: records, by: { apiDayKey($0.date) })
+            for group in grouped.values {
+                guard let date = group.first?.date else { continue }
+                let screenTimeSegments = group.filter { $0.source == "screenTime" }.map { $0.segment }
+                let appSegments = group.filter { $0.source != "screenTime" }.map { $0.segment }
+                if !appSegments.isEmpty { activityMonitor.restoreActivities(appSegments, date: date) }
+                if !screenTimeSegments.isEmpty { screenTimeStore.restoreActivities(screenTimeSegments, date: date) }
+            }
+            return .jsonObject([
+                "restored": records.map { $0.segment.id.uuidString },
+                "dates": grouped.keys.sorted()
+            ])
+        }
+
         if request.method == "GET", path == "/v1/activities" {
             let date = apiDate(from: request.query["date"]) ?? selectedDate
             do {
@@ -2340,6 +2372,7 @@ final class AppState: ObservableObject {
             "categoryName": category.name,
             "categoryRole": category.role.rawValue,
             "categoryColor": category.color.rawValue,
+            "source": screenTimeStore.segments(for: date).contains(where: { $0.id == segment.id }) ? "screenTime" : "app",
             "projectID": segment.projectID.map { $0.uuidString } ?? NSNull()
         ]
     }
