@@ -329,6 +329,9 @@ final class AppState: ObservableObject {
             if let value = body["review_reminder_interval_minutes"] as? Int {
                 preferences.reviewReminderIntervalMinutes = min(max(value, 0), 24 * 60)
             }
+            if let value = body["call_notifications_enabled"] as? Bool {
+                preferences.callNotificationsEnabled = value
+            }
             if let value = body["include_subprojects_when_selecting_project"] as? Bool {
                 preferences.includeSubprojectsWhenSelectingProject = value
             }
@@ -2512,6 +2515,7 @@ final class AppState: ObservableObject {
             "start_tracking_when_app_opens": preferences.startTrackingWhenAppOpens,
             "auto_stop_timer_on_sleep": preferences.autoStopTimerOnSleep,
             "review_reminder_interval_minutes": preferences.reviewReminderIntervalMinutes,
+            "call_notifications_enabled": preferences.callNotificationsEnabled,
             "review_reminder_notifications_authorized": reviewReminderService.notificationsAuthorized,
             "review_reminder_notification_status": reviewReminderService.notificationStatus,
             "include_subprojects_when_selecting_project": preferences.includeSubprojectsWhenSelectingProject,

@@ -19,6 +19,7 @@ final class ReviewReminderService: ObservableObject {
     private let notificationCenter = UNUserNotificationCenter.current()
     private var timer: Timer?
     private var nextReminderAt: Date?
+    private var lastNotifiedCallID: UUID?
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -43,6 +44,12 @@ final class ReviewReminderService: ObservableObject {
             .removeDuplicates()
             .sink { [weak self] _ in
                 self?.resetSchedule()
+            }
+            .store(in: &cancellables)
+
+        monitor.$pendingCallInterval
+            .sink { [weak self] interval in
+                self?.handleCallInterval(interval)
             }
             .store(in: &cancellables)
     }
@@ -120,6 +127,29 @@ final class ReviewReminderService: ObservableObject {
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(
             identifier: "co.metriday.review-reminder",
+            content: content,
+            trigger: trigger
+        )
+        notificationCenter.add(request)
+    }
+
+    private func handleCallInterval(_ interval: CallInterval?) {
+        guard let interval,
+              preferences.callNotificationsEnabled,
+              interval.durationSeconds >= 60,
+              lastNotifiedCallID != interval.id,
+              notificationsAuthorized else { return }
+        lastNotifiedCallID = interval.id
+
+        let content = UNMutableNotificationContent()
+        content.title = "Record call time?"
+        let title = interval.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        content.body = "\(title.isEmpty ? interval.appName : title) · \(durationLabel(interval.durationSeconds))"
+        content.sound = .default
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "co.metriday.call-\(interval.id.uuidString)",
             content: content,
             trigger: trigger
         )

@@ -728,6 +728,7 @@ Task { @MainActor in
     preferences.workingHoursStartMinute = 22 * 60
     preferences.workingHoursEndMinute = 6 * 60
     preferences.reviewReminderIntervalMinutes = 30
+    preferences.callNotificationsEnabled = false
     preferences.includeSubprojectsWhenSelectingProject = false
     let overnightWorkTime = calendar.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 23))!
     let overnightBreakTime = calendar.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 12))!
@@ -738,6 +739,7 @@ Task { @MainActor in
     expect(reloadedPreferences.automaticallyZoomTimelineToWorkingHours, "Timeline zoom preference should round-trip through local JSON")
     expect(reloadedPreferences.autoStopTimerOnSleep, "Preferences should default to stopping timers on sleep")
     expect(reloadedPreferences.reviewReminderIntervalMinutes == 30, "Review reminder frequency should round-trip through local JSON")
+    expect(!reloadedPreferences.callNotificationsEnabled, "Call notification preference should round-trip through local JSON")
     expect(!reloadedPreferences.includeSubprojectsWhenSelectingProject, "Project selection preference should round-trip through local JSON")
     expect(reloadedPreferences.wrapDaysAtMinute == 5 * 60, "Wrap-days preference should round-trip through local JSON")
 

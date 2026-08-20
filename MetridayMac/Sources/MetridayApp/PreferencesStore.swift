@@ -33,6 +33,9 @@ final class PreferencesStore: ObservableObject {
     @Published var reviewReminderIntervalMinutes: Int {
         didSet { persist() }
     }
+    @Published var callNotificationsEnabled: Bool {
+        didSet { persist() }
+    }
     @Published var includeSubprojectsWhenSelectingProject: Bool {
         didSet { persist() }
     }
@@ -58,6 +61,7 @@ final class PreferencesStore: ObservableObject {
             self.startTrackingWhenAppOpens = payload.startTrackingWhenAppOpens
             self.autoStopTimerOnSleep = payload.autoStopTimerOnSleep
             self.reviewReminderIntervalMinutes = payload.reviewReminderIntervalMinutes
+            self.callNotificationsEnabled = payload.callNotificationsEnabled
             self.includeSubprojectsWhenSelectingProject = payload.includeSubprojectsWhenSelectingProject
             self.allowLocalNetworkAPI = payload.allowLocalNetworkAPI
         } else {
@@ -71,6 +75,7 @@ final class PreferencesStore: ObservableObject {
             self.startTrackingWhenAppOpens = true
             self.autoStopTimerOnSleep = true
             self.reviewReminderIntervalMinutes = 0
+            self.callNotificationsEnabled = true
             self.includeSubprojectsWhenSelectingProject = true
             self.allowLocalNetworkAPI = false
             persist()
@@ -115,6 +120,7 @@ final class PreferencesStore: ObservableObject {
                 startTrackingWhenAppOpens: startTrackingWhenAppOpens,
                 autoStopTimerOnSleep: autoStopTimerOnSleep,
                 reviewReminderIntervalMinutes: reviewReminderIntervalMinutes,
+                callNotificationsEnabled: callNotificationsEnabled,
                 includeSubprojectsWhenSelectingProject: includeSubprojectsWhenSelectingProject,
                 allowLocalNetworkAPI: allowLocalNetworkAPI
             )
@@ -145,6 +151,7 @@ final class PreferencesStore: ObservableObject {
         let startTrackingWhenAppOpens: Bool
         let autoStopTimerOnSleep: Bool
         let reviewReminderIntervalMinutes: Int
+        let callNotificationsEnabled: Bool
         let includeSubprojectsWhenSelectingProject: Bool
         let allowLocalNetworkAPI: Bool
 
@@ -159,6 +166,7 @@ final class PreferencesStore: ObservableObject {
             startTrackingWhenAppOpens: Bool,
             autoStopTimerOnSleep: Bool,
             reviewReminderIntervalMinutes: Int,
+            callNotificationsEnabled: Bool,
             includeSubprojectsWhenSelectingProject: Bool,
             allowLocalNetworkAPI: Bool
         ) {
@@ -172,6 +180,7 @@ final class PreferencesStore: ObservableObject {
             self.startTrackingWhenAppOpens = startTrackingWhenAppOpens
             self.autoStopTimerOnSleep = autoStopTimerOnSleep
             self.reviewReminderIntervalMinutes = reviewReminderIntervalMinutes
+            self.callNotificationsEnabled = callNotificationsEnabled
             self.includeSubprojectsWhenSelectingProject = includeSubprojectsWhenSelectingProject
             self.allowLocalNetworkAPI = allowLocalNetworkAPI
         }
@@ -188,6 +197,7 @@ final class PreferencesStore: ObservableObject {
             startTrackingWhenAppOpens = try container.decode(Bool.self, forKey: .startTrackingWhenAppOpens)
             autoStopTimerOnSleep = try container.decodeIfPresent(Bool.self, forKey: .autoStopTimerOnSleep) ?? true
             reviewReminderIntervalMinutes = max(0, min(24 * 60, try container.decodeIfPresent(Int.self, forKey: .reviewReminderIntervalMinutes) ?? 0))
+            callNotificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .callNotificationsEnabled) ?? true
             includeSubprojectsWhenSelectingProject = try container.decodeIfPresent(Bool.self, forKey: .includeSubprojectsWhenSelectingProject) ?? true
             allowLocalNetworkAPI = try container.decodeIfPresent(Bool.self, forKey: .allowLocalNetworkAPI) ?? false
         }

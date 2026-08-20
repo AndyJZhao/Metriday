@@ -576,6 +576,17 @@ struct SettingsSheet: View {
             Label("Phone Calls filters", systemImage: "phone.arrow.down.left")
                 .font(.system(size: 15, weight: .bold))
 
+            Toggle("Notify when a video or audio call ends", isOn: $preferences.callNotificationsEnabled)
+                .toggleStyle(.checkbox)
+                .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+
+            Text("After a tracked call lasts at least one minute, show a local notification and open the call time-entry prompt when Metriday is active.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .lineSpacing(2)
+
             if phoneCallStore.hiddenAddresses.isEmpty {
                 Text("Calls are shown by default. Hide a number from the Phone Calls timeline menu; hidden calls stay out of the timeline but remain in macOS CallHistory.")
                     .font(.system(size: 10))
