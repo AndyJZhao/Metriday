@@ -2823,6 +2823,9 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
       <span className="activity-row-project activity-row-action" onClick={(event) => event.stopPropagation()}><select value={resourceID(activity.projectID)} onChange={assignProject} aria-label={`Project for ${app}`}><option value="">Unassigned</option>{projects.map((project) => <option key={project.id} value={resourceID(project.id)}>{project.title || project.name}</option>)}</select>{activity.projectID ? <button type="button" className="activity-row-rule activity-row-action" onClick={createRule} aria-label={`Create project rule from ${app}`} title="Create a rule from this activity"><Sparkle size={14} /></button> : null}</span>
     </div>;
   };
+  if (viewMode === "category") {
+    return <WebActivityCategoryCards activities={rows} dateKey={dateKey} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} />;
+  }
   const grouping = viewMode === "category" ? "category" : groupMode !== "none" ? groupMode : viewMode === "unified" ? "application" : "none";
   if (grouping === "none") {
     return <div className="activity-table">
@@ -2896,6 +2899,84 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
   return <div className="activity-table">
     {grouped.map(renderFlatGroup)}
     {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} /> : null}
+  </div>;
+}
+
+function WebActivityCategoryCards({ activities, dateKey, onSelect, onCreateTimeEntry }) {
+  const durationFor = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
+  const websiteName = (activity) => {
+    try {
+      return new URL(activity.resource || "").host || "";
+    } catch {
+      return "";
+    }
+  };
+  const pathName = (activity) => {
+    if (!activity.resource || websiteName(activity)) return "";
+    return String(activity.resource).replace(/^file:\/\//, "") || "";
+  };
+  const keywordNames = (activity) => {
+    const stopWords = new Set(["the", "and", "for", "with", "from", "http", "https", "www", "com"]);
+    return [...new Set(`${activity.windowTitle || ""} ${activity.resource || ""}`
+      .split(/[^\p{L}\p{N}_-]+/u)
+      .map((value) => value.toLowerCase())
+      .filter((value) => value.length >= 3 && !stopWords.has(value)))];
+  };
+  const groupedRows = (segments, namesFor) => {
+    const groups = new Map();
+    segments.forEach((activity) => {
+      namesFor(activity).filter(Boolean).forEach((name) => {
+        const category = activityCategory(activity);
+        const row = groups.get(name) || { name, activities: [], seconds: 0, categories: new Map() };
+        row.activities.push(activity);
+        row.seconds += durationFor(activity);
+        const categoryKey = `${category.key}:${category.label}:${category.color}`;
+        const categoryBucket = row.categories.get(categoryKey) || { category, seconds: 0 };
+        categoryBucket.seconds += durationFor(activity);
+        row.categories.set(categoryKey, categoryBucket);
+        groups.set(name, row);
+      });
+    });
+    return [...groups.values()].map((row) => {
+      const category = [...row.categories.values()].sort((left, right) => right.seconds - left.seconds)[0]?.category || { key: "other", label: "Other", color: "graphite" };
+      return { ...row, category };
+    }).sort((left, right) => right.seconds - left.seconds || left.name.localeCompare(right.name));
+  };
+  const cards = [
+    { key: "websites", title: "Websites", Icon: GlobeSimple, segments: activities.filter((activity) => Boolean(websiteName(activity))), rows: groupedRows(activities, (activity) => [websiteName(activity)]) },
+    { key: "applications", title: "Applications", Icon: Laptop, segments: activities.filter((activity) => Boolean(activity.appName || activity.deviceName)), rows: groupedRows(activities, (activity) => [activity.appName || activity.deviceName || "Unknown App"]) },
+    { key: "paths", title: "Paths", Icon: FolderSimple, segments: activities.filter((activity) => Boolean(pathName(activity))), rows: groupedRows(activities, (activity) => [pathName(activity)]) },
+    { key: "keywords", title: "Keywords", Icon: FileText, segments: activities.filter((activity) => keywordNames(activity).length > 0), rows: groupedRows(activities, keywordNames) },
+  ];
+  const openDetails = (event, activity) => {
+    if (event.target.closest("button")) return;
+    onSelect?.(activity);
+  };
+  const createTimeEntry = (event, activity) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onCreateTimeEntry?.(activity);
+  };
+  const handleKeyDown = (event, activity) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect?.(activity);
+    }
+  };
+  const dragStart = (event, row) => {
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData("application/x-metriday-activity", row.activities.map((activity) => resourceID(activity.id)).join("\n"));
+    event.dataTransfer.setData("text/plain", row.activities.map((activity) => resourceID(activity.id)).join("\n"));
+    event.dataTransfer.setData("application/x-metriday-activity-date", row.activities[0]?.date || dateKey);
+  };
+  return <div className="activity-category-card-grid">
+    {cards.map(({ key, title, Icon, segments, rows }) => <section className="activity-category-card" key={key} aria-label={title}>
+      <header className="activity-category-card-heading"><span><Icon size={17} /><strong>{title}</strong></span><small>{formatDurationSeconds(segments.reduce((total, activity) => total + durationFor(activity), 0))}</small></header>
+      {rows.length ? <div className="activity-category-card-rows">{rows.slice(0, 6).map((row) => <div className="activity-category-card-row" key={row.name} role="button" tabIndex={0} draggable onDragStart={(event) => dragStart(event, row)} onClick={(event) => openDetails(event, row.activities[0])} onDoubleClick={(event) => createTimeEntry(event, row.activities[0])} onKeyDown={(event) => handleKeyDown(event, row.activities[0])} aria-label={`Open ${row.name} in ${title}`} title="Click for details · double-click to create a time entry · drag to a project">
+        <span className={`activity-category-card-dot ${row.category.key}`} style={{ background: activityCategoryStyle(row.category).color }} title={row.category.label} aria-label={row.category.label} />
+        <strong>{row.name}</strong><span>{formatDurationSeconds(row.seconds)}</span>
+      </div>)}</div> : <p className="activity-category-card-empty">No matching activity</p>}
+    </section>)}
   </div>;
 }
 
