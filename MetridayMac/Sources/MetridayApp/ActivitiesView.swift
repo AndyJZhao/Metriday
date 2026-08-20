@@ -283,6 +283,7 @@ struct ActivitiesView: View {
             ActivityFilterEditorSheet(filter: editingFilter) { definition in
                 filterStore.save(definition)
                 filter = .saved(definition.id)
+                appState.activityScope = .all
                 editingFilter = nil
                 showingFilterEditor = false
             }
@@ -324,6 +325,7 @@ struct ActivitiesView: View {
         }
         .onAppear {
             restoreDisplayPreferences()
+            restoreActivityScope()
         }
         .onChange(of: activityMode) { _, newMode in
             guard displayPreferencesRestored else { return }
@@ -362,6 +364,34 @@ struct ActivitiesView: View {
             ? preferences.selectedDevice
             : ActivityDeviceFilter.all
         displayPreferencesRestored = true
+    }
+
+    private func restoreActivityScope() {
+        switch appState.activityScope {
+        case .all:
+            filter = .all
+        case .unassigned:
+            filter = .unassigned
+        case .project(let id):
+            filter = projectStore.project(id) == nil ? .all : .project(id)
+            if case .all = filter, appState.activityScope != .all {
+                appState.activityScope = .all
+            }
+        }
+    }
+
+    private func selectActivityFilter(_ target: ActivityFilter) {
+        filter = target
+        switch target {
+        case .all:
+            appState.activityScope = .all
+        case .unassigned:
+            appState.activityScope = .unassigned
+        case .project(let id):
+            appState.activityScope = .project(id)
+        case .saved:
+            appState.activityScope = .all
+        }
     }
 
     private var activitiesToolbar: some View {
@@ -1710,7 +1740,7 @@ struct ActivitiesView: View {
         onDoubleTap: (() -> Void)? = nil
     ) -> some View {
         let button = Button {
-            filter = target
+            selectActivityFilter(target)
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon)
@@ -1748,7 +1778,7 @@ struct ActivitiesView: View {
                             case .first:
                                 onDoubleTap()
                             case .second:
-                                filter = target
+                                selectActivityFilter(target)
                             }
                         }
                 )
@@ -1850,7 +1880,7 @@ struct ActivitiesView: View {
             }
 
             Button {
-                filter = target
+                selectActivityFilter(target)
             } label: {
                 HStack(spacing: 10) {
                     Circle()
@@ -1887,7 +1917,7 @@ struct ActivitiesView: View {
                     case .first:
                         editingProject = project
                     case .second:
-                        filter = target
+                        selectActivityFilter(target)
                     }
                 }
         )

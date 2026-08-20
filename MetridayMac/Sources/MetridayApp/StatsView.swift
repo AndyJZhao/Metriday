@@ -12,7 +12,10 @@ struct StatsView: View {
     let selectedDate: Date
 
     @State private var projectUnit: StatsProjectUnit = .hour
-    @State private var projectScope: StatsProjectScope = .all
+
+    private var projectScope: StatsProjectScope {
+        StatsProjectScope(appState.activityScope)
+    }
 
     private var calendar: Calendar {
         var calendar = Calendar.current
@@ -207,7 +210,7 @@ struct StatsView: View {
         symbol: String
     ) -> some View {
         Button {
-            projectScope = scope
+            appState.activityScope = scope.activityScope
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: symbol)
@@ -887,6 +890,22 @@ private enum StatsProjectScope: Hashable {
     case all
     case unassigned
     case project(UUID)
+
+    init(_ scope: ActivityProjectScope) {
+        switch scope {
+        case .all: self = .all
+        case .unassigned: self = .unassigned
+        case .project(let id): self = .project(id)
+        }
+    }
+
+    var activityScope: ActivityProjectScope {
+        switch self {
+        case .all: return .all
+        case .unassigned: return .unassigned
+        case .project(let id): return .project(id)
+        }
+    }
 
     var identifier: String {
         switch self {

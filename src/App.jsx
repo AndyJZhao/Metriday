@@ -3358,11 +3358,11 @@ function WebTimeEntryEditDialog({ entry, api, projects, dateKey, onClose }) {
   return <div className="entry-omatic-backdrop" role="presentation" onClick={onClose}><section className="entry-omatic-dialog time-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-time-entry-dialog-title" onClick={(event) => event.stopPropagation()}><header><div><span>Manual time</span><h2 id="edit-time-entry-dialog-title">Edit Time Entry</h2><p>Update the title, range, project, or billing category for this entry.</p></div><IconButton label="Close edit time entry dialog" onClick={onClose}><X size={17} /></IconButton></header><TimeEntryEditRow entry={entry} api={api} dateKey={dateKey} projects={projects} onCancel={onClose} dialog /></section></div>;
 }
 
-function ActivitiesPage({ api, dateKey, setDateKey }) {
+function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectScopeID }) {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [deviceFilter, setDeviceFilter] = useState("all");
-  const [projectFilterID, setProjectFilterID] = useState("all");
+  const projectFilterID = projectScopeID;
   const [savedFilterID, setSavedFilterID] = useState("all");
   const [activityView, setActivityView] = useState("unified");
   const [includeIdle, setIncludeIdle] = useState(false);
@@ -3420,17 +3420,17 @@ function ActivitiesPage({ api, dateKey, setDateKey }) {
     setQuery("");
     setCategoryFilter("all");
     setDeviceFilter("all");
-    setProjectFilterID("all");
+    setProjectScopeID("all");
     setSavedFilterID("all");
   };
   const selectProjectFilter = (value) => {
-    setProjectFilterID(value);
+    setProjectScopeID(value);
     setSavedFilterID("all");
     setCategoryFilter("all");
   };
   const selectSavedFilter = (value) => {
     setSavedFilterID(value);
-    setProjectFilterID("all");
+    setProjectScopeID("all");
     setCategoryFilter("all");
   };
   const createProjectFromActivities = async (activityIDs, options = {}) => {
@@ -3636,9 +3636,8 @@ function StatsProjectScope({ projects, segments, entries, selectedID, onChange }
   return <aside className="stats-project-scope" aria-label="Stats projects"><div className="stats-project-scope-heading"><h2>Projects</h2><span>{formatDurationSeconds(totalSeconds)}</span></div><div className="stats-project-scope-list">{scopeButton("all", "All Activities", `${activeSegments.length} segments`, Waveform)}{scopeButton("unassigned", "Unassigned", formatDurationSeconds(projectSeconds.get("unassigned") || 0), TrayIcon)}{projectRows.length ? <div className="stats-project-scope-label">My Projects</div> : null}{projectRows.map((project) => scopeButton(project.id, project.name, formatDurationSeconds(project.seconds), FolderSimple))}</div><p className="stats-project-scope-hint">Select a project to scope every chart and total to the same activity evidence.</p></aside>;
 }
 
-function StatsPage({ api, dateKey, setDateKey, setPage }) {
+function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProjectScopeID }) {
   const [projectUnit, setProjectUnit] = useState("hour");
-  const [projectScopeID, setProjectScopeID] = useState("all");
   const days = (api.calendarWeekly.length >= 7 ? api.calendarWeekly : api.weekly).slice(-7);
   const secondsForActivity = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
   const productivityValue = (activity) => activityProductivityValue(activity, api.projects);
@@ -3856,10 +3855,11 @@ function RulesPageLive({ api }) {
 export function App() {
   const [page, setPage] = useState("today");
   const [dateKey, setDateKey] = useState(localDateKey());
+  const [activityScopeID, setActivityScopeID] = useState("all");
   const [tasks, setTasks] = useState(initialTasks);
   const [apiBase, setApiBase] = useState(apiBaseURL);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const api = useMetridayAPI(dateKey, apiBase);
-  const content = useMemo(() => page === "plan" ? <PlanPage tasks={tasks} setTasks={setTasks} api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "activities" ? <ActivitiesPage api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "stats" ? <StatsPage api={api} dateKey={dateKey} setDateKey={setDateKey} setPage={setPage} /> : page === "reports" ? <ReportsPage api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "teams" ? <TeamsPage api={api} /> : page === "review" ? <ReviewPage api={api} dateKey={dateKey} setDateKey={setDateKey} setPage={setPage} /> : page === "rules" ? <RulesPageLive api={api} /> : <TodayPage setPage={setPage} api={api} dateKey={dateKey} setDateKey={setDateKey} />, [api, page, tasks, dateKey, setPage]);
+  const content = useMemo(() => page === "plan" ? <PlanPage tasks={tasks} setTasks={setTasks} api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "activities" ? <ActivitiesPage api={api} dateKey={dateKey} setDateKey={setDateKey} projectScopeID={activityScopeID} setProjectScopeID={setActivityScopeID} /> : page === "stats" ? <StatsPage api={api} dateKey={dateKey} setDateKey={setDateKey} setPage={setPage} projectScopeID={activityScopeID} setProjectScopeID={setActivityScopeID} /> : page === "reports" ? <ReportsPage api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "teams" ? <TeamsPage api={api} /> : page === "review" ? <ReviewPage api={api} dateKey={dateKey} setDateKey={setDateKey} setPage={setPage} /> : page === "rules" ? <RulesPageLive api={api} /> : <TodayPage setPage={setPage} api={api} dateKey={dateKey} setDateKey={setDateKey} />, [api, page, tasks, dateKey, setPage, activityScopeID]);
   return <div className="app-shell"><Sidebar page={page} setPage={setPage} api={api} onOpenSettings={() => setSettingsOpen(true)} /><div className="app-main"><WebGlobalHeader api={api} setPage={setPage} dateKey={dateKey} setDateKey={setDateKey} />{content}</div><ConnectionSettings open={settingsOpen} api={api} apiBase={apiBase} connected={api.connected} onSave={setApiBase} onClose={() => setSettingsOpen(false)} /></div>;
 }

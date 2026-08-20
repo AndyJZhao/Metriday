@@ -6,6 +6,13 @@ import Foundation
 final class AppState: ObservableObject {
     @Published var section: AppSection = .today
     @Published private(set) var selectedDate: Date
+    @Published var activityScope: ActivityProjectScope = ActivityProjectScope(
+        persistedValue: UserDefaults.standard.string(forKey: "Metriday.activityScope")
+    ) {
+        didSet {
+            UserDefaults.standard.set(activityScope.persistedValue, forKey: "Metriday.activityScope")
+        }
+    }
     @Published var focusIsActive = false {
         didSet { blocker.isActive = focusIsActive }
     }

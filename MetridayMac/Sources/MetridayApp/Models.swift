@@ -26,6 +26,34 @@ enum AppSection: String, CaseIterable, Identifiable {
     }
 }
 
+/// The project scope selected in the activity browser is shared by the
+/// Activities and Stats surfaces, matching Timing's persistent project tree.
+enum ActivityProjectScope: Hashable {
+    case all
+    case unassigned
+    case project(UUID)
+
+    init(persistedValue: String?) {
+        guard let value = persistedValue else {
+            self = .all
+            return
+        }
+        switch value {
+        case "all": self = .all
+        case "unassigned": self = .unassigned
+        default: self = UUID(uuidString: value).map(Self.project) ?? .all
+        }
+    }
+
+    var persistedValue: String {
+        switch self {
+        case .all: return "all"
+        case .unassigned: return "unassigned"
+        case .project(let id): return id.uuidString
+        }
+    }
+}
+
 struct PlanTask: Identifiable, Hashable {
     let id: UUID
     var title: String
