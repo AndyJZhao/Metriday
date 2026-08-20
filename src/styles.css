@@ -373,6 +373,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-project-filter-list { display: grid; gap: 2px; padding: 0 7px; }
 .activity-project-tree-node { display: grid; gap: 2px; }
 .activity-project-tree-row { display: flex; align-items: center; min-width: 0; }
+.activity-project-tree-row.drop-target { border-radius: 7px; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .activity-project-tree-row .activity-project-filter { flex: 1; min-width: 0; }
 .activity-project-disclosure, .activity-project-disclosure-placeholder { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 28px; flex: 0 0 22px; border: 0; background: transparent; color: var(--muted); }
 .activity-project-disclosure { padding: 0; cursor: pointer; }

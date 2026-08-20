@@ -979,6 +979,47 @@ function activityContext(activity, options = {}) {
   return "";
 }
 
+function activityProjectRule(activity) {
+  try {
+    const host = new URL(activity?.resource || "").host;
+    if (host) return { field: "domain", comparison: "contains", pattern: host, case_sensitive: false };
+  } catch {
+    // Fall through to application metadata.
+  }
+  if (activity?.bundleIdentifier) return { field: "bundleIdentifier", comparison: "contains", pattern: activity.bundleIdentifier, case_sensitive: false };
+  if (activity?.windowTitle) return { field: "titleContains", comparison: "contains", pattern: activity.windowTitle, case_sensitive: false };
+  return null;
+}
+
+async function assignActivitiesFromDrop({ event, activities, project, api, onAssignActivity }) {
+  const rawIDs = event.dataTransfer.getData("application/x-metriday-activity") || event.dataTransfer.getData("text/plain");
+  const activityIDs = [...new Set(rawIDs.split(/\r?\n/).map((value) => resourceID(value.trim())).filter(Boolean))];
+  const sourceActivities = activityIDs
+    .map((id) => activities.find((activity) => resourceID(activity.id) === id))
+    .filter(Boolean);
+  const createRules = Boolean(event.altKey);
+  if (!sourceActivities.length) return { message: "Drop an App / Category activity row here." };
+  if (createRules) {
+    let createdRules = 0;
+    for (const activity of sourceActivities) {
+      const rule = activityProjectRule(activity);
+      if (!rule || !api?.createProjectRule) continue;
+      await api.createProjectRule({ ...rule, project_id: resourceID(project.id) });
+      createdRules += 1;
+    }
+    return {
+      message: createdRules > 0
+        ? `Created ${createdRules} future ${createdRules === 1 ? "rule" : "rules"} for ${project.title}.`
+        : "This activity has no ruleable app, website, or document metadata."
+    };
+  }
+  if (!onAssignActivity) return { message: "Activity assignment is unavailable." };
+  for (const activity of sourceActivities) {
+    await onAssignActivity(activity.id, project.id, activity.date || undefined);
+  }
+  return { message: `Assigned ${sourceActivities.length} ${sourceActivities.length === 1 ? "activity" : "activities"} to ${project.title}.` };
+}
+
 function activityDateRangeLabel(activity, wrapAtMinute = 0) {
   const wrapSeconds = Math.max(0, Math.min(1439, Number(wrapAtMinute || 0))) * 60;
   const wallClock = (axisSeconds) => {
@@ -2191,7 +2232,7 @@ function projectOptionRows(projects, excludedID = "") {
   return rows;
 }
 
-function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandled }) {
+function ProjectPanel({ api, activities = [], onAssignActivity, onDropActivity, editProjectID, onProjectEditHandled }) {
   const [title, setTitle] = useState("");
   const [rate, setRate] = useState("0");
   const [currency, setCurrency] = useState("USD");
@@ -2290,18 +2331,17 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
   const dropOnProject = async (event, project) => {
     event.preventDefault();
     setDropTarget(null);
-    const activityID = event.dataTransfer.getData("application/x-metriday-activity");
-    const activityDate = event.dataTransfer.getData("application/x-metriday-activity-date");
-    if (!activityID || !onAssignActivity) return;
     try {
-      await onAssignActivity(activityID, project.id, activityDate || undefined);
-      setMessage(`Activity assigned to ${project.title}.`);
+      const result = onDropActivity
+        ? await onDropActivity(event, project)
+        : await assignActivitiesFromDrop({ event, activities, project, api, onAssignActivity });
+      setMessage(result.message);
     } catch (error) {
       setMessage(error.message || "Could not assign the activity.");
     }
   };
   return <section id="web-projects-panel" className="projects-panel">
-    <div className="activities-list-heading"><div><h2>Projects & clients</h2><p>Drag an App / Category row here to assign its activity to a project.</p></div><div className="activities-list-heading-actions"><button type="button" className="quiet-pill" onClick={toggleArchivedProjects} disabled={!api.connected}>{showArchivedProjects ? "Hide archived" : "Show archived"}</button><span className="api-badge online">{showArchivedProjects ? `${displayedProjects.length} total` : `${projects.length} active`}</span></div></div>
+    <div className="activities-list-heading"><div><h2>Projects & clients</h2><p>Drag an App / Category row here to assign it; hold ⌥ while dropping to create a future rule.</p></div><div className="activities-list-heading-actions"><button type="button" className="quiet-pill" onClick={toggleArchivedProjects} disabled={!api.connected}>{showArchivedProjects ? "Hide archived" : "Show archived"}</button><span className="api-badge online">{showArchivedProjects ? `${displayedProjects.length} total` : `${projects.length} active`}</span></div></div>
     <form className="project-create-form" onSubmit={create}>
       <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Project or client name" aria-label="Project name" />
       <select value={parentID} onChange={(event) => setParentID(event.target.value)} aria-label="Project parent"><option value="">Top level</option>{parentOptions.map(({ project, depth }) => <option value={resourceID(project.id)} key={project.id}>{"— ".repeat(depth)}{project.title}</option>)}</select>
@@ -3279,15 +3319,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
       const api = activityAPI();
       const projectID = resourceID(activity.projectID);
       if (!api?.createProjectRule || !projectID) return;
-      let rule = null;
-      try {
-        const host = new URL(activity.resource || "").host;
-        if (host) rule = { field: "domain", comparison: "contains", pattern: host, case_sensitive: false };
-      } catch {
-        // Fall through to application metadata.
-      }
-      if (!rule && activity.bundleIdentifier) rule = { field: "bundleIdentifier", comparison: "contains", pattern: activity.bundleIdentifier, case_sensitive: false };
-      if (!rule && activity.windowTitle) rule = { field: "titleContains", comparison: "contains", pattern: activity.windowTitle, case_sensitive: false };
+      const rule = activityProjectRule(activity);
       if (rule) await api.createProjectRule({ ...rule, project_id: projectID });
     };
     const openDetails = (event) => {
@@ -3909,9 +3941,10 @@ function WebActivityFiltersMenu({ open, filters, projectFilterID, savedFilterID,
   return <div className="activity-toolbar-popover"><button type="button" className={`quiet-pill activity-toolbar-popover-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />{title}</button>{open ? <div className="activity-toolbar-popover-panel" role="dialog" aria-label="Activity filters"><strong>Filters</strong><button type="button" className={`activity-popover-option ${allSelected ? "active" : ""}`} onClick={selectAll}><span><Waveform size={15} /></span><strong>All activity</strong>{allSelected ? <Check size={14} weight="bold" /> : null}</button><button type="button" className={`activity-popover-option ${projectFilterID === "unassigned" ? "active" : ""}`} onClick={selectProject}><span><TrayIcon /></span><strong>Unassigned</strong>{projectFilterID === "unassigned" ? <Check size={14} weight="bold" /> : null}</button><div className="activity-popover-divider" /><span className="activity-popover-label">Built-in Filters</span>{activityBuiltinFilters.map((filter) => <button type="button" className={`activity-popover-option ${builtinKey === filter.key ? "active" : ""}`} key={filter.key} onClick={() => selectBuiltin(filter.key)}><span className="activity-popover-category-dot other" /><strong>{filter.label}</strong>{builtinKey === filter.key ? <Check size={14} weight="bold" /> : null}</button>)}<div className="activity-popover-divider" />{["focused", "distracting", "other", "idle"].map((value) => <button type="button" className={`activity-popover-option ${categoryFilter === value ? "active" : ""}`} key={value} onClick={() => selectCategory(value)}><span className={`activity-popover-category-dot ${value}`} /><strong>{value[0].toUpperCase() + value.slice(1)}</strong>{categoryFilter === value ? <Check size={14} weight="bold" /> : null}</button>)}{filters.length > 0 ? <><div className="activity-popover-divider" /><span className="activity-popover-label">Saved Filters</span>{filters.map((filter) => <button type="button" className={`activity-popover-option ${savedFilterID === resourceID(filter.id) ? "active" : ""}`} key={filter.id} onClick={() => { onProjectFilter("all"); onCategoryFilter("all"); onSavedFilter(resourceID(filter.id)); }}><span><Waveform size={15} /></span><strong>{filter.name}</strong>{savedFilterID === resourceID(filter.id) ? <Check size={14} weight="bold" /> : null}</button>)}</> : null}</div> : null}</div>;
 }
 
-function WebActivityProjectSidebar({ projects, filters, activities, projectFilterID, savedFilterID, onProjectFilter, onSavedFilter, onEditProject, onCreateProjectFromActivities }) {
+function WebActivityProjectSidebar({ projects, filters, activities, projectFilterID, savedFilterID, onProjectFilter, onSavedFilter, onEditProject, onCreateProjectFromActivities, onDropActivity }) {
   const [collapsedProjectIDs, setCollapsedProjectIDs] = useState(() => new Set());
   const [dropTarget, setDropTarget] = useState(false);
+  const [dropProjectID, setDropProjectID] = useState(null);
   const [dropMessage, setDropMessage] = useState("");
   const projectClickTimer = useRef(null);
   useEffect(() => () => { if (projectClickTimer.current) window.clearTimeout(projectClickTimer.current); }, []);
@@ -3970,14 +4003,25 @@ function WebActivityProjectSidebar({ projects, filters, activities, projectFilte
       setDropMessage(error.message || "Could not create a project from this activity.");
     }
   };
+  const handleProjectDrop = async (event, project) => {
+    event.preventDefault();
+    setDropProjectID(null);
+    if (!onDropActivity) return;
+    try {
+      const result = await onDropActivity(event, project);
+      setDropMessage(result?.message || "Activity updated.");
+    } catch (error) {
+      setDropMessage(error.message || "Could not update the project activity.");
+    }
+  };
   const projectTree = (parentID = "", depth = 0) => projects.filter((project) => projectParentID(project) === parentID).sort((left, right) => String(left.title || "").localeCompare(String(right.title || ""))).map((project) => {
     const id = resourceID(project.id);
     const children = projects.some((candidate) => projectParentID(candidate) === id);
     const collapsed = collapsedProjectIDs.has(id);
     const projectActivities = projectActivitiesFor(project);
-    return <div className="activity-project-tree-node" key={id}><div className="activity-project-tree-row">{children ? <button type="button" className="activity-project-disclosure" aria-label={`${collapsed ? "Expand" : "Collapse"} ${project.title}`} onClick={() => setCollapsedProjectIDs((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })}><CaretDown size={13} className={collapsed ? "collapsed" : ""} /></button> : <span className="activity-project-disclosure-placeholder" />}{sidebarButton(projectFilterID === id, () => selectProject(project), <FolderSimple size={16} />, project.title, `${projectActivities.length} · ${formatDurationSeconds(secondsFor(projectActivities))}`, { paddingLeft: `${7 + depth * 12}px` }, () => editProject(project))}</div>{children && !collapsed ? projectTree(id, depth + 1) : null}</div>;
+    return <div className="activity-project-tree-node" key={id}><div className={`activity-project-tree-row ${dropProjectID === id ? "drop-target" : ""}`} onDragOver={(event) => { event.preventDefault(); setDropProjectID(id); }} onDragLeave={() => setDropProjectID(null)} onDrop={(event) => handleProjectDrop(event, project)}>{children ? <button type="button" className="activity-project-disclosure" aria-label={`${collapsed ? "Expand" : "Collapse"} ${project.title}`} onClick={() => setCollapsedProjectIDs((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })}><CaretDown size={13} className={collapsed ? "collapsed" : ""} /></button> : <span className="activity-project-disclosure-placeholder" />}{sidebarButton(projectFilterID === id, () => selectProject(project), <FolderSimple size={16} />, project.title, `${projectActivities.length} · ${formatDurationSeconds(secondsFor(projectActivities))}`, { paddingLeft: `${7 + depth * 12}px` }, () => editProject(project))}</div>{children && !collapsed ? projectTree(id, depth + 1) : null}</div>;
   });
-  return <aside className="activity-project-sidebar" aria-label="Activity projects and filters"><div className="activity-project-sidebar-heading"><h2>Projects</h2><span>{formatDurationSeconds(secondsFor(activeActivities))}</span><button type="button" className="activity-project-new" aria-label="New project" title="New project" onClick={openProjectComposer}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(projectFilterID === "all" && savedFilterID === "all", () => onProjectFilter("all"), <Waveform size={16} />, "All Activities", `${activeActivities.length} segments`)}{sidebarButton(projectFilterID === "unassigned", () => onProjectFilter("unassigned"), <TrayIcon />, "Unassigned", `${activeActivities.filter((activity) => !activity.projectID).length} segments`)}{projects.length > 0 ? <div className="activity-project-sidebar-label">My Projects</div> : null}{projectTree()}<div className={`activity-project-drop-zone ${dropTarget ? "active" : ""}`} onClick={openProjectComposer} onKeyDown={handleProjectDropZoneKeyDown} onDragOver={(event) => { event.preventDefault(); setDropTarget(true); }} onDragLeave={() => setDropTarget(false)} onDrop={handleCreateProjectDrop} role="button" tabIndex={0} aria-label="Create project from activity"><FolderSimple size={17} /><span><strong>{dropTarget ? "Release to create project" : "Create from activity"}</strong><small>{dropMessage || "Click to create a project · drop an App / Category row · ⌘ splits · ⌥ adds rules"}</small></span></div></div><div className="activity-project-sidebar-divider" /><div className="activity-project-sidebar-heading"><h2>Filters</h2><span>{filters.length}</span><button type="button" className="activity-project-new" aria-label="New filter" title="New filter" onClick={() => { const panel = document.getElementById("web-activity-filters-panel"); panel?.scrollIntoView({ behavior: "smooth", block: "center" }); window.setTimeout(() => panel?.querySelector('input[aria-label="Activity filter name"]')?.focus(), 250); }}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(savedFilterID === "all" && projectFilterID === "all", () => onSavedFilter("all"), <SlidersHorizontal size={16} />, "All activity", "No saved filter")}{filters.map((filter) => sidebarButton(savedFilterID === resourceID(filter.id), () => onSavedFilter(resourceID(filter.id)), <Waveform size={16} />, filter.name, `${(filter.rules || []).length} rule${(filter.rules || []).length === 1 ? "" : "s"}`, {}, () => editSavedFilter(filter)))}</div><p className="activity-project-sidebar-hint">Drag an App / Category row to a project below to assign it.</p></aside>;
+  return <aside className="activity-project-sidebar" aria-label="Activity projects and filters"><div className="activity-project-sidebar-heading"><h2>Projects</h2><span>{formatDurationSeconds(secondsFor(activeActivities))}</span><button type="button" className="activity-project-new" aria-label="New project" title="New project" onClick={openProjectComposer}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(projectFilterID === "all" && savedFilterID === "all", () => onProjectFilter("all"), <Waveform size={16} />, "All Activities", `${activeActivities.length} segments`)}{sidebarButton(projectFilterID === "unassigned", () => onProjectFilter("unassigned"), <TrayIcon />, "Unassigned", `${activeActivities.filter((activity) => !activity.projectID).length} segments`)}{projects.length > 0 ? <div className="activity-project-sidebar-label">My Projects</div> : null}{projectTree()}<div className={`activity-project-drop-zone ${dropTarget ? "active" : ""}`} onClick={openProjectComposer} onKeyDown={handleProjectDropZoneKeyDown} onDragOver={(event) => { event.preventDefault(); setDropTarget(true); }} onDragLeave={() => setDropTarget(false)} onDrop={handleCreateProjectDrop} role="button" tabIndex={0} aria-label="Create project from activity"><FolderSimple size={17} /><span><strong>{dropTarget ? "Release to create project" : "Create from activity"}</strong><small>{dropMessage || "Click to create a project · drop an App / Category row · ⌘ splits · ⌥ adds rules"}</small></span></div></div><div className="activity-project-sidebar-divider" /><div className="activity-project-sidebar-heading"><h2>Filters</h2><span>{filters.length}</span><button type="button" className="activity-project-new" aria-label="New filter" title="New filter" onClick={() => { const panel = document.getElementById("web-activity-filters-panel"); panel?.scrollIntoView({ behavior: "smooth", block: "center" }); window.setTimeout(() => panel?.querySelector('input[aria-label="Activity filter name"]')?.focus(), 250); }}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(savedFilterID === "all" && projectFilterID === "all", () => onSavedFilter("all"), <SlidersHorizontal size={16} />, "All activity", "No saved filter")}{filters.map((filter) => sidebarButton(savedFilterID === resourceID(filter.id), () => onSavedFilter(resourceID(filter.id)), <Waveform size={16} />, filter.name, `${(filter.rules || []).length} rule${(filter.rules || []).length === 1 ? "" : "s"}`, {}, () => editSavedFilter(filter)))}</div><p className="activity-project-sidebar-hint">Drag an App / Category row onto a project; hold ⌥ to create a future rule.</p></aside>;
 }
 
 function TrayIcon() {
@@ -4240,6 +4284,13 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     setSavedFilterID("all");
     setTimelineSelection(null);
   };
+  const handleActivityProjectDrop = (event, project) => assignActivitiesFromDrop({
+    event,
+    activities: allActivities,
+    project,
+    api,
+    onAssignActivity: (id, projectID, activityDate) => api.assignActivity(id, projectID, activityDate || dateKey),
+  });
   const selectProjectFilter = (value) => {
     setProjectScopeID(value);
     setSavedFilterID("all");
@@ -4268,17 +4319,6 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
       }
       return activity.appName || activity.deviceName || "New Project";
     };
-    const ruleFor = (activity) => {
-      try {
-        const host = new URL(activity.resource || "").host;
-        if (host) return { field: "domain", comparison: "contains", pattern: host, case_sensitive: false };
-      } catch {
-        // Fall through to bundle or window metadata.
-      }
-      if (activity.bundleIdentifier) return { field: "bundleIdentifier", comparison: "contains", pattern: activity.bundleIdentifier, case_sensitive: false };
-      if (activity.windowTitle) return { field: "titleContains", comparison: "contains", pattern: activity.windowTitle, case_sensitive: false };
-      return null;
-    };
     const createOne = async (items) => {
       const project = await api.createProject({ title: nameFor(items[0]), parent: parentID });
       const projectID = resourceID(project?.id || project?.project_id);
@@ -4286,7 +4326,7 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
       for (const activity of items) {
         await api.assignActivity(activity.id, projectID, activity.date || dateKey);
         if (options.createActivityRules) {
-          const rule = ruleFor(activity);
+          const rule = activityProjectRule(activity);
           if (rule) await api.createProjectRule({ ...rule, project_id: projectID });
         }
       }
@@ -4466,7 +4506,7 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   const activityRangeDescription = activityRangeLoading
     ? `Loading ${activityTimeRangeLabel(activityTimeRange).toLowerCase()}…`
     : `${activityTimeRangeLabel(activityTimeRange)} history`;
-  return <main className="page supporting-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Activities date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button type="button" className="quiet-pill" onClick={() => openNewTimeEntry()} disabled={!api.connected}><Plus size={16} />New time entry</button><button type="button" className={`status-pill activities-timer ${timerRunning ? "active" : ""}`} onClick={toggleTimer} disabled={timerBusy || !api.connected}><Timer size={16} weight={timerRunning ? "fill" : "regular"} />{timerBusy ? "Updating…" : timerRunning ? "Stop timer" : "Start timer"}</button><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="activities-page-toolbar"><div className="activity-view-switcher" role="group" aria-label="Activity view"><button type="button" className={activityView === "unified" ? "active" : ""} onClick={() => setViewMode("unified")}>Unified</button><button type="button" className={activityView === "category" ? "active" : ""} onClick={() => setViewMode("category")}>By Category</button><button type="button" className={activityView === "chronological" ? "active" : ""} onClick={() => setViewMode("chronological")}>Chronological</button></div><label className="activity-display-toggle"><input type="checkbox" checked={includeIdle} onChange={(event) => setIdleVisibility(event.target.checked)} />Show Idle</label><label className="activity-display-toggle"><input type="checkbox" checked={groupByProject} disabled={activityView === "category"} onChange={(event) => setGrouping("project", event.target.checked)} />Group by project</label><label className="activity-display-toggle"><input type="checkbox" checked={groupByDevice} disabled={activityView === "category"} onChange={(event) => setGrouping("device", event.target.checked)} />Group by device</label><WebActivityDisplayMenu open={displayMenuOpen} onToggle={() => setDisplayMenuOpen((value) => !value)} preferences={api.activityPreferences} devices={devices} onChange={updateDisplayPreference} /><label className="activity-search"><Waveform size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search app, website, window title…" aria-label="Search activities" />{query ? <IconButton label="Clear activity search" onClick={() => setQuery("")}><X size={15} /></IconButton> : null}</label><WebActivityFiltersMenu open={filtersMenuOpen} filters={api.filters} projectFilterID={projectFilterID} savedFilterID={savedFilterID} categoryFilter={categoryFilter} onToggle={() => { setFiltersMenuOpen((value) => !value); setDevicesMenuOpen(false); }} onProjectFilter={(value) => { selectProjectFilter(value); setFiltersMenuOpen(false); }} onSavedFilter={(value) => { selectSavedFilter(value); setFiltersMenuOpen(false); }} onCategoryFilter={(value) => { setCategoryFilter(value); setFiltersMenuOpen(false); }} /><WebActivityDevicesMenu open={devicesMenuOpen} devices={devices} selectedDevice={deviceFilter} hideDevicesWithoutTime={hideDevicesWithoutTime} onToggle={() => { setDevicesMenuOpen((value) => !value); setFiltersMenuOpen(false); }} onSelect={setDeviceSelection} onToggleHide={setHideDevicesWithoutTime} /><button type="button" className="quiet-pill activity-reset" onClick={resetFilters} disabled={!hasFilters}>Reset</button></div>{timerMessage ? <p className="entry-message activities-timer-message" role="status">{timerMessage}</p> : null}{displayMessage ? <p className="entry-message activities-display-message" role="status">{displayMessage}</p> : null}<div className="activities-workspace"><WebActivityProjectSidebar projects={api.projects} filters={api.filters} activities={allActivities} projectFilterID={projectFilterID} savedFilterID={savedFilterID} onProjectFilter={selectProjectFilter} onSavedFilter={selectSavedFilter} onEditProject={setEditProjectID} onCreateProjectFromActivities={createProjectFromActivities} /><div className="activities-workspace-main"><WebActivityTimeline activities={timelineActivities} dateKey={dateKey} api={api} onSelect={setSelectedActivity} onCreateTimeEntry={openActivityTimeEntry} onCreateSelection={openSelectedRangeTimeEntry} selection={timelineSelection} onSelectionChange={setTimelineSelection} onEditTimeEntry={setSelectedTimeEntry} onRecordCalendarEvent={openSourceTimeEntry} /><WebCalendarEventsPanel api={api} onRecord={openSourceTimeEntry} /><WebRemindersPanel api={api} onRecord={openSourceTimeEntry} /><WebPhoneCallsPanel api={api} onRecord={openSourceTimeEntry} /><WebScreenTimePanel api={api} /><WebActivityFiltersPanel api={api} /><WebActivityExclusionsPanel api={api} /><WebActivityCategoriesPanel api={api} /><section className="activities-list"><div className="activities-list-heading"><div><h2>{activityHeading}</h2><p>{api.connected ? hasFilters ? `${activities.length} of ${allActivities.length} locally recorded segments · ${activityRangeDescription}` : `${activities.length} locally recorded segments · ${activityRangeDescription}` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><div className="activities-list-heading-actions"><button type="button" className="quiet-pill" onClick={() => setEntryOMaticOpen(true)} disabled={!api.connected || timelineActivities.length === 0}><Sparkle size={16} />Create time entries</button><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? allActivities.length > 0 ? "No activity matches these filters" : "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || (hasFilters ? "Clear the filters to see all local activity." : "The hosted view keeps working with preview data until the loopback API is available.")}</span></div> : <ActivityTable activities={activities} viewMode={activityView} groupMode={activityView === "chronological" ? (groupByProject ? "project" : groupByDevice ? "device" : "none") : "none"} projects={api.projects} displayPreferences={api.activityPreferences} dateKey={dateKey} onSelect={setSelectedActivity} api={api} onCreateTimeEntry={openActivityTimeEntry} />}</section><ProjectPanel api={api} editProjectID={editProjectID} onProjectEditHandled={() => setEditProjectID(null)} onAssignActivity={(id, projectID, activityDate) => api.assignActivity(id, projectID, activityDate || dateKey)} />{api.activityPreferences?.include_time_entries === false ? <TimeEntriesPanel api={api} dateKey={dateKey} /> : null}</div></div>{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} displayPreferences={api.activityPreferences} onClose={() => setSelectedActivity(null)} /> : null}<WebEntryOMaticDialog open={entryOMaticOpen} activities={timelineActivities} entries={api.entries} projects={api.projects} dateKey={dateKey} onClose={() => setEntryOMaticOpen(false)} onCreate={createGeneratedEntries} /><WebTimeEntryDialog mode={timeEntryDialogMode} open={Boolean(timeEntryDialogMode)} api={api} projects={api.projects} recentEntries={api.entries} dateKey={dateKey} initialEntry={timeEntryPrefill} onClose={() => { setTimeEntryDialogMode(null); setTimeEntryPrefill(null); }} /><WebTimeEntryEditDialog entry={selectedTimeEntry} api={api} projects={api.projects} dateKey={dateKey} onClose={() => setSelectedTimeEntry(null)} /></main>;
+  return <main className="page supporting-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native activity stream · ${planDateLabel(dateKey)}` : "Local preview"}</span><h1>Activities</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Activities date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button type="button" className="quiet-pill" onClick={() => openNewTimeEntry()} disabled={!api.connected}><Plus size={16} />New time entry</button><button type="button" className={`status-pill activities-timer ${timerRunning ? "active" : ""}`} onClick={toggleTimer} disabled={timerBusy || !api.connected}><Timer size={16} weight={timerRunning ? "fill" : "regular"} />{timerBusy ? "Updating…" : timerRunning ? "Stop timer" : "Start timer"}</button><button className="quiet-pill" type="button" onClick={api.refresh}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="activities-page-toolbar"><div className="activity-view-switcher" role="group" aria-label="Activity view"><button type="button" className={activityView === "unified" ? "active" : ""} onClick={() => setViewMode("unified")}>Unified</button><button type="button" className={activityView === "category" ? "active" : ""} onClick={() => setViewMode("category")}>By Category</button><button type="button" className={activityView === "chronological" ? "active" : ""} onClick={() => setViewMode("chronological")}>Chronological</button></div><label className="activity-display-toggle"><input type="checkbox" checked={includeIdle} onChange={(event) => setIdleVisibility(event.target.checked)} />Show Idle</label><label className="activity-display-toggle"><input type="checkbox" checked={groupByProject} disabled={activityView === "category"} onChange={(event) => setGrouping("project", event.target.checked)} />Group by project</label><label className="activity-display-toggle"><input type="checkbox" checked={groupByDevice} disabled={activityView === "category"} onChange={(event) => setGrouping("device", event.target.checked)} />Group by device</label><WebActivityDisplayMenu open={displayMenuOpen} onToggle={() => setDisplayMenuOpen((value) => !value)} preferences={api.activityPreferences} devices={devices} onChange={updateDisplayPreference} /><label className="activity-search"><Waveform size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search app, website, window title…" aria-label="Search activities" />{query ? <IconButton label="Clear activity search" onClick={() => setQuery("")}><X size={15} /></IconButton> : null}</label><WebActivityFiltersMenu open={filtersMenuOpen} filters={api.filters} projectFilterID={projectFilterID} savedFilterID={savedFilterID} categoryFilter={categoryFilter} onToggle={() => { setFiltersMenuOpen((value) => !value); setDevicesMenuOpen(false); }} onProjectFilter={(value) => { selectProjectFilter(value); setFiltersMenuOpen(false); }} onSavedFilter={(value) => { selectSavedFilter(value); setFiltersMenuOpen(false); }} onCategoryFilter={(value) => { setCategoryFilter(value); setFiltersMenuOpen(false); }} /><WebActivityDevicesMenu open={devicesMenuOpen} devices={devices} selectedDevice={deviceFilter} hideDevicesWithoutTime={hideDevicesWithoutTime} onToggle={() => { setDevicesMenuOpen((value) => !value); setFiltersMenuOpen(false); }} onSelect={setDeviceSelection} onToggleHide={setHideDevicesWithoutTime} /><button type="button" className="quiet-pill activity-reset" onClick={resetFilters} disabled={!hasFilters}>Reset</button></div>{timerMessage ? <p className="entry-message activities-timer-message" role="status">{timerMessage}</p> : null}{displayMessage ? <p className="entry-message activities-display-message" role="status">{displayMessage}</p> : null}<div className="activities-workspace"><WebActivityProjectSidebar projects={api.projects} filters={api.filters} activities={allActivities} projectFilterID={projectFilterID} savedFilterID={savedFilterID} onProjectFilter={selectProjectFilter} onSavedFilter={selectSavedFilter} onEditProject={setEditProjectID} onCreateProjectFromActivities={createProjectFromActivities} onDropActivity={handleActivityProjectDrop} /><div className="activities-workspace-main"><WebActivityTimeline activities={timelineActivities} dateKey={dateKey} api={api} onSelect={setSelectedActivity} onCreateTimeEntry={openActivityTimeEntry} onCreateSelection={openSelectedRangeTimeEntry} selection={timelineSelection} onSelectionChange={setTimelineSelection} onEditTimeEntry={setSelectedTimeEntry} onRecordCalendarEvent={openSourceTimeEntry} /><WebCalendarEventsPanel api={api} onRecord={openSourceTimeEntry} /><WebRemindersPanel api={api} onRecord={openSourceTimeEntry} /><WebPhoneCallsPanel api={api} onRecord={openSourceTimeEntry} /><WebScreenTimePanel api={api} /><WebActivityFiltersPanel api={api} /><WebActivityExclusionsPanel api={api} /><WebActivityCategoriesPanel api={api} /><section className="activities-list"><div className="activities-list-heading"><div><h2>{activityHeading}</h2><p>{api.connected ? hasFilters ? `${activities.length} of ${allActivities.length} locally recorded segments · ${activityRangeDescription}` : `${activities.length} locally recorded segments · ${activityRangeDescription}` : "Start Metriday to see app, browser, and Screen Time activity here."}</p></div><div className="activities-list-heading-actions"><button type="button" className="quiet-pill" onClick={() => setEntryOMaticOpen(true)} disabled={!api.connected || timelineActivities.length === 0}><Sparkle size={16} />Create time entries</button><span className={`api-badge ${api.connected ? "online" : "offline"}`}>{api.connected ? "Connected" : "Offline"}</span></div></div>{activities.length === 0 ? <div className="activities-empty"><Waveform size={34} /><strong>{api.connected ? allActivities.length > 0 ? "No activity matches these filters" : "No activity recorded yet" : "Waiting for the native Metriday app"}</strong><span>{api.error || (hasFilters ? "Clear the filters to see all local activity." : "The hosted view keeps working with preview data until the loopback API is available.")}</span></div> : <ActivityTable activities={activities} viewMode={activityView} groupMode={activityView === "chronological" ? (groupByProject ? "project" : groupByDevice ? "device" : "none") : "none"} projects={api.projects} displayPreferences={api.activityPreferences} dateKey={dateKey} onSelect={setSelectedActivity} api={api} onCreateTimeEntry={openActivityTimeEntry} />}</section><ProjectPanel api={api} activities={allActivities} onDropActivity={handleActivityProjectDrop} editProjectID={editProjectID} onProjectEditHandled={() => setEditProjectID(null)} onAssignActivity={(id, projectID, activityDate) => api.assignActivity(id, projectID, activityDate || dateKey)} />{api.activityPreferences?.include_time_entries === false ? <TimeEntriesPanel api={api} dateKey={dateKey} /> : null}</div></div>{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} displayPreferences={api.activityPreferences} onClose={() => setSelectedActivity(null)} /> : null}<WebEntryOMaticDialog open={entryOMaticOpen} activities={timelineActivities} entries={api.entries} projects={api.projects} dateKey={dateKey} onClose={() => setEntryOMaticOpen(false)} onCreate={createGeneratedEntries} /><WebTimeEntryDialog mode={timeEntryDialogMode} open={Boolean(timeEntryDialogMode)} api={api} projects={api.projects} recentEntries={api.entries} dateKey={dateKey} initialEntry={timeEntryPrefill} onClose={() => { setTimeEntryDialogMode(null); setTimeEntryPrefill(null); }} /><WebTimeEntryEditDialog entry={selectedTimeEntry} api={api} projects={api.projects} dateKey={dateKey} onClose={() => setSelectedTimeEntry(null)} /></main>;
 }
 
 function StatsDonut({ rows, total, label, centerLabel = null, centerCaption = null }) {
