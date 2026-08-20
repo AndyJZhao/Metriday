@@ -1387,6 +1387,24 @@ Task { @MainActor in
         timeEntries.materializedEntries(at: timerStart.addingTimeInterval(5 * 60)).contains { $0.title == "Focused writing" && !$0.isManual },
         "Live timers should participate in materialized report entries"
     )
+
+    let expiredTimerStore = TimeEntryStore(rootDirectory: tempRoot.appendingPathComponent("ExpiredTimer", isDirectory: true))
+    expiredTimerStore.startTimer(
+        title: "Expired estimate",
+        projectID: researchProjectID,
+        startedAt: Date().addingTimeInterval(-2 * 60),
+        estimatedDurationSeconds: 60
+    )
+    expect(
+        (expiredTimerStore.runningTimerRemainingSeconds ?? 0) < 0,
+        "Running timers should expose an expired estimate for check-in prompts"
+    )
+    expiredTimerStore.setRunningTimerEstimate(to: expiredTimerStore.runningDurationSeconds + 15 * 60)
+    expect(
+        (expiredTimerStore.runningTimerRemainingSeconds ?? -1) >= 0,
+        "Extending a timer during check-in should restore positive remaining time"
+    )
+    _ = expiredTimerStore.stopTimer()
     let timerID = timeEntries.stopTimer(at: timerStart.addingTimeInterval(20 * 60))
     expect(timerID != nil, "Stopping a timer should create a time entry")
     expect(timeEntries.runningTimer == nil, "Stopping a timer should clear the active timer")

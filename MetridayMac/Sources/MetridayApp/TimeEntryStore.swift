@@ -141,7 +141,7 @@ struct TimeEntry: Identifiable, Hashable, Codable {
     }
 }
 
-struct RunningTimer: Hashable, Codable {
+struct RunningTimer: Identifiable, Hashable, Codable {
     let id: UUID
     var projectID: UUID?
     var title: String

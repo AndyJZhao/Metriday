@@ -1363,9 +1363,16 @@ function ActionMenu({ label, items, children }) {
 
 function TimerControls({ api }) {
   const [message, setMessage] = useState("");
+  const [dismissedTimerID, setDismissedTimerID] = useState(null);
   const timer = api.status?.timer;
+  const timerID = resourceID(timer?.id);
+  useEffect(() => {
+    if (!timerID || dismissedTimerID === timerID) return;
+    if (dismissedTimerID) setDismissedTimerID(null);
+  }, [dismissedTimerID, timerID]);
   if (!timer) return null;
   const remaining = Number(timer.remainingSeconds);
+  const expired = Number.isFinite(remaining) && remaining < 0;
   const setEstimate = async (event) => {
     const minutes = Number(event.target.value);
     if (!minutes) return;
@@ -1400,7 +1407,28 @@ function TimerControls({ api }) {
       setMessage(error.message || "Could not adjust timer estimate.");
     }
   };
-  return <div className="timer-controls" aria-label="Running timer controls"><span>{Number.isFinite(remaining) ? `${formatDurationSeconds(remaining)} remaining` : "Timer running"}</span><select aria-label="Timer estimate" value={timer.estimatedDurationSeconds ? Math.round(Number(timer.estimatedDurationSeconds) / 60) : ""} onChange={setEstimate}><option value="">Set estimate</option><option value={15}>15 min</option><option value={25}>25 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 hour</option><option value={90}>90 min</option><option value={120}>2 hours</option></select><details className="timer-adjust-menu" onClick={(event) => { if (event.target.closest("button")) event.currentTarget.open = false; }}><summary>Adjust</summary><div className="timer-adjust-popover"><strong>Adjust start</strong><div className="timer-adjust-grid">{[-15, -5, -1, 1, 5, 15].map((minutes) => <button type="button" key={minutes} onClick={() => adjust(minutes)}>{minutes > 0 ? `+${minutes}` : minutes}m</button>)}</div><button type="button" onClick={align}>Align to previous entry</button><strong>Estimate</strong><div className="timer-adjust-estimate-list">{[15, 30, 60].map((minutes) => <button type="button" key={minutes} onClick={() => adjustEstimate(minutes)}>Add {minutes === 60 ? "1 hour" : `${minutes} min`}</button>)}</div></div></details>{message ? <small role="status">{message}</small> : null}</div>;
+  const keepWorking = async () => {
+    const elapsedMinutes = Math.max(1, Math.ceil(Number(timer.durationSeconds || 0) / 60));
+    try {
+      await api.setTimerEstimate(elapsedMinutes + 15);
+      setDismissedTimerID(timerID);
+      setMessage("Timer extended by 15 min");
+    } catch (error) {
+      setMessage(error.message || "Could not extend the timer.");
+    }
+  };
+  const stopTimer = async () => {
+    try {
+      await api.stopTimer();
+      setDismissedTimerID(null);
+    } catch (error) {
+      setMessage(error.message || "Could not stop the timer.");
+    }
+  };
+  const remainingLabel = Number.isFinite(remaining)
+    ? remaining >= 0 ? `${formatDurationSeconds(remaining)} remaining` : `Over by ${formatDurationSeconds(-remaining)}`
+    : "Timer running";
+  return <div className="timer-controls" aria-label="Running timer controls"><span>{remainingLabel}</span><select aria-label="Timer estimate" value={timer.estimatedDurationSeconds ? Math.round(Number(timer.estimatedDurationSeconds) / 60) : ""} onChange={setEstimate}><option value="">Set estimate</option><option value={15}>15 min</option><option value={25}>25 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 hour</option><option value={90}>90 min</option><option value={120}>2 hours</option></select><details className="timer-adjust-menu" onClick={(event) => { if (event.target.closest("button")) event.currentTarget.open = false; }}><summary>Adjust</summary><div className="timer-adjust-popover"><strong>Adjust start</strong><div className="timer-adjust-grid">{[-15, -5, -1, 1, 5, 15].map((minutes) => <button type="button" key={minutes} onClick={() => adjust(minutes)}>{minutes > 0 ? `+${minutes}` : minutes}m</button>)}</div><button type="button" onClick={align}>Align to previous entry</button><strong>Estimate</strong><div className="timer-adjust-estimate-list">{[15, 30, 60].map((minutes) => <button type="button" key={minutes} onClick={() => adjustEstimate(minutes)}>Add {minutes === 60 ? "1 hour" : `${minutes} min`}</button>)}</div></div></details>{expired && dismissedTimerID !== timerID ? <div className="timer-check-in" role="alert"><strong>Timer estimate reached</strong><span>Still working on “{timer.title}”?</span><button type="button" onClick={keepWorking}>Keep working · +15m</button><button type="button" className="danger" onClick={stopTimer}>Stop timer</button><button type="button" className="quiet" onClick={() => setDismissedTimerID(timerID)}>Dismiss</button></div> : null}{message ? <small role="status">{message}</small> : null}</div>;
 }
 
 function TodayHeader({ focusRunning, setFocusRunning, setPage, api, dateKey, setDateKey }) {

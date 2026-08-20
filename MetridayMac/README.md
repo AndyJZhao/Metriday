@@ -77,7 +77,7 @@ Reports and Teams are now first-class native sections. Reports exposes Timing-st
 
 All Time Entry editors and Timer start now provide local title suggestions from prior entries and projects. Typing a dollar shortcut such as $billable, $billed, $paid, or $undetermined exposes matching Billing Status actions and applies the selected status without leaving the title field. When the same title occurs more than once on the selected day, each row exposes Edit Title for All Occurrences; the existing single-entry editor remains available for changing one occurrence's time, notes, project, or billing status.
 
-The running timer controls support Timing-style ±1/±5/±15-minute start corrections, alignment to the previous entry boundary, estimate check-ins, and visible remaining time.
+The running timer controls support Timing-style ±1/±5/±15-minute start corrections, alignment to the previous entry boundary, estimate check-ins, and visible remaining time. When an estimate expires, the native app and hosted view ask whether you are still working; keeping the timer running extends the estimate by 15 minutes, while Stop Timer records the timer immediately.
 
 The native tracker menu and Tracking command menu expose up to five recent non-manual timers for one-click resume. Resuming one preserves its title, project, notes, billing status, and custom fields; the existing Quick Start Timer shortcut still starts the most recent timer automatically.
 

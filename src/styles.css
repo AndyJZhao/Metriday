@@ -102,6 +102,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .timer-adjust-popover button { width: 100%; text-align: center; }
 .timer-adjust-estimate-list { display: grid; gap: 4px; }
 .timer-controls small { width: 100%; color: var(--accent); text-align: center; }
+.timer-check-in { position: absolute; z-index: 35; top: calc(100% + 7px); right: 0; display: grid; gap: 6px; width: 235px; padding: 11px; border: 1px solid #e6c68e; border-radius: 9px; background: #fffaf0; box-shadow: 0 10px 24px rgba(55, 44, 22, 0.16); color: #5e4b2d; text-align: left; }
+.timer-check-in strong { color: #5a431f; font-size: 11px; }
+.timer-check-in span { font-size: 10px; line-height: 1.35; }
+.timer-check-in button { min-height: 26px; border-color: #e1c184; background: #fff; color: #6b5125; }
+.timer-check-in button:hover { border-color: #c99840; background: #fff4d9; }
+.timer-check-in button.danger { color: var(--danger); }
+.timer-check-in button.quiet { border-color: transparent; background: transparent; color: var(--muted); }
 .focus-rule { display: flex; align-items: center; gap: 10px; min-width: 0; padding-left: 18px; border-left: 1px solid var(--border); }
 .focus-rule > div { display: flex; flex-direction: column; min-width: 0; }
 .focus-rule strong { font-size: 14px; }

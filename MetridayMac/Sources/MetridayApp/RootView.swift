@@ -110,8 +110,108 @@ struct RootView: View {
                     timeEntryStore: appState.timeEntryStore,
                     projectStore: appState.projectStore
                 )
+                TimerCheckInPresenter(
+                    timeEntryStore: appState.timeEntryStore,
+                    projectStore: appState.projectStore
+                )
             }
         }
+    }
+}
+
+private struct TimerCheckInPresenter: View {
+    @ObservedObject var timeEntryStore: TimeEntryStore
+    @ObservedObject var projectStore: ProjectStore
+
+    @State private var pendingTimer: RunningTimer?
+    @State private var lastPromptedTimerID: UUID?
+
+    private var timerStateKey: String {
+        guard let timer = timeEntryStore.runningTimer else { return "none" }
+        let remaining = timeEntryStore.runningTimerRemainingSeconds ?? Int.max
+        return "\(timer.id.uuidString)-\(remaining < 0)"
+    }
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            Color.clear
+                .frame(width: 0, height: 0)
+                .onAppear(perform: evaluateTimer)
+                .onChange(of: timerStateKey) { _, _ in
+                    evaluateTimer()
+                }
+        }
+        .sheet(item: $pendingTimer) { timer in
+            TimerCheckInSheet(
+                timer: timer,
+                projectName: projectStore.name(for: timer.projectID),
+                timeEntryStore: timeEntryStore
+            ) {
+                pendingTimer = nil
+            }
+        }
+    }
+
+    private func evaluateTimer() {
+        guard let timer = timeEntryStore.runningTimer,
+              timeEntryStore.runningTimerRemainingSeconds ?? 0 < 0,
+              lastPromptedTimerID != timer.id else { return }
+        lastPromptedTimerID = timer.id
+        pendingTimer = timer
+    }
+}
+
+private struct TimerCheckInSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let timer: RunningTimer
+    let projectName: String
+    @ObservedObject var timeEntryStore: TimeEntryStore
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Label("Timer check-in", systemImage: "timer")
+                .font(.system(size: 18, weight: .bold))
+            Text("Your estimate for \(timer.title) has ended. Are you still working on it?")
+                .font(.system(size: 12))
+                .fixedSize(horizontal: false, vertical: true)
+            Text("\(projectName) · running for \(formatDuration(timeEntryStore.runningDurationSeconds))")
+                .font(.system(size: 11))
+                .foregroundStyle(MetridayTheme.secondary)
+
+            HStack {
+                Button("Dismiss") {
+                    close()
+                }
+                Spacer()
+                Button("Stop Timer", role: .destructive) {
+                    _ = timeEntryStore.stopTimer()
+                    close()
+                }
+                Button("Keep Working · +15m") {
+                    timeEntryStore.setRunningTimerEstimate(
+                        to: timeEntryStore.runningDurationSeconds + 15 * 60
+                    )
+                    close()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(24)
+        .frame(width: 430)
+    }
+
+    private func close() {
+        onDismiss()
+        dismiss()
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = max(1, Int((Double(seconds) / 60.0).rounded()))
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        return hours > 0 ? "\(hours)h \(remainder)m" : "\(remainder)m"
     }
 }
 
