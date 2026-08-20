@@ -5506,12 +5506,20 @@ private struct TimelineHoverBanner: View {
     }
 }
 
+private struct TimelineLegendEntry: Identifiable {
+    let id: String
+    let label: String
+    let color: Color
+}
+
 private struct TimelineLegend: View {
+    let activityCategories: [TimelineLegendEntry]
+
     var body: some View {
         HStack(spacing: 10) {
-            item("Focused", color: ActivityCategoryKind.focused.color)
-            item("Distracting", color: ActivityCategoryKind.distracting.color)
-            item("Other / idle", color: ActivityCategoryKind.other.color)
+            ForEach(activityCategories) { category in
+                item(category.label, color: category.color)
+            }
             item("Summary", color: MetridayTheme.accent, outlined: true)
             item("Time entry", color: MetridayTheme.warning, outlined: true)
             item("Calendar", color: MetridayTheme.accent, outlined: true)
@@ -5666,7 +5674,7 @@ private struct ActivityTimelinePanel: View {
             .padding(.top, 14)
             .padding(.bottom, 6)
 
-            TimelineLegend()
+            TimelineLegend(activityCategories: activityLegend)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
 
@@ -6453,6 +6461,30 @@ private struct ActivityTimelinePanel: View {
         }
 
         return nil
+    }
+
+    private var activityLegend: [TimelineLegendEntry] {
+        var entries: [TimelineLegendEntry] = []
+        var seen = Set<String>()
+        for segment in segments {
+            let label = categoryName(segment)
+            guard seen.insert(label).inserted else { continue }
+            entries.append(
+                TimelineLegendEntry(
+                    id: "\(label)-\(segment.id.uuidString)",
+                    label: label,
+                    color: activityColor(segment)
+                )
+            )
+        }
+        if entries.isEmpty {
+            return [
+                TimelineLegendEntry(id: "focused", label: "Focused", color: ActivityCategoryKind.focused.color),
+                TimelineLegendEntry(id: "distracting", label: "Distracting", color: ActivityCategoryKind.distracting.color),
+                TimelineLegendEntry(id: "other-idle", label: "Other / idle", color: ActivityCategoryKind.other.color)
+            ]
+        }
+        return entries
     }
 
     private func minute(at x: CGFloat, width: CGFloat) -> Int {
