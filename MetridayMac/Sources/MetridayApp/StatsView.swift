@@ -344,6 +344,11 @@ struct StatsView: View {
                 ForEach(applicationPoints) { point in
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 8) {
+                            AppIdentityIcon(
+                                symbol: "rectangle.on.rectangle",
+                                bundleIdentifier: point.bundleIdentifier,
+                                size: 22
+                            )
                             Text(point.name)
                                 .font(.system(size: 11, weight: .medium))
                                 .lineLimit(1)
@@ -543,20 +548,33 @@ struct StatsView: View {
     }
 
     private var applicationPoints: [StatsApplicationPoint] {
-        var totals: [String: (name: String, categoryName: String, seconds: Int, color: Color)] = [:]
+        var totals: [String: (name: String, categoryName: String, bundleIdentifier: String, seconds: Int, color: Color)] = [:]
         for item in datedWeekSegments where item.segment.relevance != .idle {
             let definition = category(for: item.segment, date: item.date)
             let key = "\(item.segment.displayTitle)::\(definition.name)::\(definition.role.rawValue)"
-            let existing = totals[key, default: (name: item.segment.displayTitle, categoryName: definition.name, seconds: 0, color: categoryColor(for: definition))]
+            let existing = totals[key, default: (
+                name: item.segment.displayTitle,
+                categoryName: definition.name,
+                bundleIdentifier: item.segment.bundleIdentifier,
+                seconds: 0,
+                color: categoryColor(for: definition)
+            )]
             totals[key] = (
                 name: existing.name,
                 categoryName: existing.categoryName,
+                bundleIdentifier: existing.bundleIdentifier.isEmpty ? item.segment.bundleIdentifier : existing.bundleIdentifier,
                 seconds: existing.seconds + item.segment.durationSeconds,
                 color: existing.color
             )
         }
         return totals.map { _, value in
-            StatsApplicationPoint(name: value.name, categoryName: value.categoryName, seconds: value.seconds, color: value.color)
+            StatsApplicationPoint(
+                name: value.name,
+                categoryName: value.categoryName,
+                bundleIdentifier: value.bundleIdentifier,
+                seconds: value.seconds,
+                color: value.color
+            )
         }
         .sorted { $0.seconds > $1.seconds }
         .prefix(8)
@@ -672,6 +690,7 @@ private struct StatsApplicationPoint: Identifiable {
     var id: String { "\(name)::\(categoryName)" }
     let name: String
     let categoryName: String
+    let bundleIdentifier: String
     let seconds: Int
     let color: Color
 }

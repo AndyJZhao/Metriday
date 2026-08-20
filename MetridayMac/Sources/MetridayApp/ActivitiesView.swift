@@ -1386,9 +1386,9 @@ struct ActivitiesView: View {
                                 Image(systemName: appCollapsed ? "chevron.right" : "chevron.down")
                                     .font(.system(size: 8, weight: .bold))
                                     .frame(width: 10)
-                                ActivityAppIdentityIcon(
-                                    bundleIdentifier: appGroup.segments[0].bundleIdentifier,
-                                    fallbackSymbol: icon(for: appGroup.segments[0])
+                                AppIdentityIcon(
+                                    symbol: icon(for: appGroup.segments[0]),
+                                    bundleIdentifier: appGroup.segments[0].bundleIdentifier
                                 )
                                 Text(appGroup.name)
                                     .font(.system(size: 11, weight: .semibold))
@@ -1556,9 +1556,9 @@ struct ActivitiesView: View {
         let category = category(for: segment)
         return HStack(spacing: 12) {
             HStack(spacing: 9) {
-                ActivityAppIdentityIcon(
+                AppIdentityIcon(
+                    symbol: icon(for: segment),
                     bundleIdentifier: segment.bundleIdentifier,
-                    fallbackSymbol: icon(for: segment),
                     size: 30
                 )
 
@@ -1655,41 +1655,6 @@ struct ActivitiesView: View {
             }
         }
         .help("Double-click or right-click to create a time entry")
-}
-
-/// App identity is metadata. The category badge beside it owns the semantic
-/// color, so a focused or distracting classification never recolors the app
-/// icon itself.
-private struct ActivityAppIdentityIcon: View {
-    let bundleIdentifier: String
-    let fallbackSymbol: String
-    var size: CGFloat = 20
-
-    private var applicationIcon: NSImage? {
-        guard !bundleIdentifier.isEmpty,
-              bundleIdentifier != "com.metriday.idle",
-              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
-        else { return nil }
-        return NSWorkspace.shared.icon(forFile: url.path)
-    }
-
-    var body: some View {
-        Group {
-            if let applicationIcon {
-                Image(nsImage: applicationIcon)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(size >= 30 ? 4 : 2)
-            } else {
-                Image(systemName: fallbackSymbol)
-                    .font(.system(size: size >= 30 ? 15 : 12, weight: .medium))
-                    .foregroundStyle(MetridayTheme.graphite)
-            }
-        }
-        .frame(width: size, height: size)
-        .background(MetridayTheme.sidebar)
-        .clipShape(RoundedRectangle(cornerRadius: size >= 30 ? 7 : 5, style: .continuous))
-    }
 }
 
     private func category(for segment: ActivitySegment) -> ActivityCategoryDefinition {

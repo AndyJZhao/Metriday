@@ -455,6 +455,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-ranking-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stats-ranking-name { display: flex; align-items: center; min-width: 0; gap: 7px; overflow: hidden; }
 .stats-ranking-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-ranking-name > .stats-ranking-icon { overflow: visible; text-overflow: clip; white-space: normal; }
+.stats-ranking-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stats-ranking-name .activity-category { flex: 0 0 auto; min-height: 20px; padding: 0 6px; font-size: 9px; }
 .stats-ranking-row > i { display: block; height: 7px; overflow: hidden; border-radius: 99px; background: #eff0f3; }
 .stats-ranking-row > i b { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
@@ -560,6 +562,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .review-ranking-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, 1.2fr) auto; align-items: center; gap: 10px; color: #454a55; font-size: 11px; }
 .review-ranking-row > div { display: flex; align-items: center; min-width: 0; gap: 7px; }
 .review-ranking-row > div > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-ranking-icon { width: 24px; height: 24px; flex: 0 0 24px; border-radius: 6px; }
 .review-ranking-row .activity-category { min-height: 20px; padding: 0 6px; font-size: 9px; }
 .review-ranking-row > span { display: block; height: 7px; overflow: hidden; border-radius: 99px; background: #eff0f3; }
 .review-ranking-row > span b { display: block; height: 100%; min-width: 4px; border-radius: inherit; }

@@ -222,9 +222,21 @@ struct ReviewView: View {
                 ForEach(applicationTotals) { item in
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 8) {
+                            AppIdentityIcon(
+                                symbol: "rectangle.on.rectangle",
+                                bundleIdentifier: item.bundleIdentifier,
+                                size: 22
+                            )
                             Text(item.name)
                                 .font(.system(size: 11, weight: .medium))
                                 .lineLimit(1)
+                            Text(item.category.name)
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(categoryColor(for: item.category))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(categoryColor(for: item.category).opacity(0.10))
+                                .clipShape(Capsule())
                             Spacer()
                             Text(formatSeconds(item.seconds))
                                 .font(.system(size: 10, weight: .semibold))
@@ -487,14 +499,21 @@ struct ReviewView: View {
     }
 
     private var applicationTotals: [ApplicationTotal] {
-        var totals: [String: (seconds: Int, categories: [UUID: (category: ActivityCategoryDefinition, seconds: Int)])] = [:]
+        var totals: [String: (bundleIdentifier: String, seconds: Int, categories: [UUID: (category: ActivityCategoryDefinition, seconds: Int)])] = [:]
         for date in weekDates {
             let sourceSegments = monitor.segments(for: date) + screenTimeStore.segments(for: date)
             for segment in sourceSegments {
                 let category = categoryStore.category(for: segment, filterStore: filterStore, date: date)
                 guard category.role != .idle else { continue }
                 let name = segment.displayTitle
-                var existing = totals[name, default: (seconds: 0, categories: [:])]
+                var existing = totals[name, default: (
+                    bundleIdentifier: segment.bundleIdentifier,
+                    seconds: 0,
+                    categories: [:]
+                )]
+                if existing.bundleIdentifier.isEmpty {
+                    existing.bundleIdentifier = segment.bundleIdentifier
+                }
                 existing.seconds += segment.durationSeconds
                 existing.categories[category.id, default: (category: category, seconds: 0)].seconds += segment.durationSeconds
                 totals[name] = existing
@@ -503,7 +522,12 @@ struct ReviewView: View {
         return totals.map { name, value in
             let primary = value.categories.values.max { left, right in left.seconds < right.seconds }?.category
                 ?? ActivityCategoryDefinition(name: "Other", role: .other, isSystem: true)
-            return ApplicationTotal(name: name, seconds: value.seconds, category: primary)
+            return ApplicationTotal(
+                name: name,
+                bundleIdentifier: value.bundleIdentifier,
+                seconds: value.seconds,
+                category: primary
+            )
         }
         .sorted { $0.seconds > $1.seconds }
         .prefix(8)
@@ -651,6 +675,7 @@ private struct ProjectTotal: Identifiable {
 private struct ApplicationTotal: Identifiable {
     var id: String { name }
     let name: String
+    let bundleIdentifier: String
     let seconds: Int
     let category: ActivityCategoryDefinition
 }

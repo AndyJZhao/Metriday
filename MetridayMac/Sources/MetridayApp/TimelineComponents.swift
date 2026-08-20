@@ -119,9 +119,10 @@ struct ActivityRow: View {
     }
 }
 
-private struct AppIdentityIcon: View {
+struct AppIdentityIcon: View {
     let symbol: String?
     let bundleIdentifier: String?
+    var size: CGFloat = 23
 
     private var appImage: NSImage? {
         guard let bundleIdentifier,
@@ -138,17 +139,17 @@ private struct AppIdentityIcon: View {
                 Image(nsImage: appImage)
                     .resizable()
                     .scaledToFit()
-                    .padding(3)
+                    .padding(size >= 30 ? 4 : 3)
             } else if let symbol {
                 Image(systemName: symbol)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: size >= 30 ? 15 : 14, weight: .medium))
                     .foregroundStyle(MetridayTheme.graphite)
             } else {
                 Color.clear
             }
         }
-        .frame(width: 23, height: 23)
+        .frame(width: size, height: size)
         .background(MetridayTheme.sidebar)
-        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: size >= 30 ? 7 : 5, style: .continuous))
     }
 }
