@@ -12,6 +12,7 @@ struct StatsView: View {
     let selectedDate: Date
 
     @State private var projectUnit: StatsProjectUnit = .hour
+    @State private var projectScope: StatsProjectScope = .all
 
     private var calendar: Calendar {
         var calendar = Calendar.current
@@ -28,97 +29,212 @@ struct StatsView: View {
                     showsDateControls: true
                 )
 
-                HStack(spacing: 10) {
-                    Text(weekRangeLabel)
-                        .font(.system(size: 13, weight: .semibold))
-                    Spacer()
-                    Button("Open Activities") {
-                        appState.section = .activities
+                HStack(alignment: .top, spacing: 16) {
+                    projectScopePanel
+                        .frame(width: 216)
+
+                    VStack(alignment: .leading, spacing: 22) {
+                        HStack(spacing: 10) {
+                            Text(weekRangeLabel)
+                                .font(.system(size: 13, weight: .semibold))
+                            Spacer()
+                            Button("Open Activities") {
+                                appState.section = .activities
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("stats.open-activities")
+                        }
+                        .padding(.horizontal, 2)
+
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 12),
+                                GridItem(.flexible(), spacing: 12)
+                            ],
+                            spacing: 12
+                        ) {
+                            statCard(
+                                title: "Total time",
+                                value: formatSeconds(totalActiveSeconds),
+                                note: "Active app usage",
+                                color: MetridayTheme.accent,
+                                symbol: "clock"
+                            )
+                            statCard(
+                                title: "Productivity score",
+                                value: totalActiveSeconds > 0 ? "\(productivityScore)%" : "—",
+                                note: "Weighted by project relevance",
+                                color: MetridayTheme.success,
+                                symbol: "checkmark.seal"
+                            )
+                            statCard(
+                                title: "Related time",
+                                value: formatSeconds(weeklySummary.relatedDurationSeconds),
+                                note: "Task-related activity",
+                                color: MetridayTheme.success,
+                                symbol: "target"
+                            )
+                            statCard(
+                                title: "Distraction",
+                                value: formatSeconds(weeklySummary.distractedDurationSeconds),
+                                note: "Detected locally",
+                                color: MetridayTheme.danger,
+                                symbol: "exclamationmark.triangle"
+                            )
+                        }
+
+                        HStack(alignment: .top, spacing: 16) {
+                            weekdayChart(
+                                title: "Most active weekdays",
+                                subtitle: "Active minutes",
+                                points: weekdayPoints,
+                                value: { $0.activeMinutes },
+                                color: MetridayTheme.accent,
+                                identifier: "stats.active-weekdays"
+                            )
+                            weekdayChart(
+                                title: "Most productive weekdays",
+                                subtitle: "Productivity score",
+                                points: weekdayPoints,
+                                value: { $0.productivityScore },
+                                color: MetridayTheme.success,
+                                identifier: "stats.productive-weekdays"
+                            )
+                        }
+
+                        HStack(alignment: .top, spacing: 16) {
+                            hourChart(
+                                title: "Most active hours",
+                                subtitle: "Active minutes",
+                                value: { $0.activeMinutes },
+                                color: MetridayTheme.accent,
+                                identifier: "stats.active-hours"
+                            )
+                            hourChart(
+                                title: "Most productive hours",
+                                subtitle: "Productivity score",
+                                value: { $0.productivityScore },
+                                color: MetridayTheme.success,
+                                identifier: "stats.productive-hours"
+                            )
+                        }
+
+                        HStack(alignment: .top, spacing: 16) {
+                            categoryPanel
+                            applicationsPanel
+                        }
+
+                        HStack(alignment: .top, spacing: 16) {
+                            projectChart
+                            projectsAndEntriesPanel
+                        }
                     }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("stats.open-activities")
-                }
-                .padding(.horizontal, 2)
-
-                HStack(spacing: 14) {
-                    statCard(
-                        title: "Total time",
-                        value: formatSeconds(totalActiveSeconds),
-                        note: "Active app usage",
-                        color: MetridayTheme.accent,
-                        symbol: "clock"
-                    )
-                    statCard(
-                        title: "Productivity score",
-                        value: totalActiveSeconds > 0 ? "\(productivityScore)%" : "—",
-                        note: "Weighted by project relevance",
-                        color: MetridayTheme.success,
-                        symbol: "checkmark.seal"
-                    )
-                    statCard(
-                        title: "Related time",
-                        value: formatSeconds(weeklySummary.relatedDurationSeconds),
-                        note: "Task-related activity",
-                        color: MetridayTheme.success,
-                        symbol: "target"
-                    )
-                    statCard(
-                        title: "Distraction",
-                        value: formatSeconds(weeklySummary.distractedDurationSeconds),
-                        note: "Detected locally",
-                        color: MetridayTheme.danger,
-                        symbol: "exclamationmark.triangle"
-                    )
-                }
-
-                HStack(alignment: .top, spacing: 16) {
-                    weekdayChart(
-                        title: "Most active weekdays",
-                        subtitle: "Active minutes",
-                        points: weekdayPoints,
-                        value: { $0.activeMinutes },
-                        color: MetridayTheme.accent,
-                        identifier: "stats.active-weekdays"
-                    )
-                    weekdayChart(
-                        title: "Most productive weekdays",
-                        subtitle: "Productivity score",
-                        points: weekdayPoints,
-                        value: { $0.productivityScore },
-                        color: MetridayTheme.success,
-                        identifier: "stats.productive-weekdays"
-                    )
-                }
-
-                HStack(alignment: .top, spacing: 16) {
-                    hourChart(
-                        title: "Most active hours",
-                        subtitle: "Active minutes",
-                        value: { $0.activeMinutes },
-                        color: MetridayTheme.accent,
-                        identifier: "stats.active-hours"
-                    )
-                    hourChart(
-                        title: "Most productive hours",
-                        subtitle: "Productivity score",
-                        value: { $0.productivityScore },
-                        color: MetridayTheme.success,
-                        identifier: "stats.productive-hours"
-                    )
-                }
-
-                HStack(alignment: .top, spacing: 16) {
-                    categoryPanel
-                    applicationsPanel
-                }
-
-                HStack(alignment: .top, spacing: 16) {
-                    projectChart
-                    projectsAndEntriesPanel
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding(28)
         }
+    }
+
+    private var projectScopePanel: some View {
+        let totalSeconds = projectScopePoints.reduce(0) { $0 + $1.seconds }
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Text("Projects")
+                    .font(.system(size: 13, weight: .bold))
+                Spacer()
+                Text(formatSeconds(totalSeconds))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(MetridayTheme.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 10)
+
+            Divider()
+
+            VStack(spacing: 3) {
+                projectScopeButton(
+                    scope: .all,
+                    name: "All Activities",
+                    detail: "\(projectScopePoints.reduce(0) { $0 + $1.segmentCount }) segments",
+                    symbol: "waveform.path"
+                )
+                projectScopeButton(
+                    scope: .unassigned,
+                    name: "Unassigned",
+                    detail: formatSeconds(projectScopePoints.first(where: { $0.id == "unassigned" })?.seconds ?? 0),
+                    symbol: "tray"
+                )
+
+                if !projectStore.activeProjects.isEmpty {
+                    Text("MY PROJECTS")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(0.7)
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 10)
+                        .padding(.horizontal, 8)
+                }
+
+                ForEach(projectStore.activeProjects) { project in
+                    let point = projectScopePoints.first(where: { $0.projectID == project.id })
+                    projectScopeButton(
+                        scope: .project(project.id),
+                        name: project.name,
+                        detail: formatSeconds(point?.seconds ?? 0),
+                        symbol: "folder"
+                    )
+                }
+            }
+            .padding(.top, 8)
+
+            Text("Select a project to scope every chart and total to the same activity evidence.")
+                .font(.system(size: 9))
+                .foregroundStyle(MetridayTheme.secondary)
+                .lineSpacing(2)
+                .padding(.top, 12)
+                .padding(.horizontal, 8)
+        }
+        .padding(.vertical, 14)
+        .metridayPanel()
+        .accessibilityIdentifier("stats.projects")
+    }
+
+    private func projectScopeButton(
+        scope: StatsProjectScope,
+        name: String,
+        detail: String,
+        symbol: String
+    ) -> some View {
+        Button {
+            projectScope = scope
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    Text(detail)
+                        .font(.system(size: 9))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(projectScope == scope ? MetridayTheme.accentDeep : MetridayTheme.graphite)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(projectScope == scope ? MetridayTheme.accentSoft : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("stats.project-scope.(scope.identifier)")
+        .accessibilityAddTraits(projectScope == scope ? .isSelected : [])
     }
 
     private func statCard(
@@ -541,7 +657,7 @@ struct StatsView: View {
         }
         let weekStart = calendar.startOfDay(for: weekDates.first ?? selectedDate)
         let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
-        for entry in timeEntryStore.materializedEntries() where entry.start < weekEnd && entry.end > weekStart {
+        for entry in timeEntryStore.materializedEntries() where entry.start < weekEnd && entry.end > weekStart && matchesProjectScope(entry.projectID) {
             let clippedStart = max(entry.start, weekStart)
             let clippedEnd = min(entry.end, weekEnd)
             totals[entry.projectID, default: 0] += max(0, Int(clippedEnd.timeIntervalSince(clippedStart)))
@@ -622,12 +738,60 @@ struct StatsView: View {
         .map { $0 }
     }
 
-    private func activitySegments(for date: Date) -> [ActivitySegment] {
+    private var projectScopePoints: [StatsProjectScopePoint] {
+        var totals: [UUID?: (seconds: Int, segmentCount: Int)] = [:]
+        for segment in weekDates.flatMap(allActivitySegments(for:)) where segment.relevance != .idle {
+            let current = totals[segment.projectID, default: (seconds: 0, segmentCount: 0)]
+            totals[segment.projectID] = (
+                seconds: current.seconds + segment.durationSeconds,
+                segmentCount: current.segmentCount + 1
+            )
+        }
+        let weekStart = calendar.startOfDay(for: weekDates.first ?? selectedDate)
+        let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
+        for entry in timeEntryStore.materializedEntries() where entry.start < weekEnd && entry.end > weekStart {
+            let clippedStart = max(entry.start, weekStart)
+            let clippedEnd = min(entry.end, weekEnd)
+            let current = totals[entry.projectID, default: (seconds: 0, segmentCount: 0)]
+            totals[entry.projectID] = (
+                seconds: current.seconds + max(0, Int(clippedEnd.timeIntervalSince(clippedStart))),
+                segmentCount: current.segmentCount
+            )
+        }
+        return totals
+            .filter { $0.value.seconds > 0 }
+            .map { projectID, value in
+                StatsProjectScopePoint(
+                    id: projectID?.uuidString ?? "unassigned",
+                    projectID: projectID,
+                    seconds: value.seconds,
+                    segmentCount: value.segmentCount
+                )
+            }
+            .sorted { $0.seconds > $1.seconds }
+    }
+
+    private func allActivitySegments(for date: Date) -> [ActivitySegment] {
         categoryStore.applyingCategories(
             to: monitor.segments(for: date) + screenTimeStore.segments(for: date),
             filterStore: filterStore,
             date: date
         )
+    }
+
+    private func activitySegments(for date: Date) -> [ActivitySegment] {
+        allActivitySegments(for: date).filter { matchesProjectScope($0.projectID) }
+    }
+
+    private func matchesProjectScope(_ projectID: UUID?) -> Bool {
+        switch projectScope {
+        case .all:
+            return true
+        case .unassigned:
+            return projectID == nil
+        case .project(let selectedID):
+            return projectID == selectedID
+        }
     }
 
     private func category(for segment: ActivitySegment, date: Date? = nil) -> ActivityCategoryDefinition {
@@ -717,6 +881,27 @@ private struct StatsProjectPoint: Identifiable {
         let divisor = unit == .hour ? 1 : 24
         return max(1, Int((Double(seconds) / 60.0 / Double(divisor)).rounded()))
     }
+}
+
+private enum StatsProjectScope: Hashable {
+    case all
+    case unassigned
+    case project(UUID)
+
+    var identifier: String {
+        switch self {
+        case .all: return "all"
+        case .unassigned: return "unassigned"
+        case .project(let id): return id.uuidString
+        }
+    }
+}
+
+private struct StatsProjectScopePoint: Identifiable {
+    let id: String
+    let projectID: UUID?
+    let seconds: Int
+    let segmentCount: Int
 }
 
 private struct StatsCategoryPoint: Identifiable {
