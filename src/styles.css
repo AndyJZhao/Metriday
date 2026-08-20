@@ -839,7 +839,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-table-head, .activity-table-row { display: grid; grid-template-columns: minmax(220px, 1.55fr) minmax(112px, .85fr) minmax(120px, .85fr) minmax(128px, 1fr) minmax(170px, 1.05fr); align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
 .activity-table-row { width: 100%; padding: 0; border-top: 0; border-right: 0; border-bottom: 1px solid #eceef1; border-left: 0; border-radius: 0; appearance: none; background: #fff; text-align: left; cursor: pointer; }
 .activity-table-row:hover { background: #fafbff; }
+.activity-table-row.selected { background: var(--accent-soft); }
 .activity-table-row-collapsed { cursor: default; background: #fafbfc; color: var(--muted); }
+.activity-table-row-collapsed.selected { background: var(--accent-soft); }
 .activity-table-row-collapsed:hover { background: #f7f8fa; }
 .activity-table-row-collapsed .activity-table-icon { background: #e9ebef; color: #737986; }
 .activity-row-project-static { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
@@ -876,7 +878,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-category-card-heading small { color: var(--muted); font-size: 10px; font-weight: 650; }
 .activity-category-card-rows { display: grid; gap: 1px; max-height: 184px; overflow-y: auto; padding-right: 2px; }
 .activity-category-card-row { display: grid; grid-template-columns: 7px 22px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 28px; padding: 3px 4px; border-radius: 5px; color: #343841; cursor: pointer; }
-.activity-category-card-row:hover, .activity-category-card-row:focus-visible, .activity-category-card-row.selected { background: #fff; outline: none; }
+.activity-category-card-row:hover, .activity-category-card-row:focus-visible { background: #fff; outline: none; }
+.activity-category-card-row.selected { background: var(--accent-soft); outline: none; }
 .activity-category-card-row strong { overflow: hidden; font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .activity-category-card-row > span:last-child { color: var(--muted); font-size: 10px; font-weight: 650; }
 .activity-category-card-dot { width: 6px; height: 6px; border-radius: 50%; }
