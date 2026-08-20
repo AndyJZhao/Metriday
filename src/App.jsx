@@ -1687,8 +1687,22 @@ function TodayPage({ setPage, api, dateKey, setDateKey }) {
 }
 
 function TodayInsightBar({ api, setPage }) {
+  const openRules = () => setPage("rules");
+  const handleRulesKeyDown = (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    openRules();
+  };
+  const bannerProps = {
+    className: "insight-bar",
+    role: "button",
+    tabIndex: 0,
+    "aria-label": "Open Research Focus rules",
+    onClick: openRules,
+    onKeyDown: handleRulesKeyDown,
+  };
   if (!api.connected) {
-    return <div className="insight-bar"><TrendUp size={26} color="#4f63ef" weight="duotone" /><div><p><strong>Started 8 min late</strong><b>·</b><strong className="positive">82% task-related</strong><b>·</b><strong className="warning">Estimate likely +25 min</strong></p><span>Connect Metriday to replace the preview insight with local activity evidence.</span></div><button type="button" className="secondary-button" onClick={() => setPage("rules")}><ShieldCheck size={18} /> Adjust blocklist</button></div>;
+    return <div {...bannerProps}><TrendUp size={26} color="#4f63ef" weight="duotone" /><div><p><strong>Started 8 min late</strong><b>·</b><strong className="positive">82% task-related</strong><b>·</b><strong className="warning">Estimate likely +25 min</strong></p><span>Connect Metriday to replace the preview insight with local activity evidence.</span></div><button type="button" className="secondary-button" onClick={(event) => { event.stopPropagation(); openRules(); }}><ShieldCheck size={18} /> Adjust blocklist</button></div>;
   }
   const activities = Array.isArray(api.activities) ? api.activities : [];
   const active = activities.filter((activity) => activity.relevance !== "idle");
@@ -1700,7 +1714,7 @@ function TodayInsightBar({ api, setPage }) {
   const trackingLabel = api.status?.tracking ? "Tracking active" : "Tracking paused";
   const activityLabel = activeSeconds > 0 ? `${formatDurationSeconds(activeSeconds)} captured locally` : "No active usage captured yet";
   const distractionLabel = distraction?.detail || (distractedSeconds > 0 ? `${formatDurationSeconds(distractedSeconds)} outside task focus` : "No distraction evidence yet");
-  return <div className="insight-bar"><TrendUp size={26} color="#4f63ef" weight="duotone" /><div><p><strong>{trackingLabel}</strong><b>·</b><strong className="positive">{taskRelated}% task-related</strong><b>·</b><strong className={distractedSeconds > 0 ? "warning" : "positive"}>{activityLabel}</strong></p><span>{distractionLabel} · Source: local activity monitor and Screen Time when available.</span></div><button type="button" className="secondary-button" onClick={() => setPage("rules")}><ShieldCheck size={18} /> Adjust blocklist</button></div>;
+  return <div {...bannerProps}><TrendUp size={26} color="#4f63ef" weight="duotone" /><div><p><strong>{trackingLabel}</strong><b>·</b><strong className="positive">{taskRelated}% task-related</strong><b>·</b><strong className={distractedSeconds > 0 ? "warning" : "positive"}>{activityLabel}</strong></p><span>{distractionLabel} · Source: local activity monitor and Screen Time when available.</span></div><button type="button" className="secondary-button" onClick={(event) => { event.stopPropagation(); openRules(); }}><ShieldCheck size={18} /> Adjust blocklist</button></div>;
 }
 
 function WebActivityInsights({ insights, dateKey }) {

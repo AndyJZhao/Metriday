@@ -180,6 +180,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .now-marker { position: absolute; z-index: 8; top: calc(56px + 7.86 * var(--hour-height)); right: 0; left: 70px; height: 1px; border-top: 1px solid rgba(78, 95, 242, 0.55); pointer-events: none; }
 .now-marker span { position: absolute; top: -4px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .insight-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; margin: 12px 18px 14px; padding: 12px 14px; border: 1px solid #dfe1e6; border-radius: 10px; background: #fafafd; }
+.insight-bar:hover, .insight-bar:focus-visible { border-color: #cbd1ff; background: var(--accent-soft); outline: none; cursor: pointer; }
 .insight-bar p { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 5px; font-size: 13px; }
 .insight-bar p b { color: #a6a9b0; font-weight: 400; }
 .insight-bar .positive { color: var(--accent); }
