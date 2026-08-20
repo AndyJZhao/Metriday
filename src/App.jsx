@@ -3199,6 +3199,28 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
    onCreateTimeEntry?.(activity);
  };
  const hoveredActivity = activities.find((activity) => resourceID(activity.id) === resourceID(hoveredActivityID)) || null;
+ const timelineCategories = useMemo(() => {
+   const categories = new Map();
+   activities.forEach((activity) => {
+     const category = activityCategory(activity);
+     const key = category.key + ":" + category.label + ":" + category.color;
+     if (!categories.has(key)) {
+       categories.set(key, {
+         key,
+         label: category.label,
+         color: activityCategoryStyle(category).color,
+       });
+     }
+   });
+   return categories.size > 0
+     ? [...categories.values()]
+     : [
+       { key: "focused", label: "Focused", color: "#384ae0" },
+       { key: "distracting", label: "Distracting", color: "#d24b4b" },
+       { key: "other", label: "Other", color: "#6f7480" },
+       { key: "idle", label: "Idle", color: "#a0a3aa" },
+     ];
+ }, [activities]);
   const controlledOrientation = typeof onToggleOrientation === "function";
   const [localOrientation, setLocalOrientation] = useState(() => api.activityPreferences?.timeline_orientation === "horizontal" ? "horizontal" : "vertical");
   const orientation = controlledOrientation ? requestedOrientation : localOrientation;
@@ -3419,10 +3441,7 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
         <h2>Timeline</h2>
         <p>Click for details · double-click to create a time entry · right-click for actions · drag across a gap to select time.</p>
         <div className="web-activity-timeline-legend" aria-label="Timeline color legend">
-          <span><i className="focused" />Focused</span>
-          <span><i className="distracting" />Distracting</span>
-          <span><i className="other" />Other</span>
-          <span><i className="idle" />Idle</span>
+          {timelineCategories.map((category) => <span key={category.key}><i className={category.key} style={{ background: category.color }} />{category.label}</span>)}
         </div>
       </div>
       <div className="web-activity-timeline-actions">
