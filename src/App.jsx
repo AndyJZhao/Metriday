@@ -2566,6 +2566,7 @@ function WebTimeEntryRow({ entry, projects, selected = false, onToggleSelect = (
   const interactive = !entry.is_running;
   const open = () => { if (interactive) onEdit(); };
   const handleKeyDown = (event) => {
+    if (event.target.closest("button, .project-actions")) return;
     if (!interactive || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
     open();
