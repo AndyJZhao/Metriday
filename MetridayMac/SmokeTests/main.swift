@@ -1236,6 +1236,52 @@ Task { @MainActor in
         ).contains { $0.id == manualEntryID },
         "Time entries should detect overlapping ranges"
     )
+
+    let splitTimeEntries = TimeEntryStore(rootDirectory: tempRoot.appendingPathComponent("SplitTimeEntries", isDirectory: true))
+    let splitStart = date.addingTimeInterval(9 * 60 * 60)
+    let splitEnd = date.addingTimeInterval(12 * 60 * 60)
+    guard let splitOriginalID = splitTimeEntries.addEntry(
+        title: "Long existing entry",
+        projectID: researchProjectID,
+        start: splitStart,
+        end: splitEnd
+    ), let splitOriginal = splitTimeEntries.entries.first(where: { $0.id == splitOriginalID }) else {
+        expect(false, "Split test should create an existing time entry")
+        return
+    }
+    let splitFragments = splitTimeEntries.splitOverlappingEntries(
+        [splitOriginal],
+        excluding: [(start: date.addingTimeInterval(10 * 60 * 60), end: date.addingTimeInterval(11 * 60 * 60))]
+    )
+    expect(
+        splitFragments.count == 2
+            && splitFragments.contains { $0.start == splitStart && $0.end == date.addingTimeInterval(10 * 60 * 60) }
+            && splitFragments.contains { $0.start == date.addingTimeInterval(11 * 60 * 60) && $0.end == splitEnd },
+        "Replacing a range should preserve both outside fragments"
+    )
+    guard let splitReplacementID = splitTimeEntries.addEntry(
+        title: "Replacement entry",
+        projectID: researchProjectID,
+        start: date.addingTimeInterval(10 * 60 * 60),
+        end: date.addingTimeInterval(11 * 60 * 60)
+    ), let splitReplacement = splitTimeEntries.entries.first(where: { $0.id == splitReplacementID }) else {
+        expect(false, "Split test should create the replacement entry")
+        return
+    }
+    splitTimeEntries.recordEntryOMaticCreation(
+        created: [splitReplacement],
+        replaced: [splitOriginal],
+        splitFragments: splitFragments
+    )
+    expect(splitTimeEntries.undoEntryOMaticCreation(), "Undo should restore split entries")
+    expect(
+        splitTimeEntries.entries.count == 1
+            && splitTimeEntries.entries.first?.id == splitOriginal.id
+            && splitTimeEntries.entries.first?.start == splitOriginal.start
+            && splitTimeEntries.entries.first?.end == splitOriginal.end,
+        "Undo should remove generated entries and fragments and restore the original entry"
+    )
+
     expect(
         timeEntries.entries.first(where: { $0.id == manualEntryID })?.billingStatus == .pending,
         "Manual entries should preserve billing status"

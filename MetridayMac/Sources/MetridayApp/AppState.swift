@@ -967,8 +967,23 @@ final class AppState: ObservableObject {
                 guard updated.end > updated.start else {
                     return .error("Time entry has an invalid time range", statusCode: 400)
                 }
+                var splitFragments: [TimeEntry] = []
+                if body["replace_overlapping"] as? Bool == true {
+                    let overlapping = timeEntryStore.entries(
+                        overlapping: updated.start,
+                        end: updated.end,
+                        excluding: existing.id
+                    )
+                    splitFragments = timeEntryStore.splitOverlappingEntries(
+                        overlapping,
+                        excluding: [(start: updated.start, end: updated.end)]
+                    )
+                }
                 timeEntryStore.update(updated)
-                return .jsonObject(["data": officialEntry(updated)])
+                return .jsonObject([
+                    "data": officialEntry(updated),
+                    "split_fragments": splitFragments.map { officialEntry($0) }
+                ])
             }
             if request.method == "DELETE" {
                 timeEntryStore.delete(existing)
@@ -1029,6 +1044,14 @@ final class AppState: ObservableObject {
             let end = (body["end_date"] as? String).flatMap(parseCommandDate)
                 ?? (body["end"] as? String).flatMap(parseCommandDate)
                 ?? start.addingTimeInterval(TimeInterval(max(1, body["minutes"] as? Int ?? 60) * 60))
+            var splitFragments: [TimeEntry] = []
+            if body["replace_overlapping"] as? Bool == true {
+                let overlapping = timeEntryStore.entries(overlapping: start, end: end)
+                splitFragments = timeEntryStore.splitOverlappingEntries(
+                    overlapping,
+                    excluding: [(start: start, end: end)]
+                )
+            }
             guard let id = timeEntryStore.addEntry(
                 title: title,
                 projectID: project,
@@ -1040,7 +1063,10 @@ final class AppState: ObservableObject {
             ), let entry = timeEntryStore.entries.first(where: { $0.id == id }) else {
                 return .error("Time entry has an invalid time range", statusCode: 400)
             }
-            return .jsonObject(["data": officialEntry(entry)], statusCode: 201)
+            return .jsonObject([
+                "data": officialEntry(entry),
+                "split_fragments": splitFragments.map { officialEntry($0) }
+            ], statusCode: 201)
         }
 
         if request.method == "GET", path == "/v1/sync/status" {
@@ -1610,9 +1636,18 @@ final class AppState: ObservableObject {
             let start = (body["start"] as? String).flatMap(parseCommandDate) ?? .now
             let end = (body["end"] as? String).flatMap(parseCommandDate)
                 ?? start.addingTimeInterval(TimeInterval(max(1, body["minutes"] as? Int ?? 60) * 60))
+            let projectID = projectID(for: body["projectID"] as? String ?? body["project"] as? String)
+            var splitFragments: [TimeEntry] = []
+            if body["replace_overlapping"] as? Bool == true {
+                let overlapping = timeEntryStore.entries(overlapping: start, end: end)
+                splitFragments = timeEntryStore.splitOverlappingEntries(
+                    overlapping,
+                    excluding: [(start: start, end: end)]
+                )
+            }
             guard let id = timeEntryStore.addEntry(
                 title: title,
-                projectID: projectID(for: body["projectID"] as? String ?? body["project"] as? String),
+                projectID: projectID,
                 notes: body["notes"] as? String ?? "",
                 start: start,
                 end: end,
@@ -1621,7 +1656,14 @@ final class AppState: ObservableObject {
             ) else {
                 return .error("Time entry has an invalid time range", statusCode: 400)
             }
-            return .jsonObject(["id": id.uuidString], statusCode: 201)
+            guard let entry = timeEntryStore.entries.first(where: { $0.id == id }) else {
+                return .error("Time entry could not be loaded", statusCode: 500)
+            }
+            return .jsonObject([
+                "id": id.uuidString,
+                "data": apiEntry(entry),
+                "split_fragments": splitFragments.map(apiEntry)
+            ], statusCode: 201)
         }
 
         if request.method == "GET", path == "/v1" {

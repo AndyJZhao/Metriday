@@ -97,7 +97,7 @@ struct TimeEntry: Identifiable, Hashable, Codable {
         self.title = title
         self.notes = notes
         self.start = start
-        self.end = max(end, start.addingTimeInterval(60))
+        self.end = end > start ? end : start.addingTimeInterval(1)
         self.billingStatus = billingStatus
         self.isManual = isManual
         self.customFields = customFields
@@ -205,6 +205,7 @@ struct TimeEntryArchive: Codable {
 private struct EntryOMaticUndoBatch {
     let created: [TimeEntry]
     let replaced: [TimeEntry]
+    let splitFragments: [TimeEntry]
 }
 
 @MainActor
@@ -403,9 +404,17 @@ final class TimeEntryStore: ObservableObject {
         return updatedCount
     }
 
-    func recordEntryOMaticCreation(created: [TimeEntry], replaced: [TimeEntry]) {
+    func recordEntryOMaticCreation(
+        created: [TimeEntry],
+        replaced: [TimeEntry],
+        splitFragments: [TimeEntry] = []
+    ) {
         guard !created.isEmpty else { return }
-        entryOMaticUndoBatch = EntryOMaticUndoBatch(created: created, replaced: replaced)
+        entryOMaticUndoBatch = EntryOMaticUndoBatch(
+            created: created,
+            replaced: replaced,
+            splitFragments: splitFragments
+        )
         canUndoEntryOMatic = true
         lastEntryOMaticCreationCount = created.count
         statusMessage = "Created \(created.count) time entries · press ⌘Z to undo"
@@ -415,7 +424,8 @@ final class TimeEntryStore: ObservableObject {
     func undoEntryOMaticCreation() -> Bool {
         guard let entryOMaticUndoBatch else { return false }
         let createdIDs = Set(entryOMaticUndoBatch.created.map(\.id))
-        entries.removeAll { createdIDs.contains($0.id) }
+        let splitFragmentIDs = Set(entryOMaticUndoBatch.splitFragments.map(\.id))
+        entries.removeAll { createdIDs.contains($0.id) || splitFragmentIDs.contains($0.id) }
         let existingIDs = Set(entries.map(\.id))
         entries.append(contentsOf: entryOMaticUndoBatch.replaced.filter { !existingIDs.contains($0.id) })
         entries.sort { $0.start < $1.start }
@@ -425,6 +435,85 @@ final class TimeEntryStore: ObservableObject {
         persist()
         statusMessage = "Undid Entry-O-Matic changes"
         return true
+    }
+
+    /// Replaces only the requested ranges in existing entries, preserving any
+    /// time before or after those ranges as new fragments. This matches
+    /// Timing's replace behavior when recording time over an existing entry.
+    @discardableResult
+    func splitOverlappingEntries(
+        _ overlappingEntries: [TimeEntry],
+        excluding ranges: [(start: Date, end: Date)]
+    ) -> [TimeEntry] {
+        let validRanges = ranges
+            .filter { $0.end > $0.start }
+            .sorted { $0.start < $1.start }
+        guard !overlappingEntries.isEmpty, !validRanges.isEmpty else { return [] }
+
+        var mergedRanges: [(start: Date, end: Date)] = []
+        for range in validRanges {
+            if let last = mergedRanges.last, range.start <= last.end {
+                mergedRanges[mergedRanges.count - 1].end = max(last.end, range.end)
+            } else {
+                mergedRanges.append(range)
+            }
+        }
+
+        let candidateIDs = Set(overlappingEntries.map(\.id))
+        let affectedEntries = entries.filter { entry in
+            candidateIDs.contains(entry.id)
+                && mergedRanges.contains { entry.start < $0.end && entry.end > $0.start }
+        }
+        guard !affectedEntries.isEmpty else { return [] }
+
+        let affectedIDs = Set(affectedEntries.map(\.id))
+        entries.removeAll { affectedIDs.contains($0.id) }
+
+        var fragments: [TimeEntry] = []
+        for entry in affectedEntries {
+            var cursor = entry.start
+            var fragmentIndex = 0
+
+            for range in mergedRanges {
+                guard range.end > entry.start, range.start < entry.end else { continue }
+                let coveredStart = max(entry.start, range.start)
+                let coveredEnd = min(entry.end, range.end)
+                guard coveredEnd > coveredStart else { continue }
+
+                if cursor < coveredStart {
+                    fragments.append(
+                        fragment(
+                            of: entry,
+                            start: cursor,
+                            end: coveredStart,
+                            index: fragmentIndex
+                        )
+                    )
+                    fragmentIndex += 1
+                }
+                cursor = max(cursor, coveredEnd)
+                if cursor >= entry.end { break }
+            }
+
+            if cursor < entry.end {
+                fragments.append(
+                    fragment(
+                        of: entry,
+                        start: cursor,
+                        end: entry.end,
+                        index: fragmentIndex
+                    )
+                )
+            }
+        }
+
+        entries.append(contentsOf: fragments)
+        entries.sort { $0.start < $1.start }
+        persist()
+        statusMessage = fragments.isEmpty
+            ? "Replaced overlapping time"
+            : "Replaced overlapping time · preserved \(fragments.count) entry fragment\(fragments.count == 1 ? "" : "s")"
+        return fragments
     }
 
     func delete(_ entry: TimeEntry) {
@@ -565,6 +654,25 @@ final class TimeEntryStore: ObservableObject {
         } catch {
             statusMessage = "Could not save time entries: \(error.localizedDescription)"
         }
+    }
+
+    private func fragment(
+        of entry: TimeEntry,
+        start: Date,
+        end: Date,
+        index: Int
+    ) -> TimeEntry {
+        TimeEntry(
+            id: index == 0 ? entry.id : UUID(),
+            projectID: entry.projectID,
+            title: entry.title,
+            notes: entry.notes,
+            start: start,
+            end: end,
+            billingStatus: entry.billingStatus,
+            isManual: entry.isManual,
+            customFields: entry.customFields
+        )
     }
 
     private func formatDuration(_ seconds: Int) -> String {

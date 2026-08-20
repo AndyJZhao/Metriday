@@ -481,12 +481,14 @@ function useMetridayAPI(dateKey, apiBase) {
     },
     createTimeEntries: async (entries) => {
       const created = [];
+      const splitFragments = [];
       for (const entry of entries) {
         const result = await request("/v1/time-entries", { method: "POST", body: JSON.stringify(entry) });
         if (result?.data) created.push(result.data);
+        if (Array.isArray(result?.split_fragments)) splitFragments.push(...result.split_fragments);
       }
       await refresh();
-      return created;
+      return { createdEntries: created, splitFragments };
     },
     restoreTimeEntries: async (entries) => {
       for (const entry of entries) {
@@ -495,8 +497,8 @@ function useMetridayAPI(dateKey, apiBase) {
           body: JSON.stringify({
             title: entry.title || "Untitled",
             notes: entry.notes || "",
-            projectID: resourceID(entry.project) || undefined,
-            billingStatus: entry.billing_status || "billable",
+            projectID: resourceID(entry.project) || resourceID(entry.projectID) || undefined,
+            billingStatus: entry.billing_status || entry.billingStatus || "billable",
             start: entry.start_date || entry.start,
             end: entry.end_date || entry.end,
             custom_fields: entry.custom_fields || {},
@@ -506,8 +508,9 @@ function useMetridayAPI(dateKey, apiBase) {
       await refresh();
     },
     updateTimeEntry: async (id, entry) => {
-      await request(`/api/v1/time-entries/${resourceID(id)}`, { method: "PATCH", body: JSON.stringify(entry) });
+      const result = await request(`/api/v1/time-entries/${resourceID(id)}`, { method: "PATCH", body: JSON.stringify(entry) });
       await refresh();
+      return result;
     },
     batchUpdateTimeEntries: async (ids, billingStatus) => {
       await request("/api/v1/time-entries/batch-update", {
@@ -2228,10 +2231,7 @@ function TimeEntryEditRow({ entry, api, dateKey, projects, onCancel, dialog = fa
     }
     setBusy(true);
     try {
-      if (overlapDecision === "replace" && overlapEntries.length > 0) {
-        await api.deleteTimeEntries(overlapEntries.map((candidate) => entryID(candidate)));
-      }
-      await api.updateTimeEntry(entry.id, { title: title.trim(), start_date: startDate, end_date: endDate, project: project || "", billing_status: billingStatus });
+      await api.updateTimeEntry(entry.id, { title: title.trim(), start_date: startDate, end_date: endDate, project: project || "", billing_status: billingStatus, replace_overlapping: overlapDecision === "replace" });
       setOverlapEntries([]);
       onCancel();
     } catch (error) {
@@ -3225,9 +3225,6 @@ function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = nul
     try {
       const start = localEntryDateSeconds(activityDateKey, startSecond);
       const end = localEntryDateSeconds(activityDateKey, endSecond);
-      if (overlapDecision === "replace" && overlapEntries.length > 0) {
-        await api.deleteTimeEntries(overlapEntries.map((entry) => entryID(entry)));
-      }
       await api.addTimeEntry({
         title: activity.appName || activity.deviceName || "App activity",
         notes: activity.displayTitle || activityLabel(activity),
@@ -3235,6 +3232,7 @@ function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = nul
         end,
         projectID: activity.projectID || undefined,
         billingStatus: "billable",
+        replace_overlapping: overlapDecision === "replace",
       });
       setOverlapEntries([]);
       setMessage("Recorded as a time entry.");
@@ -3728,10 +3726,7 @@ function WebTimeEntryDialog({ mode, open, api, projects, recentEntries, dateKey,
       if (timerMode) {
         await api.startTimer(title.trim(), projectID ? resourceID(projectID) : undefined, { notes, billingStatus, estimatedMinutes: estimatedMinutes ? Number(estimatedMinutes) : undefined });
       } else {
-        if (overlapDecision === "replace" && overlapEntries.length > 0) {
-          await api.deleteTimeEntries(overlapEntries.map((entry) => entryID(entry)));
-        }
-        await api.addTimeEntry({ title: title.trim(), projectID: projectID ? resourceID(projectID) : undefined, notes, billingStatus, start: startDate, end: endDate });
+        await api.addTimeEntry({ title: title.trim(), projectID: projectID ? resourceID(projectID) : undefined, notes, billingStatus, start: startDate, end: endDate, replace_overlapping: overlapDecision === "replace" });
       }
       setOverlapEntries([]);
       onClose();
@@ -4041,20 +4036,17 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
       start: localEntryDateSeconds(dateKey, interval.startSecond),
       end: localEntryDateSeconds(dateKey, interval.endSecond),
     }));
-    if (configuration.overwriteExisting) {
-      const overlappingIDs = replacedEntries.map((entry) => entryID(entry));
-      if (overlappingIDs.length > 0) await api.deleteTimeEntries(overlappingIDs);
-    }
-    const createdEntries = await api.createTimeEntries(generatedRanges.map((range) => ({
+    const { createdEntries, splitFragments } = await api.createTimeEntries(generatedRanges.map((range) => ({
       title: configuration.title,
       notes: configuration.notes,
       projectID: configuration.projectID ? resourceID(configuration.projectID) : undefined,
       billingStatus: configuration.billingStatus,
       start: range.start,
       end: range.end,
+      replace_overlapping: configuration.overwriteExisting,
     })));
     if (createdEntries.length > 0) {
-      setEntryOMaticUndo({ createdEntries, replacedEntries });
+      setEntryOMaticUndo({ createdEntries, replacedEntries, splitFragments });
       setDisplayMessage(`Created ${createdEntries.length} Entry-O-Matic time ${createdEntries.length === 1 ? "entry" : "entries"} · Undo available (⌘Z)`);
     }
   };
@@ -4063,6 +4055,8 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     try {
       const createdIDs = entryOMaticUndo.createdEntries.map(entryID).filter(Boolean);
       if (createdIDs.length > 0) await api.deleteTimeEntries(createdIDs);
+      const splitFragmentIDs = [...new Set((entryOMaticUndo.splitFragments || []).map(entryID).filter(Boolean))];
+      if (splitFragmentIDs.length > 0) await api.deleteTimeEntries(splitFragmentIDs);
       if (entryOMaticUndo.replacedEntries.length > 0) await api.restoreTimeEntries(entryOMaticUndo.replacedEntries);
       setEntryOMaticUndo(null);
       setDisplayMessage("Entry-O-Matic changes undone.");

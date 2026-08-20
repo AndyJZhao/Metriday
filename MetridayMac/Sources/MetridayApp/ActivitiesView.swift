@@ -256,6 +256,7 @@ struct ActivitiesView: View {
                 initialProjectID: selectedProjectID
             ) { intervals, title, projectID, notes, billingStatus, overwriteExisting in
                 var replacedEntries: [TimeEntry] = []
+                var splitFragments: [TimeEntry] = []
                 if overwriteExisting {
                     let generatedRanges = intervals.map { interval in
                         let day = Calendar.current.startOfDay(for: selectedDate)
@@ -269,7 +270,10 @@ struct ActivitiesView: View {
                             existing.start < range.end && existing.end > range.start
                         }
                     }
-                    replacedEntries.forEach { timeEntryStore.delete($0) }
+                    splitFragments = timeEntryStore.splitOverlappingEntries(
+                        replacedEntries,
+                        excluding: generatedRanges
+                    )
                 }
                 let day = Calendar.current.startOfDay(for: selectedDate)
                 var createdEntries: [TimeEntry] = []
@@ -284,7 +288,11 @@ struct ActivitiesView: View {
                     ), let entry = timeEntryStore.entries.first(where: { $0.id == id }) else { continue }
                     createdEntries.append(entry)
                 }
-                timeEntryStore.recordEntryOMaticCreation(created: createdEntries, replaced: replacedEntries)
+                timeEntryStore.recordEntryOMaticCreation(
+                    created: createdEntries,
+                    replaced: replacedEntries,
+                    splitFragments: splitFragments
+                )
                 showingEntryOMatic = false
             }
         }
@@ -316,7 +324,10 @@ struct ActivitiesView: View {
         }
         .sheet(item: $editingEntry) { entry in
             TimeEntryEditorSheet(entry: entry, projects: projectStore.activeProjects, existingEntries: timeEntryStore.entries) { updatedEntry, replacements in
-                replacements.forEach { timeEntryStore.delete($0) }
+                _ = timeEntryStore.splitOverlappingEntries(
+                    replacements,
+                    excluding: [(start: updatedEntry.start, end: updatedEntry.end)]
+                )
                 timeEntryStore.update(updatedEntry)
                 editingEntry = nil
             }
@@ -2891,7 +2902,10 @@ struct ActivitiesView: View {
 
     private func commitNewEntry(replacing: Bool) {
         if replacing {
-            overlappingEntries.forEach { timeEntryStore.delete($0) }
+            _ = timeEntryStore.splitOverlappingEntries(
+                overlappingEntries,
+                excluding: [(start: newEntryStart, end: newEntryEnd)]
+            )
         }
         guard timeEntryStore.addEntry(
             title: newEntryTitle,
@@ -2907,7 +2921,7 @@ struct ActivitiesView: View {
 
     private var overlapMessage: String {
         let noun = overlappingEntries.count == 1 ? "entry" : "entries"
-        return "This range overlaps \(overlappingEntries.count) existing time \(noun). Replace them or keep parallel entries?"
+        return "This range overlaps \(overlappingEntries.count) existing time \(noun). Replace the selected range or keep parallel entries? Time outside the range is preserved."
     }
 
     private func formatMinutes(_ seconds: Int) -> String {
@@ -4389,7 +4403,7 @@ private struct EntryOMaticSheet: View {
             Toggle("Replace overlapping time entries", isOn: $overwriteExisting)
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
-            Text("Without replacement, already recorded time is subtracted from the generated intervals.")
+            Text("Without replacement, already recorded time is subtracted from the generated intervals. Replacement preserves time outside the generated ranges.")
                 .font(.system(size: 10))
                 .foregroundStyle(MetridayTheme.secondary)
 
@@ -5834,7 +5848,7 @@ private struct TimeEntryEditorSheet: View {
             }
         } message: {
             let noun = overlappingEntries.count == 1 ? "entry" : "entries"
-            Text("This range overlaps \(overlappingEntries.count) existing time \(noun). Replace them or keep parallel entries?")
+            Text("This range overlaps \(overlappingEntries.count) existing time \(noun). Replace the selected range or keep parallel entries? Time outside the range is preserved.")
         }
     }
 
