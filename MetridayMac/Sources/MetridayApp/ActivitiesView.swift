@@ -597,6 +597,8 @@ struct ActivitiesView: View {
             appState.activityScope = .project(id)
         case .saved:
             appState.activityScope = .all
+        case .category:
+            appState.activityScope = .all
         }
     }
 
@@ -877,6 +879,25 @@ struct ActivitiesView: View {
                 }
             }
 
+            if !categoryStore.customCategories.isEmpty {
+                Divider()
+                Text("Categories")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(MetridayTheme.secondary)
+                ForEach(categoryStore.customCategories) { category in
+                    toolbarFilterRow(
+                        title: category.name,
+                        icon: "circle.fill",
+                        isSelected: filter == .category(category.id),
+                        tint: categoryColor(for: category)
+                    ) {
+                        selectedBuiltinFilter = nil
+                        selectActivityFilter(.category(category.id))
+                        showingFiltersPopover = false
+                    }
+                }
+            }
+
             if !filterStore.activeFilters.isEmpty {
                 Divider()
                 Text("Saved Filters")
@@ -950,6 +971,8 @@ struct ActivitiesView: View {
             return "Filters"
         case .saved(let id):
             return filterStore.filter(id)?.name ?? "Filters"
+        case .category(let id):
+            return categoryStore.categories.first(where: { $0.id == id })?.name ?? "Category"
         case .unassigned, .project:
             return "Filters"
         }
@@ -3060,6 +3083,11 @@ struct ActivitiesView: View {
         case .saved(let id):
             guard let savedFilter = filterStore.filter(id) else { return [] }
             return source.filter { filterStore.matches(savedFilter, activity: $0, date: $0.activityDate ?? selectedDate) }
+        case .category(let id):
+            guard categoryStore.categories.contains(where: { $0.id == id && !$0.isArchived }) else { return [] }
+            return source.filter {
+                categoryStore.category(for: $0, filterStore: filterStore, date: $0.activityDate ?? selectedDate).id == id
+            }
         }
     }
 
@@ -3074,6 +3102,8 @@ struct ActivitiesView: View {
             baseTitle = projectStore.name(for: id)
         case .saved(let id):
             baseTitle = filterStore.filter(id)?.name ?? "Filter"
+        case .category(let id):
+            baseTitle = categoryStore.categories.first(where: { $0.id == id })?.name ?? "Category"
         }
         if let selectedBuiltinFilter {
             return "\(baseTitle) · \(selectedBuiltinFilter.label)"
@@ -3763,6 +3793,7 @@ private enum ActivityFilter: Hashable {
     case unassigned
     case project(UUID)
     case saved(UUID)
+    case category(UUID)
 }
 
 private enum ActivityBuiltinFilter: String, CaseIterable, Hashable, Identifiable {
