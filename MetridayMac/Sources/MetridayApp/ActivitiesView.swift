@@ -266,6 +266,7 @@ struct ActivitiesView: View {
                             orientation: timelineOrientation,
                             timelineWindow: activityTimelineWindow,
                             activityColor: { categoryColor(for: category(for: $0)) },
+                            selectedActivityIDs: $selectedActivityIDs,
                             onToggleOrientation: {
                                 timelineOrientation = timelineOrientation == .horizontal ? .vertical : .horizontal
                             },
@@ -293,6 +294,12 @@ struct ActivitiesView: View {
                             },
                             onSelectActivity: { activity in
                                 selectedActivity = activity
+                            },
+                            onCreateSelectedTimeEntries: {
+                                showingEntryOMatic = true
+                            },
+                            onDeleteActivities: { segments in
+                                requestDeleteActivities(segments)
                             },
                             onEditTimeEntry: { entry in
                                 editingEntry = entry
@@ -5524,6 +5531,7 @@ private struct ActivityTimelinePanel: View {
     let orientation: ActivityTimelineOrientation
     let timelineWindow: ActivityTimelineWindow
     let activityColor: (ActivitySegment) -> Color
+    @Binding var selectedActivityIDs: Set<UUID>
     let onToggleOrientation: () -> Void
     @Binding var selectionStart: Int?
     @Binding var selectionEnd: Int?
@@ -5531,6 +5539,8 @@ private struct ActivityTimelinePanel: View {
     let onSelectTimelineSuggestion: (ActivityTimelineSuggestion, Bool) -> Void
     let onRecordCalendarEvent: (CalendarEventItem, Bool) -> Void
     let onSelectActivity: (ActivitySegment) -> Void
+    let onCreateSelectedTimeEntries: () -> Void
+    let onDeleteActivities: ([ActivitySegment]) -> Void
     let onEditTimeEntry: (TimeEntry) -> Void
     let onDeleteTimeEntry: (TimeEntry) -> Void
 
@@ -5571,6 +5581,31 @@ private struct ActivityTimelinePanel: View {
             gaps.append((start: cursor, end: timelineWindow.endMinute))
         }
         return gaps
+    }
+
+    @ViewBuilder
+    private func activityContextMenu(for segment: ActivitySegment) -> some View {
+        Button(selectedActivityIDs.contains(segment.id) ? "Deselect Activity" : "Select Activity") {
+            if selectedActivityIDs.contains(segment.id) {
+                selectedActivityIDs.remove(segment.id)
+            } else {
+                selectedActivityIDs.insert(segment.id)
+            }
+        }
+        if !selectedActivityIDs.isEmpty {
+            Button("Create Time Entries from Selected Activities") {
+                onCreateSelectedTimeEntries()
+            }
+        }
+        Divider()
+        Button("Create Time Entry") {
+            let start = max(0, segment.startMinute)
+            let end = min(1_440, max(start + 15, segment.endMinute))
+            onCreateTimeEntry(start, end)
+        }
+        Button("Delete Activity", role: .destructive) {
+            onDeleteActivities([segment])
+        }
     }
 
     var body: some View {
@@ -5733,11 +5768,7 @@ private struct ActivityTimelinePanel: View {
                             }
                         }
                         .contextMenu {
-                            Button("Create Time Entry") {
-                                let start = max(0, segment.startMinute)
-                                let end = min(1_440, max(start + 15, segment.endMinute))
-                                onCreateTimeEntry(start, end)
-                            }
+                            activityContextMenu(for: segment)
                         }
                             .position(
                                 x: left + width / 2,
@@ -6004,11 +6035,7 @@ private struct ActivityTimelinePanel: View {
                                 }
                             }
                             .contextMenu {
-                                Button("Create Time Entry") {
-                                    let start = max(0, segment.startMinute)
-                                    let end = min(1_440, max(start + 15, segment.endMinute))
-                                    onCreateTimeEntry(start, end)
-                                }
+                                activityContextMenu(for: segment)
                             }
                             .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
                     }
