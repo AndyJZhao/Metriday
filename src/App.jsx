@@ -2868,6 +2868,18 @@ function WebReportPanel({ api, dateKey }) {
     notes: row.notes || "",
   }));
   const selectedReportColumns = reportColumnOptions.filter(([key]) => reportColumns.includes(key));
+  const allReportProjectIDs = api.projects.map((project) => resourceID(project.id)).filter(Boolean);
+  const toggleAllReportProjects = () => {
+    setProjectIDs((current) => current.length === 0 ? allReportProjectIDs : []);
+  };
+  const toggleReportProject = (projectID, checked) => {
+    setProjectIDs((current) => {
+      const selected = new Set(current.length === 0 ? allReportProjectIDs : current);
+      if (checked) selected.add(projectID);
+      else selected.delete(projectID);
+      return selected.size === allReportProjectIDs.length ? [] : [...selected];
+    });
+  };
   const reportPreviewColumns = selectedReportColumns.length ? selectedReportColumns : [reportColumnOptions.find(([key]) => key === "title")];
   const reportPreviewValue = (row, key) => {
     switch (key) {
@@ -2943,7 +2955,7 @@ function WebReportPanel({ api, dateKey }) {
       <label>Rounding<select value={rounding} onChange={(event) => setRounding(event.target.value)}><option value="none">Exact</option><option value="up">Round up</option><option value="down">Round down</option><option value="nearest">Nearest</option></select></label>
       <label>Interval<select value={roundingInterval} onChange={(event) => setRoundingInterval(Number(event.target.value))}><option value={1}>1 min</option><option value={5}>5 min</option><option value={6}>6 min</option><option value={10}>10 min</option><option value={12}>12 min</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label>
     </div>
-    <div className="report-project-filter"><strong>Projects</strong><label><input type="checkbox" checked={projectIDs.length === 0} onChange={() => setProjectIDs([])} />All projects</label>{api.projects.map((project) => <label key={project.id}><input type="checkbox" checked={projectIDs.length === 0 || projectIDs.includes(resourceID(project.id))} onChange={(event) => setProjectIDs((current) => { const id = resourceID(project.id); if (event.target.checked) return current.length === 0 ? [id] : [...new Set([...current, id])]; return current.filter((value) => value !== id); })} />{project.title || project.name}</label>)}</div>
+    <div className="report-project-filter"><strong>Projects</strong><label><input type="checkbox" checked={projectIDs.length === 0} onChange={toggleAllReportProjects} />All projects</label>{api.projects.map((project) => { const id = resourceID(project.id); return <label key={project.id}><input type="checkbox" checked={projectIDs.length === 0 || projectIDs.includes(id)} onChange={(event) => toggleReportProject(id, event.target.checked)} />{project.title || project.name}</label>; })}</div>
     <div className="report-advanced"><label>Duration<select value={durationFormat} onChange={(event) => setDurationFormat(event.target.value)}><option value="decimalMinutes">Fractional minutes</option><option value="hms">HH:MM:SS</option><option value="human">Xh Ym Zs</option><option value="seconds">Fractional seconds</option><option value="decimalHours">Fractional hours</option></select></label><label><input type="checkbox" checked={includeShortEntries} onChange={(event) => setIncludeShortEntries(event.target.checked)} />Include App usage shorter than 1 minute</label><label><input type="checkbox" checked={includeCoveredAppUsage} onChange={(event) => setIncludeCoveredAppUsage(event.target.checked)} />Include App usage covered by Time Entries</label><label><input type="checkbox" checked={roundIndividualEntries} onChange={(event) => setRoundIndividualEntries(event.target.checked)} disabled={rounding === "none"} />Round individual entries</label></div>
     <div className="report-columns"><strong>Columns</strong>{reportColumnOptions.map(([key, label]) => <label key={key}><input type="checkbox" checked={reportColumns.includes(key)} disabled={reportColumns.length === 1 && reportColumns.includes(key)} onChange={(event) => setReportColumns((current) => event.target.checked ? [...new Set([...current, key])] : current.filter((value) => value !== key))} />{label}</label>)}</div>
     </> : null}
