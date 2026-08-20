@@ -677,11 +677,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .report-metrics > div { display: flex; flex-direction: column; gap: 5px; padding: 14px; background: #fbfcff; }
 .report-metrics span { color: var(--muted); font-size: 11px; }
 .report-metrics strong { color: #282b32; font-size: 18px; }
-.report-table { margin-top: 20px; border-top: 1px solid var(--border); }
-.report-table-head, .report-table-row { display: grid; grid-template-columns: minmax(180px, 1fr) 120px 180px 80px 100px; align-items: center; gap: 10px; min-height: 42px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 11px; }
+.report-table-scroll { margin-top: 20px; overflow-x: auto; }
+.report-table { min-width: 100%; border-top: 1px solid var(--border); }
+.report-table-head, .report-table-row { display: grid; grid-template-columns: var(--report-grid); align-items: center; gap: 10px; min-width: max-content; min-height: 42px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 11px; }
 .report-table-head { position: sticky; top: 0; z-index: 1; color: var(--muted); font-weight: 650; background: var(--canvas); }
 .report-table-body { max-height: 560px; overflow: auto; }
-.report-table-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
+.report-table-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-table-row strong { color: #282b32; }
 .report-table-row small { color: var(--muted); }
 .status-pill { display: inline-flex; align-items: center; gap: 7px; }
 .status-pill:disabled { cursor: not-allowed; opacity: .55; }

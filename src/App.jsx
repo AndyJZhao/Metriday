@@ -2868,6 +2868,27 @@ function WebReportPanel({ api, dateKey }) {
     notes: row.notes || "",
   }));
   const selectedReportColumns = reportColumnOptions.filter(([key]) => reportColumns.includes(key));
+  const reportPreviewColumns = selectedReportColumns.length ? selectedReportColumns : [reportColumnOptions.find(([key]) => key === "title")];
+  const reportPreviewValue = (row, key) => {
+    switch (key) {
+      case "date": return localDateKey(row.start);
+      case "type": return row.type || row.kind;
+      case "project": return row.project;
+      case "group": return row.group || "";
+      case "application": return row.application || "";
+      case "title": return row.displayTitle || row.title;
+      case "device": return row.device || localDeviceName;
+      case "resource": return row.resource || "";
+      case "start": return entryClock(row.start);
+      case "end": return entryClock(row.end);
+      case "duration": return formatReportDuration(row.seconds);
+      case "billingStatus": return row.billing || "";
+      case "billingAmount": return `${row.currency || "USD"} ${row.amount.toFixed(2)}`;
+      case "notes": return row.notes || "";
+      default: return "";
+    }
+  };
+  const reportPreviewGrid = reportPreviewColumns.map(([key]) => ["title", "notes", "resource"].includes(key) ? "minmax(180px, 1fr)" : "minmax(96px, max-content)").join(" ");
   const exportCSV = () => {
     const headers = selectedReportColumns.map(([, label]) => label);
     const csv = [headers, ...exportRows.map((row) => selectedReportColumns.map(([key]) => row[key]))].map((line) => line.map(reportCell).join(",")).join("\n");
@@ -2928,7 +2949,7 @@ function WebReportPanel({ api, dateKey }) {
     </> : null}
     {message ? <p className="entry-message" role="status">{message}</p> : null}
     <div className="report-metrics"><div><span>Total</span><strong>{formatReportDuration(report.totalSeconds)}</strong></div><div><span>Billable</span><strong>{formatReportDuration(report.billableSeconds)}</strong></div><div><span>Amount</span><strong>{report.amount.toFixed(2)} {report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD"}</strong></div><div><span>Rows</span><strong>{loading ? "…" : report.rows.length}</strong></div></div>
-    {report.rows.length > 0 ? <div className="report-table"><div className="report-table-head"><span>Title</span><span>Project</span><span>Timespan</span><span>Duration</span><span>Billing</span></div><div className="report-table-body">{report.rows.map((row, index) => <div className="report-table-row" key={`${row.kind}-${row.start.toISOString()}-${index}`}><strong>{row.displayTitle || row.title}</strong><span>{row.project}</span><span>{row.start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} {entryClock(row.start)}–{entryClock(row.end)}</span><span>{formatReportDuration(row.seconds)}</span><small>{row.billing}</small></div>)}</div></div> : <div className="entries-empty"><ChartBar size={24} /><span>{loading ? "Loading report data…" : api.connected ? "No rows match this report." : "Connect the native app to generate a report."}</span></div>}
+    {report.rows.length > 0 ? <div className="report-table-scroll"><div className="report-table" style={{ "--report-grid": reportPreviewGrid }}><div className="report-table-head">{reportPreviewColumns.map(([key, label]) => <span key={key} className={`report-table-cell report-table-cell-${key}`}>{label}</span>)}</div><div className="report-table-body">{report.rows.map((row, index) => <div className="report-table-row" key={`${row.kind}-${row.start.toISOString()}-${index}`}>{reportPreviewColumns.map(([key]) => { const value = reportPreviewValue(row, key); return key === "title" ? <strong key={key} className={`report-table-cell report-table-cell-${key}`} title={value}>{value || "—"}</strong> : <span key={key} className={`report-table-cell report-table-cell-${key}`} title={value}>{value || "—"}</span>; })}</div>)}</div></div></div> : <div className="entries-empty"><ChartBar size={24} /><span>{loading ? "Loading report data…" : api.connected ? "No rows match this report." : "Connect the native app to generate a report."}</span></div>}
   </section>;
 }
 
