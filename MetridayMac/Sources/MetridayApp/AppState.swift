@@ -81,6 +81,7 @@ final class AppState: ObservableObject {
         self.syncStore = SyncStore(
             projectStore: projectStore,
             filterStore: filterStore,
+            categoryStore: categoryStore,
             timeEntryStore: timeEntryStore,
             activityMonitor: activityMonitor,
             markdownStore: markdownStore,

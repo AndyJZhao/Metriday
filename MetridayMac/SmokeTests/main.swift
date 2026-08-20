@@ -527,6 +527,17 @@ Task { @MainActor in
         )
     )
     expect(categorizedSummary.distractedMinutes == 12 && categorizedSummary.taskRelatedPercentage == 0, "Category-owned relevance should drive Today and report summaries")
+    let categoryArchive = try! categoryStore.exportArchiveData()
+    let importedCategoryStore = ActivityCategoryStore(
+        rootDirectory: tempRoot.appendingPathComponent("ImportedCategories", isDirectory: true)
+    )
+    let importedCategoryCount = try! importedCategoryStore.importArchiveData(categoryArchive)
+    expect(importedCategoryCount == 3, "Category sync should import custom definitions without duplicating system categories")
+    expect(
+        importedCategoryStore.categories.contains { $0.name == "Focused coding" && $0.color == .blue }
+            && importedCategoryStore.categories.contains { $0.name == "Distracting video" && $0.color == .red },
+        "Category sync should preserve matching rules and normalized role colors"
+    )
 
     let teamRoot = tempRoot.appendingPathComponent("Teams", isDirectory: true)
     let teamStore = TeamStore(rootDirectory: teamRoot)
@@ -1607,6 +1618,14 @@ Task { @MainActor in
     let deviceBRoot = tempRoot.appendingPathComponent("DeviceB", isDirectory: true)
     let deviceATeams = TeamStore(rootDirectory: deviceARoot.appendingPathComponent("Teams", isDirectory: true))
     let deviceAFilters = ActivityFilterStore(rootDirectory: deviceARoot.appendingPathComponent("Filters", isDirectory: true))
+    let deviceACategories = ActivityCategoryStore(rootDirectory: deviceARoot.appendingPathComponent("Categories", isDirectory: true))
+    _ = deviceACategories.createCategory(
+        name: "Shared Focused Work",
+        role: .focused,
+        color: .orange,
+        matchMode: .any,
+        rules: [ActivityFilterRule(field: .application, pattern: "Device A Editor")]
+    )
     deviceAFilters.save(ActivityFilterDefinition(
         name: "Shared Browser Work",
         color: .green,
@@ -1676,6 +1695,7 @@ Task { @MainActor in
     let deviceASync = SyncStore(
         projectStore: deviceAProjects,
         filterStore: deviceAFilters,
+        categoryStore: deviceACategories,
         timeEntryStore: deviceATimeEntries,
         activityMonitor: deviceAActivity,
         markdownStore: MarkdownStore(date: date, rootDirectory: deviceARoot),
@@ -1696,6 +1716,7 @@ Task { @MainActor in
 
     let deviceBTeams = TeamStore(rootDirectory: deviceBRoot.appendingPathComponent("Teams", isDirectory: true))
     let deviceBFilters = ActivityFilterStore(rootDirectory: deviceBRoot.appendingPathComponent("Filters", isDirectory: true))
+    let deviceBCategories = ActivityCategoryStore(rootDirectory: deviceBRoot.appendingPathComponent("Categories", isDirectory: true))
     let deviceBProjects = ProjectStore(rootDirectory: deviceBRoot.appendingPathComponent("Projects", isDirectory: true))
     let deviceBTimeEntries = TimeEntryStore(rootDirectory: deviceBRoot.appendingPathComponent("TimeEntries", isDirectory: true))
     let deviceBPreferences = PreferencesStore(rootDirectory: deviceBRoot.appendingPathComponent("Preferences", isDirectory: true))
@@ -1713,6 +1734,7 @@ Task { @MainActor in
     let deviceBSync = SyncStore(
         projectStore: deviceBProjects,
         filterStore: deviceBFilters,
+        categoryStore: deviceBCategories,
         timeEntryStore: deviceBTimeEntries,
         activityMonitor: deviceBActivity,
         markdownStore: MarkdownStore(date: date, rootDirectory: deviceBRoot),
@@ -1729,6 +1751,7 @@ Task { @MainActor in
     expect(deviceBTimeEntries.entries.contains { $0.title == "Device A entry" }, "Sync should merge time entries")
     expect(deviceBActivity.segments(for: date).contains { $0.deviceName == "Mac A" }, "Sync should preserve source device names on activities")
     expect(deviceBFilters.filters.contains { $0.name == "Shared Browser Work" }, "Sync should merge saved activity filters")
+    expect(deviceBCategories.categories.contains { $0.name == "Shared Focused Work" && $0.color == .blue }, "Sync should merge activity categories and preserve focused color semantics")
     expect(deviceBExclusions.rules.contains { $0.pattern == "Private Browser" }, "Sync should merge activity exclusion rules")
     expect(deviceBScreenTime.segments(for: date).contains { $0.resource == "https://research.example" }, "Sync should merge archived Screen Time activity")
     expect(deviceBSync.backupCount > 0, "Sync should expose retained backup count")

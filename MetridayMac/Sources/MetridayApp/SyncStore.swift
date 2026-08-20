@@ -13,6 +13,8 @@ struct MetridaySyncArchive: Codable {
     let projects: ProjectArchive
     /// Optional keeps archives written before saved activity filters readable.
     let filters: ActivityFilterArchive?
+    /// Optional keeps archives written before category sync readable.
+    let categories: ActivityCategoryArchive?
     let timeEntries: TimeEntryArchive
     let activities: ActivityHistoryArchive
     /// Optional keeps archives written before Screen Time sync forward-compatible.
@@ -42,6 +44,7 @@ final class SyncStore: ObservableObject {
 
     private let projectStore: ProjectStore
     private let filterStore: ActivityFilterStore?
+    private let categoryStore: ActivityCategoryStore?
     private let timeEntryStore: TimeEntryStore
     private let activityMonitor: AppActivityMonitor
     private let screenTimeStore: ScreenTimeStore?
@@ -56,6 +59,7 @@ final class SyncStore: ObservableObject {
     init(
         projectStore: ProjectStore,
         filterStore: ActivityFilterStore? = nil,
+        categoryStore: ActivityCategoryStore? = nil,
         timeEntryStore: TimeEntryStore,
         activityMonitor: AppActivityMonitor,
         markdownStore: MarkdownStore,
@@ -68,6 +72,7 @@ final class SyncStore: ObservableObject {
         let root = rootDirectory ?? Self.defaultRootDirectory()
         self.projectStore = projectStore
         self.filterStore = filterStore
+        self.categoryStore = categoryStore
         self.timeEntryStore = timeEntryStore
         self.activityMonitor = activityMonitor
         self.screenTimeStore = screenTimeStore
@@ -169,7 +174,10 @@ final class SyncStore: ObservableObject {
             let filterSuffix = stats.importedFilters > 0
                 ? " · \(stats.importedFilters) filters"
                 : ""
-            statusMessage = "Synced \(archives.count) device\(devicePlural) · \(stats.importedEntries) new entries · \(stats.importedActivities) new activities\(screenTimeSuffix)\(filterSuffix) · \(stats.importedPlans) plans · \(backupCount) backups"
+            let categorySuffix = stats.importedCategories > 0
+                ? " · \(stats.importedCategories) categories"
+                : ""
+            statusMessage = "Synced \(archives.count) device\(devicePlural) · \(stats.importedEntries) new entries · \(stats.importedActivities) new activities\(screenTimeSuffix)\(filterSuffix)\(categorySuffix) · \(stats.importedPlans) plans · \(backupCount) backups"
             return true
         } catch {
             statusMessage = "Sync failed · \(error.localizedDescription)"
@@ -217,6 +225,7 @@ final class SyncStore: ObservableObject {
         var importedActivities = 0
         var importedScreenTime = 0
         var importedFilters = 0
+        var importedCategories = 0
         var importedPlans = 0
     }
 
@@ -229,6 +238,9 @@ final class SyncStore: ObservableObject {
         for archive in archives {
             if let archiveFilters = archive.filters, let filterStore {
                 stats.importedFilters += filterStore.mergeArchive(archiveFilters)
+            }
+            if let archiveCategories = archive.categories, let categoryStore {
+                stats.importedCategories += categoryStore.mergeArchive(archiveCategories)
             }
             let teamMap: [UUID: UUID]
             if let teamArchive = archive.teams, let teamStore {
@@ -308,6 +320,9 @@ final class SyncStore: ObservableObject {
         let filters = try filterStore.map {
             try decoder.decode(ActivityFilterArchive.self, from: $0.exportArchiveData())
         }
+        let categories = try categoryStore.map {
+            try decoder.decode(ActivityCategoryArchive.self, from: $0.exportArchiveData())
+        }
         let timeEntries = try decoder.decode(TimeEntryArchive.self, from: timeEntryStore.exportArchiveData())
         let activities = try decoder.decode(ActivityHistoryArchive.self, from: activityMonitor.exportHistoryArchiveData())
         let screenTime = try screenTimeStore.map {
@@ -317,22 +332,23 @@ final class SyncStore: ObservableObject {
             let teams = try teamStore.map {
                 try decoder.decode(TeamArchive.self, from: $0.exportArchiveData())
             }
-            return MetridaySyncArchive(
+        return MetridaySyncArchive(
             version: 1,
             deviceID: deviceID,
             deviceName: deviceName,
             updatedAt: .now,
             projects: projects,
             filters: filters,
+            categories: categories,
             timeEntries: timeEntries,
             activities: activities,
             screenTime: screenTime,
-                plans: plans,
-                webRules: webBlocker?.rules,
-                excludedBundleIdentifiers: exclusionStore?.bundleIdentifiers,
-                exclusionRules: exclusionStore?.rules,
-                teams: teams
-            )
+            plans: plans,
+            webRules: webBlocker?.rules,
+            excludedBundleIdentifiers: exclusionStore?.bundleIdentifiers,
+            exclusionRules: exclusionStore?.rules,
+            teams: teams
+        )
     }
 
     private func loadArchives(from devicesURL: URL) throws -> [MetridaySyncArchive] {

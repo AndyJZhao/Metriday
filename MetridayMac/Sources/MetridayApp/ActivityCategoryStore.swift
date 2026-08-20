@@ -207,6 +207,36 @@ final class ActivityCategoryStore: ObservableObject {
         return try encoder.encode(archive)
     }
 
+    @discardableResult
+    func importArchiveData(_ data: Data) throws -> Int {
+        let archive = try JSONDecoder().decode(ActivityCategoryArchive.self, from: data)
+        return mergeArchive(archive)
+    }
+
+    @discardableResult
+    func mergeArchive(_ archive: ActivityCategoryArchive) -> Int {
+        var imported = 0
+        for candidate in archive.categories {
+            let normalizedCandidate = Self.normalized(candidate)
+            if let index = categories.firstIndex(where: { $0.id == normalizedCandidate.id }) {
+                categories[index] = normalizedCandidate
+            } else if let index = categories.firstIndex(where: {
+                $0.name.caseInsensitiveCompare(normalizedCandidate.name) == .orderedSame
+            }) {
+                categories[index] = normalizedCandidate
+            } else {
+                categories.append(normalizedCandidate)
+                imported += 1
+            }
+        }
+        if !archive.categories.isEmpty {
+            persist()
+            let suffix = archive.categories.count == 1 ? "y" : "ies"
+            statusMessage = "Merged \(archive.categories.count) categor\(suffix)"
+        }
+        return imported
+    }
+
     private static var defaultCategories: [ActivityCategoryDefinition] {
         [
             ActivityCategoryDefinition(name: "Focused", role: .focused, color: .blue, isSystem: true),
