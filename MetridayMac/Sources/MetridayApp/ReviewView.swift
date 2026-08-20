@@ -648,7 +648,12 @@ struct ReviewView: View {
             to: monitor.segments(for: date) + screenTimeStore.segments(for: date),
             filterStore: filterStore,
             date: date
-        )
+        ).filter(matchesSelectedDevice)
+    }
+
+    private func matchesSelectedDevice(_ segment: ActivitySegment) -> Bool {
+        let selectedDevice = appState.activitiesPreferences.selectedDevice
+        return selectedDevice == "All Devices" || selectedDevice == "all" || segment.deviceName == selectedDevice
     }
 }
 

@@ -419,7 +419,7 @@ function useMetridayAPI(dateKey, apiBase) {
     fetchPlan,
     fetchProjects,
     downloadReportFile: async ({ startDate, endDate, format, include, groupBy, billingFilter, rounding, roundingMinutes, projectIDs = [], durationFormat = "decimalMinutes", includeShortEntries = true, includeCoveredAppUsage = false, roundIndividualEntries = true, columns = [] }) => {
-      const params = new URLSearchParams({ start_date: startDate, end_date: endDate, format, include, group_by: groupBy, billing_status: billingFilter, rounding, rounding_minutes: String(roundingMinutes), duration_format: durationFormat, include_short_entries: String(includeShortEntries), include_covered_app_usage: String(includeCoveredAppUsage), round_individual_entries: String(roundIndividualEntries) });
+      const params = new URLSearchParams({ start_date: startDate, end_date: endDate, format, include, group_by: groupBy, billing_status: billingFilter, rounding, rounding_minutes: String(roundingMinutes), duration_format: durationFormat, include_short_entries: String(includeShortEntries), include_covered_app_usage: String(includeCoveredAppUsage), round_individual_entries: String(roundIndividualEntries), device: snapshot.activityPreferences?.selected_device || "All Devices" });
       if (projectIDs.length > 0) params.set("project_ids", projectIDs.join(","));
       if (columns.length > 0) params.set("columns", columns.join(","));
       const response = await fetch(`${normalizeApiBase(apiBase)}/v1/reports?${params.toString()}`);
@@ -837,6 +837,11 @@ function activityCategory(activity) {
     default:
       return { key: "other", label: "Other", color: "graphite" };
   }
+}
+
+function activityMatchesSelectedDevice(activity, selectedDevice) {
+  const selected = String(selectedDevice || "All Devices");
+  return selected === "All Devices" || selected === "all" || String(activity?.deviceName || "This Mac") === selected;
 }
 
 function categoryRoleColor(role) {
@@ -2421,20 +2426,23 @@ function WebTimeEntryRow({ entry, projects, selected = false, onToggleSelect = (
 function ReviewPage({ api, dateKey, setDateKey, setPage }) {
   const fallbackDays = [{ label: "Mon", planned: 7.2, actual: 6.6 }, { label: "Tue", planned: 6.5, actual: 7.1 }, { label: "Wed", planned: 7.8, actual: 6.9 }, { label: "Thu", planned: 6.2, actual: 5.8 }, { label: "Fri", planned: 7.1, actual: 6.5 }, { label: "Sat", planned: 5.5, actual: 4.8 }, { label: "Sun", planned: 4.8, actual: 4.2 }];
   const reviewWeekly = api.calendarWeekly.length >= 7 ? api.calendarWeekly : api.weekly;
+  const selectedDevice = api.activityPreferences?.selected_device || "All Devices";
   const days = reviewWeekly.length >= 7 ? reviewWeekly.slice(-7).map((day) => {
     const plannedMinutes = (day.plan?.tasks || []).reduce((total, task) => total + (Number.isFinite(task.start_minute) && Number.isFinite(task.end_minute) ? Math.max(0, task.end_minute - task.start_minute) : 0), 0);
-    const activeSeconds = (day.activities || []).reduce((total, activity) => total + (activity.relevance === "idle" ? 0 : Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0))), 0);
-    return { label: new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short" }), planned: plannedMinutes / 60, actual: activeSeconds / 3600 };
+    const activities = (day.activities || []).filter((activity) => activityMatchesSelectedDevice(activity, selectedDevice));
+    const activeSeconds = activities.reduce((total, activity) => total + (activity.relevance === "idle" ? 0 : Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0))), 0);
+    return { date: day.date, label: new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short" }), planned: plannedMinutes / 60, actual: activeSeconds / 3600, activities, entries: day.entries || [] };
   }) : fallbackDays;
-  const relatedSeconds = api.activities.filter((activity) => activity.relevance === "related").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
-  const distractedSeconds = api.activities.filter((activity) => activity.relevance === "distracted").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
-  const totalActive = relatedSeconds + distractedSeconds + api.activities.filter((activity) => activity.relevance === "other").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
+  const selectedActivities = api.activities.filter((activity) => activityMatchesSelectedDevice(activity, selectedDevice));
+  const relatedSeconds = selectedActivities.filter((activity) => activity.relevance === "related").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
+  const distractedSeconds = selectedActivities.filter((activity) => activity.relevance === "distracted").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
+  const totalActive = relatedSeconds + distractedSeconds + selectedActivities.filter((activity) => activity.relevance === "other").reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
   const taskRelated = totalActive > 0 ? Math.round((relatedSeconds / totalActive) * 100) : 0;
-  const productivityScore = totalActive > 0 ? Math.round(api.activities.filter((activity) => activity.relevance !== "idle").reduce((total, activity) => total + activityProductivityValue(activity, api.projects) * Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0) / totalActive) : 0;
+  const productivityScore = totalActive > 0 ? Math.round(selectedActivities.filter((activity) => activity.relevance !== "idle").reduce((total, activity) => total + activityProductivityValue(activity, api.projects) * Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0) / totalActive) : 0;
   const deepWork = api.connected ? formatDurationSeconds(relatedSeconds) : "22h 14m";
   const distraction = api.connected ? formatDurationSeconds(distractedSeconds) : "91%";
   const categoryActivities = api.connected
-    ? (api.calendarWeekly.length >= 7 ? api.calendarWeekly.flatMap((day) => day.activities || []) : api.activities)
+    ? (api.calendarWeekly.length >= 7 ? api.calendarWeekly.flatMap((day) => (day.activities || []).filter((activity) => activityMatchesSelectedDevice(activity, selectedDevice))) : selectedActivities)
     : [];
   const categoryRows = api.connected ? [...categoryActivities.reduce((groups, activity) => {
     const category = activityCategory(activity);
@@ -2593,6 +2601,7 @@ function WebReportPanel({ api, dateKey }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const controlsRef = useRef(null);
+  const selectedDevice = api.activityPreferences?.selected_device || "All Devices";
   useEffect(() => {
     const weekStart = weekStartDateKey(dateKey);
     setRangeStart(weekStart);
@@ -2682,6 +2691,7 @@ function WebReportPanel({ api, dateKey }) {
     if (includeMode !== "time" && billingFilter === "all") {
       dataset.activities.forEach((activity) => {
         if (activity.relevance === "idle") return;
+        if (!activityMatchesSelectedDevice(activity, selectedDevice)) return;
         if (!includesProject(activity.projectID)) return;
         const start = reportDateTime(activity.date, activity.startSecond);
         const end = reportDateTime(activity.date, activity.endSecond);
@@ -2721,7 +2731,7 @@ function WebReportPanel({ api, dateKey }) {
       ? groupedRows
       : groupedRows.map((row) => ({ ...row, seconds: reportRoundSeconds(row.seconds, rounding, Number(roundingInterval)) }));
     return { rows: finalRows, totalSeconds: finalRows.reduce((sum, row) => sum + row.seconds, 0), billableSeconds: finalRows.reduce((sum, row) => sum + row.billableSeconds, 0), amount: finalRows.reduce((sum, row) => sum + row.amount, 0), currencies: [...new Set(finalRows.map((row) => row.currency).filter(Boolean))] };
-  }, [api.projects, billingFilter, dataset, groupBy, includeCoveredAppUsage, includeMode, includeShortEntries, projectIDs, rangeEnd, rangeStart, roundIndividualEntries, rounding, roundingInterval]);
+  }, [api.projects, billingFilter, dataset, groupBy, includeCoveredAppUsage, includeMode, includeShortEntries, projectIDs, rangeEnd, rangeStart, roundIndividualEntries, rounding, roundingInterval, selectedDevice]);
   const setDatePreset = (preset) => {
     if (preset === "today") {
       setRangeStart(dateKey);
@@ -4531,14 +4541,15 @@ function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProje
       .finally(() => { if (current) setStatsRangeLoading(false); });
     return () => { current = false; };
   }, [api.connected, api.fetchRange, statsBounds.end, statsBounds.start, statsPeriod]);
+  const selectedDevice = api.activityPreferences?.selected_device || "All Devices";
   const baseDays = (api.calendarWeekly.length >= 7 ? api.calendarWeekly : api.weekly).slice(-7);
   const days = statsRangeData
     ? dateKeysBetween(statsBounds.start, statsBounds.end).map((date) => ({
       date,
-      activities: statsRangeData.activities.filter((activity) => activity.date === date),
+      activities: statsRangeData.activities.filter((activity) => activity.date === date && activityMatchesSelectedDevice(activity, selectedDevice)),
       entries: [],
     }))
-    : baseDays;
+    : baseDays.map((day) => ({ ...day, activities: (day.activities || []).filter((activity) => activityMatchesSelectedDevice(activity, selectedDevice)) }));
   const secondsForActivity = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
   const productivityValue = (activity) => activityProductivityValue(activity, api.projects);
   const includeSubprojects = api.preferences?.include_subprojects_when_selecting_project !== false;

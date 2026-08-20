@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ReportsView: View {
+    @EnvironmentObject private var appState: AppState
     @ObservedObject var monitor: AppActivityMonitor
     @ObservedObject var filterStore: ActivityFilterStore
     @ObservedObject var categoryStore: ActivityCategoryStore
@@ -204,8 +205,13 @@ struct ReportsView: View {
                 to: monitor.segments(for: date) + screenTimeStore.segments(for: date),
                 filterStore: filterStore,
                 date: date
-            )
+            ).filter(matchesSelectedDevice)
         }
+    }
+
+    private func matchesSelectedDevice(_ segment: ActivitySegment) -> Bool {
+        let selectedDevice = appState.activitiesPreferences.selectedDevice
+        return selectedDevice == "All Devices" || selectedDevice == "all" || segment.deviceName == selectedDevice
     }
 
     private var activeSeconds: Int {

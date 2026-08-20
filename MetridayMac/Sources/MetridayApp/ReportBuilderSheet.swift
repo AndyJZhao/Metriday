@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct ReportBuilderSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appState: AppState
     @ObservedObject var monitor: AppActivityMonitor
     @ObservedObject var filterStore: ActivityFilterStore
     @ObservedObject var categoryStore: ActivityCategoryStore
@@ -512,9 +513,14 @@ struct ReportBuilderSheet: View {
                     to: rawSegments,
                     filterStore: filterStore,
                     date: date
-                )
+                ).filter(matchesSelectedDevice)
             )
         }
+    }
+
+    private func matchesSelectedDevice(_ segment: ActivitySegment) -> Bool {
+        let selectedDevice = appState.activitiesPreferences.selectedDevice
+        return selectedDevice == "All Devices" || selectedDevice == "all" || segment.deviceName == selectedDevice
     }
 
     private var reportTimeEntries: [TimeEntry] {

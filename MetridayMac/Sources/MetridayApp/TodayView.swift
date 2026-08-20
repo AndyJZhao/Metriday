@@ -197,7 +197,7 @@ struct TodayView: View {
             to: monitor.observedSegments + screenTimeStore.segments,
             filterStore: filterStore,
             date: appState.selectedDate
-        )
+        ).filter(matchesSelectedDevice)
         let clipped: [ActivitySegment] = sourceSegments.compactMap { segment in
             let timelineStart = TimelineMetrics.startMinute * 60
             let timelineEnd = TimelineMetrics.endMinute * 60
@@ -215,7 +215,9 @@ struct TodayView: View {
                 endMinute: Int(ceil(Double(end) / 60.0)),
                 startSecond: start,
                 endSecond: end,
-                relevance: segment.relevance
+                relevance: segment.relevance,
+                projectID: segment.projectID,
+                activityDate: segment.activityDate
             )
         }
         return condensedActivitySegments(clipped)
@@ -396,7 +398,12 @@ struct TodayView: View {
             to: monitor.observedSegments + screenTimeStore.segments,
             filterStore: filterStore,
             date: appState.selectedDate
-        )
+        ).filter(matchesSelectedDevice)
+    }
+
+    private func matchesSelectedDevice(_ segment: ActivitySegment) -> Bool {
+        let selectedDevice = appState.activitiesPreferences.selectedDevice
+        return selectedDevice == "All Devices" || selectedDevice == "all" || segment.deviceName == selectedDevice
     }
 
     private func insightText(summary: ActivitySummary) -> String {

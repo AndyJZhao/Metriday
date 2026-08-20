@@ -1453,7 +1453,7 @@ final class AppState: ObservableObject {
 
         if request.method == "GET", path == "/v1/insights" {
             let date = apiDate(from: request.query["date"]) ?? selectedDate
-            let segments = effectiveActivitySegments(for: date)
+            let segments = effectiveActivitySegments(for: date, selectedDevice: request.query["device"])
             let insights = ActivityInsights.generate(from: segments)
             let data = insights.map { insight -> [String: Any] in
                 let sourceLabel: String
@@ -1498,7 +1498,7 @@ final class AppState: ObservableObject {
             let activityDays = dates.map { date in
                 (
                     date: date,
-                    segments: effectiveActivitySegments(for: date)
+                    segments: effectiveActivitySegments(for: date, selectedDevice: request.query["device"])
                 )
             }
             let reportEnd = calendar.date(byAdding: .day, value: 1, to: endDate) ?? endDate
@@ -2303,12 +2303,15 @@ final class AppState: ObservableObject {
         activityMonitor.segments(for: date) + screenTimeStore.segments(for: date)
     }
 
-    private func effectiveActivitySegments(for date: Date) -> [ActivitySegment] {
+    private func effectiveActivitySegments(for date: Date, selectedDevice: String? = nil) -> [ActivitySegment] {
         categoryStore.applyingCategories(
             to: rawActivitySegments(for: date),
             filterStore: filterStore,
             date: date
-        )
+        ).filter { segment in
+            let device = selectedDevice ?? activitiesPreferences.selectedDevice
+            return device == "All Devices" || device == "all" || segment.deviceName == device
+        }
     }
 
     private func apiActivity(_ segment: ActivitySegment, date: Date) -> [String: Any] {
