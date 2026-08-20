@@ -101,7 +101,7 @@ final class ActivityCategoryStore: ObservableObject {
         self.fileURL = root.appendingPathComponent("ActivityCategories.json")
         if let data = try? Data(contentsOf: fileURL),
            let archive = try? JSONDecoder().decode(ActivityCategoryArchive.self, from: data) {
-            self.categories = archive.categories
+            self.categories = archive.categories.map(Self.normalized)
         } else {
             self.categories = Self.defaultCategories
             persist()
@@ -185,6 +185,7 @@ final class ActivityCategoryStore: ObservableObject {
         var updated = definition
         updated.name = name
         updated.rules = normalizedRules(definition.rules)
+        updated = Self.normalized(updated)
         categories[index] = updated
         persist()
         statusMessage = "Category updated · \(name)"
@@ -213,6 +214,19 @@ final class ActivityCategoryStore: ObservableObject {
             ActivityCategoryDefinition(name: "Other", role: .other, color: .graphite, isSystem: true),
             ActivityCategoryDefinition(name: "Idle", role: .idle, color: .graphite, isSystem: true)
         ]
+    }
+
+    private static func normalized(_ definition: ActivityCategoryDefinition) -> ActivityCategoryDefinition {
+        var normalized = definition
+        switch normalized.role {
+        case .focused:
+            normalized.color = .blue
+        case .distracting:
+            normalized.color = .red
+        case .other, .idle:
+            break
+        }
+        return normalized
     }
 
     private func normalizedRules(_ rules: [ActivityFilterRule]) -> [ActivityFilterRule] {
