@@ -598,6 +598,26 @@ final class AppState: ObservableObject {
             return .jsonObject(["data": apiActivityCategory(created)], statusCode: 201)
         }
 
+        if request.method == "POST", path.hasSuffix("/move"), path.hasPrefix("/v1/categories/") {
+            let rawID = String(path.dropFirst("/v1/categories/".count).dropLast("/move".count))
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            guard let categoryID = UUID(uuidString: rawID),
+                  let existing = categoryStore.categories.first(where: { $0.id == categoryID }) else {
+                return .error("Category not found", statusCode: 404)
+            }
+            let offset = apiBody(request)?["offset"] as? Int ?? 0
+            guard offset != 0 else {
+                return .error("Category move needs a non-zero offset", statusCode: 400)
+            }
+            guard categoryStore.move(existing, by: offset) else {
+                return .error("Category is already at that priority boundary", statusCode: 409)
+            }
+            return .jsonObject([
+                "data": categoryStore.activeCategories.map(apiActivityCategory),
+                "status": categoryStore.statusMessage
+            ])
+        }
+
         if path.hasPrefix("/v1/categories/") {
             let rawID = String(path.dropFirst("/v1/categories/".count))
             guard let categoryID = UUID(uuidString: rawID),

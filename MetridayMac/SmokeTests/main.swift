@@ -527,6 +527,12 @@ Task { @MainActor in
         )
     )
     expect(categorizedSummary.distractedMinutes == 12 && categorizedSummary.taskRelatedPercentage == 0, "Category-owned relevance should drive Today and report summaries")
+    if let focusedResearch = categoryStore.customCategories.first(where: { $0.name == "Focused research" }) {
+        expect(categoryStore.move(focusedResearch, by: -2), "Category priority should move a custom rule ahead of earlier rules")
+        expect(categoryStore.customCategories.first?.name == "Focused research", "Category priority should be reflected in first-match order")
+    } else {
+        expect(false, "Category priority smoke data should exist")
+    }
     let categoryArchive = try! categoryStore.exportArchiveData()
     let importedCategoryStore = ActivityCategoryStore(
         rootDirectory: tempRoot.appendingPathComponent("ImportedCategories", isDirectory: true)
@@ -538,6 +544,7 @@ Task { @MainActor in
             && importedCategoryStore.categories.contains { $0.name == "Distracting video" && $0.color == .red },
         "Category sync should preserve matching rules and normalized role colors"
     )
+    expect(importedCategoryStore.customCategories.first?.name == "Focused research", "Category sync should preserve custom rule priority")
 
     let teamRoot = tempRoot.appendingPathComponent("Teams", isDirectory: true)
     let teamStore = TeamStore(rootDirectory: teamRoot)

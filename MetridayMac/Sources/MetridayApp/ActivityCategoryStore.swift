@@ -200,6 +200,26 @@ final class ActivityCategoryStore: ObservableObject {
         statusMessage = "Category archived · \(definition.name)"
     }
 
+    @discardableResult
+    func move(_ definition: ActivityCategoryDefinition, by offset: Int) -> Bool {
+        let activeCustom = categories.filter { !$0.isSystem && !$0.isArchived }
+        guard let currentIndex = activeCustom.firstIndex(where: { $0.id == definition.id }) else {
+            return false
+        }
+        let targetIndex = max(0, min(activeCustom.count - 1, currentIndex + offset))
+        guard targetIndex != currentIndex else { return false }
+
+        var reordered = activeCustom
+        let moved = reordered.remove(at: currentIndex)
+        reordered.insert(moved, at: targetIndex)
+        let systemCategories = categories.filter(\.isSystem)
+        let archivedCategories = categories.filter { !$0.isSystem && $0.isArchived }
+        categories = systemCategories + reordered + archivedCategories
+        persist()
+        statusMessage = "Category priority updated · \(moved.name)"
+        return true
+    }
+
     func exportArchiveData() throws -> Data {
         let archive = ActivityCategoryArchive(version: 1, categories: categories)
         let encoder = JSONEncoder()

@@ -4221,6 +4221,8 @@ private struct ActivityCategoriesSheet: View {
         let detail = category.isSystem
             ? "Built-in fallback · \(category.role.label)"
             : "\(category.rules.count) rule\(category.rules.count == 1 ? "" : "s") · \(category.role.label)"
+        let priorityIndex = categoryStore.customCategories.firstIndex(where: { $0.id == category.id })
+        let customCount = categoryStore.customCategories.count
         return HStack(spacing: 10) {
             Circle()
                 .fill(categoryColor(for: category))
@@ -4238,6 +4240,24 @@ private struct ActivityCategoriesSheet: View {
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
+                HStack(spacing: 2) {
+                    Button {
+                        _ = categoryStore.move(category, by: -1)
+                    } label: {
+                        Image(systemName: "chevron.up")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(priorityIndex == nil || priorityIndex == 0)
+                    .help("Move category priority up")
+                    Button {
+                        _ = categoryStore.move(category, by: 1)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(priorityIndex == nil || priorityIndex == customCount - 1)
+                    .help("Move category priority down")
+                }
                 Button("Edit") {
                     creatingCategory = false
                     editingCategory = category
