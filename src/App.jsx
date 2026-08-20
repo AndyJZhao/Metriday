@@ -145,9 +145,26 @@ function weekStartDateKey(dateKey) {
   return localDateKey(date);
 }
 
+function statsRangeBounds(dateKey, period) {
+  const date = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return { start: dateKey, end: dateKey };
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  if (period === "year") {
+    return { start: `${year}-01-01`, end: `${year}-12-31` };
+  }
+  if (period === "month") {
+    const start = new Date(year, month, 1, 12, 0, 0);
+    const end = new Date(year, month + 1, 0, 12, 0, 0);
+    return { start: localDateKey(start), end: localDateKey(end) };
+  }
+  const start = weekStartDateKey(dateKey);
+  return { start, end: offsetDateKey(start, 6) };
+}
+
 function dateKeysBetween(startDate, endDate) {
   const keys = [];
-  for (let offset = 0; offset < 90; offset += 1) {
+  for (let offset = 0; offset < 420; offset += 1) {
     const key = offsetDateKey(startDate, offset);
     keys.push(key);
     if (key >= endDate) break;
@@ -317,12 +334,13 @@ function useMetridayAPI(dateKey, apiBase) {
 
   const fetchRange = useCallback(async (startDate, endDate) => {
     const activityDates = dateKeysBetween(startDate, endDate);
-    const entryDates = dateKeysBetween(offsetDateKey(startDate, -1), endDate);
-    const activityResults = await Promise.all(activityDates.map(async (day) => ({ day, items: await request(`/v1/activities?date=${day}`) })));
-    const entryResults = await Promise.all(entryDates.map((day) => request(`/api/v1/time-entries?start_date_min=${day}&start_date_max=${day}`)));
+    const [activityResults, entryResult] = await Promise.all([
+      Promise.all(activityDates.map(async (day) => ({ day, items: await request(`/v1/activities?date=${day}`) }))),
+      request(`/api/v1/time-entries?start_date_min=${offsetDateKey(startDate, -1)}&start_date_max=${endDate}`),
+    ]);
     return {
       activities: activityResults.flatMap(({ day, items }) => Array.isArray(items) ? items.map((item) => ({ ...item, date: day })) : []),
-      entries: entryResults.flatMap((payload) => payload?.data || []),
+      entries: entryResult?.data || [],
       startDate,
       endDate,
     };
@@ -3891,7 +3909,33 @@ function StatsProjectScope({ projects, segments, entries, selectedID, onChange }
 
 function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProjectScopeID }) {
   const [projectUnit, setProjectUnit] = useState("hour");
-  const days = (api.calendarWeekly.length >= 7 ? api.calendarWeekly : api.weekly).slice(-7);
+  const [statsPeriod, setStatsPeriod] = useState("week");
+  const [statsRangeData, setStatsRangeData] = useState(null);
+  const [statsRangeLoading, setStatsRangeLoading] = useState(false);
+  const statsBounds = statsRangeBounds(dateKey, statsPeriod);
+  useEffect(() => {
+    let current = true;
+    if (statsPeriod === "week" || !api.connected) {
+      setStatsRangeData(null);
+      setStatsRangeLoading(false);
+      return () => { current = false; };
+    }
+    setStatsRangeData(null);
+    setStatsRangeLoading(true);
+    api.fetchRange(statsBounds.start, statsBounds.end)
+      .then((result) => { if (current) setStatsRangeData(result); })
+      .catch(() => { if (current) setStatsRangeData({ activities: [], entries: [], startDate: statsBounds.start, endDate: statsBounds.end }); })
+      .finally(() => { if (current) setStatsRangeLoading(false); });
+    return () => { current = false; };
+  }, [api.connected, api.fetchRange, statsBounds.end, statsBounds.start, statsPeriod]);
+  const baseDays = (api.calendarWeekly.length >= 7 ? api.calendarWeekly : api.weekly).slice(-7);
+  const days = statsRangeData
+    ? dateKeysBetween(statsBounds.start, statsBounds.end).map((date) => ({
+      date,
+      activities: statsRangeData.activities.filter((activity) => activity.date === date),
+      entries: [],
+    }))
+    : baseDays;
   const secondsForActivity = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
   const productivityValue = (activity) => activityProductivityValue(activity, api.projects);
   const scopedProjectIDs = projectScopeID !== "all" && projectScopeID !== "unassigned"
@@ -3916,11 +3960,54 @@ function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProje
     }, new Map()).values()].sort((left, right) => right.seconds - left.seconds);
     return { date: day.date, label: new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short" }), active, focused, categories, productivityScore: active ? Math.round(weighted / active) : 0 };
   });
+  const periodRows = statsPeriod === "week" ? dayRows : Array.from({ length: Math.ceil(dayRows.length / 7) }, (_, index) => {
+    const chunk = dayRows.slice(index * 7, index * 7 + 7);
+    const categories = [...chunk.reduce((groups, day) => {
+      day.categories.forEach((category) => {
+        const key = `${category.key}:${category.label}:${category.color}`;
+        const current = groups.get(key) || { ...category, seconds: 0 };
+        current.seconds += category.seconds;
+        groups.set(key, current);
+      });
+      return groups;
+    }, new Map()).values()].sort((left, right) => right.seconds - left.seconds);
+    const active = chunk.reduce((total, day) => total + day.active, 0);
+    const weighted = chunk.reduce((total, day) => total + day.productivityScore * day.active, 0);
+    const firstDate = chunk[0]?.date || statsBounds.start;
+    return { date: firstDate, label: new Date(`${firstDate}T12:00:00`).toLocaleDateString(undefined, { month: "numeric", day: "numeric" }), active, focused: chunk.reduce((total, day) => total + day.focused, 0), categories, productivityScore: active ? Math.round(weighted / active) : 0 };
+  });
+  const weekdayRows = Array.from({ length: 7 }, (_, index) => {
+    const matches = dayRows.filter((day) => {
+      const weekday = new Date(`${day.date}T12:00:00`).getDay();
+      return (weekday + 6) % 7 === index;
+    });
+    const active = matches.reduce((total, day) => total + day.active, 0);
+    const categories = [...matches.reduce((groups, day) => {
+      day.categories.forEach((category) => {
+        const key = `${category.key}:${category.label}:${category.color}`;
+        const current = groups.get(key) || { ...category, seconds: 0 };
+        current.seconds += category.seconds;
+        groups.set(key, current);
+      });
+      return groups;
+    }, new Map()).values()].sort((left, right) => right.seconds - left.seconds);
+    const weighted = matches.reduce((total, day) => total + day.productivityScore * day.active, 0);
+    const label = new Date(2024, 0, index + 1, 12, 0, 0).toLocaleDateString(undefined, { weekday: "short" });
+    return { date: `weekday-${index}`, label, active, focused: matches.reduce((total, day) => total + day.focused, 0), categories, productivityScore: active ? Math.round(weighted / active) : 0 };
+  });
   const totalActive = dayRows.reduce((total, day) => total + day.active, 0);
   const totalFocused = dayRows.reduce((total, day) => total + day.focused, 0);
   const totalDistracted = segments.filter((activity) => activityCategory(activity).key === "distracting").reduce((total, activity) => total + secondsForActivity(activity), 0);
   const productivityScore = totalActive > 0 ? Math.round(segments.filter((activity) => activityCategory(activity).key !== "idle").reduce((total, activity) => total + productivityValue(activity) * secondsForActivity(activity), 0) / totalActive) : 0;
-  const allWeeklyEntries = days.flatMap((day) => day.entries || []);
+  const rangeStartTime = new Date(`${statsBounds.start}T00:00:00`).getTime();
+  const rangeEndTime = new Date(`${offsetDateKey(statsBounds.end, 1)}T00:00:00`).getTime();
+  const allWeeklyEntries = statsRangeData
+    ? statsRangeData.entries.filter((entry) => {
+      const start = new Date(entry.start_date || entry.start || "").getTime();
+      const end = new Date(entry.end_date || entry.end || "").getTime();
+      return Number.isFinite(start) && Number.isFinite(end) && start < rangeEndTime && end > rangeStartTime;
+    })
+    : days.flatMap((day) => day.entries || []);
   const weeklyEntries = allWeeklyEntries.filter((entry) => projectScopeID === "all" || (projectScopeID === "unassigned" ? !entry.project : scopedProjectIDs.has(resourceID(entry.project))));
   const hourRows = Array.from({ length: 24 }, (_, hour) => {
     const activities = segments.filter((activity) => activityCategory(activity).key !== "idle" && Math.min(23, Math.max(0, Math.floor(Number(activity.startSecond || 0) / 3600))) === hour);
@@ -3966,12 +4053,12 @@ function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProje
     return { key: name, label: name, seconds, color: activityCategoryStyle({ color: project ? projectColorKey(project) : fallbackColors[index % fallbackColors.length] }).color };
   });
   const maxCategory = Math.max(1, ...categoryRows.map((row) => row.seconds));
-  const maxDay = Math.max(1, ...dayRows.map((day) => day.active));
+  const maxDay = Math.max(1, ...periodRows.map((day) => day.active));
   const maxHour = Math.max(1, ...hourRows.map((row) => row.active));
   const maxApp = Math.max(1, ...appRows.map((row) => row.seconds));
   const formatStat = (seconds) => formatDurationSeconds(seconds);
   const formatProjectValue = (seconds) => projectUnit === "day" ? `${(seconds / 86400).toFixed(1)}d` : formatStat(seconds);
-  return <main className="page supporting-page stats-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? "Native statistics · This week" : "Local preview"}</span><h1>Stats</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Stats date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><button className="quiet-pill" type="button" onClick={() => setPage?.("activities")}>Open Activities</button><button className="quiet-pill" type="button" onClick={() => api.refresh()}>{api.loading ? "Connecting…" : "Refresh"}</button></div></header><div className="stats-workspace"><StatsProjectScope projects={api.projects} segments={allSegments} entries={allWeeklyEntries} selectedID={projectScopeID} onChange={setProjectScopeID} /><div className="stats-main"><section className="stats-summary"><div><Clock size={22} /><span>Total time</span><strong>{formatStat(totalActive)}</strong><small>Active app usage</small></div><div><ShieldCheck size={22} /><span>Productivity score</span><strong>{totalActive ? `${productivityScore}%` : "—"}</strong><small>Weighted by project relevance</small></div><div><Timer size={22} /><span>Related time</span><strong>{formatStat(totalFocused)}</strong><small>Task-related activity</small></div><div><TrendUp size={22} /><span>Distraction</span><strong>{formatStat(totalDistracted)}</strong><small>Detected locally</small></div></section><section className="stats-grid"><section className="stats-panel"><div className="chart-heading"><div><h2>Time by Week</h2><p>Active minutes by Category.</p></div><div className="legend stats-category-legend">{categoryRows.slice(0, 5).map((category) => <span key={category.key + category.label}><i style={{ background: activityCategoryStyle(category).color }} />{category.label}</span>)}</div></div><div className="stats-bars stats-category-bars"><span className="stats-visually-hidden">Active minutes by Category and weekday</span>{dayRows.map((day) => <div className="stats-bar-column" key={day.date}><div className="stats-bar-track stats-category-bar-track">{day.categories.map((category) => <i key={category.key + category.label} className={category.key} style={{ height: Math.max(0.8, (category.seconds / Math.max(1, maxDay)) * 100) + "%", background: activityCategoryStyle(category).color }} />)}</div><strong>{day.active ? formatStat(day.active) : "—"}</strong><span>{day.label}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most productive weekdays</h2><p>Productivity score</p></div></div><div className="stats-bars stats-score-bars"><span className="stats-visually-hidden">Productivity score by weekday</span>{dayRows.map((day) => <div className="stats-bar-column" key={day.date}><div className="stats-bar-track"><i style={{ height: Math.max(3, day.productivityScore) + "%", background: "var(--success)" }} /></div><strong>{day.productivityScore}%</strong><span>{day.label}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most active hours</h2><p>Active minutes</p></div></div><div className="stats-hour-bars"><span className="stats-visually-hidden">Active minutes by hour</span>{hourRows.map((row) => <div className="stats-hour-column" key={row.hour}><div className="stats-hour-track"><i style={{ height: Math.max(3, (row.active / maxHour) * 100) + "%" }} /></div><span>{row.hour % 6 === 0 || row.hour === 23 ? String(row.hour).padStart(2, "0") : ""}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most productive hours</h2><p>Productivity score</p></div></div><div className="stats-hour-bars stats-score-bars"><span className="stats-visually-hidden">Productivity score by hour</span>{hourRows.map((row) => <div className="stats-hour-column" key={row.hour}><div className="stats-hour-track"><i style={{ height: Math.max(3, row.productivityScore) + "%", background: "var(--success)" }} /></div><span>{row.hour % 6 === 0 || row.hour === 23 ? String(row.hour).padStart(2, "0") : ""}</span></div>)}</div></section><section className="stats-panel stats-category-panel"><div className="chart-heading"><div><h2>Productivity pulse</h2><p>Category-weighted activity quality.</p></div></div><div className="stats-donut-layout">{categoryRows.length ? <><StatsDonut rows={categoryDonutRows} total={categoryTotal} centerLabel={totalActive ? `${productivityScore}` : "—"} centerCaption="score" label="Productivity pulse" /><div className="stats-donut-legend">{categoryRows.map((row) => { const categoryStyle = activityCategoryStyle({ color: row.color }); const percentage = categoryTotal ? Math.round((row.seconds / categoryTotal) * 100) : 0; return <div className="stats-donut-legend-row" key={row.key + row.label}><i style={{ background: categoryStyle.color }} /><span>{row.label}</span><strong>{percentage}% · {formatStat(row.seconds)}</strong></div>; })}</div></> : <div className="entries-empty"><ChartBar size={22} /><span>No categorized activity yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Time per Project</h2><p>Tracked activity and time entries.</p></div><label className="stats-unit-picker">Unit<select value={projectUnit} onChange={(event) => setProjectUnit(event.target.value)} aria-label="Project time unit"><option value="hour">Hour</option><option value="day">Day</option></select></label></div><div className="stats-ranking">{projectRows.length ? projectRows.map(([name, seconds]) => <div className="stats-ranking-row" key={name}><span>{name}</span><i><b style={{ width: `${Math.max(4, (seconds / Math.max(1, projectRows[0][1])) * 100)}%` }} /></i><strong>{formatProjectValue(seconds)}</strong></div>) : <div className="entries-empty"><FolderSimple size={22} /><span>No project activity yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Projects &amp; Time Entries</h2><p>Tracked activity and time entries</p></div><span className="api-badge">{formatStat(projectRows.reduce((total, row) => total + row[1], 0))}</span></div><div className="stats-donut-layout">{projectRows.length ? <><StatsDonut rows={projectDonutRows} total={projectRows.reduce((total, row) => total + row[1], 0)} label="Projects and Time Entries" /><div className="stats-donut-legend">{projectDonutRows.map((row) => <div className="stats-donut-legend-row" key={"entries-" + row.key}><i style={{ background: row.color }} /><span>{row.label}</span><strong>{formatStat(row.seconds)}</strong></div>)}</div></> : <div className="entries-empty"><Clock size={22} /><span>No project-assigned activity or time entry yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most active applications</h2><p>Top App / website sources by captured time.</p></div></div><div className="stats-donut-layout">{appRows.length ? <><StatsDonut rows={applicationDonutRows} total={appRows.reduce((total, row) => total + row.seconds, 0)} label="Most active applications" /><div className="stats-donut-legend">{appRows.map((row) => <div className="stats-donut-legend-row stats-app-legend-row" key={row.name + ":" + row.category.label}><span className="stats-app-identity"><row.icon size={15} weight="duotone" /></span><span>{row.name}<small className={`activity-category ${row.category.key}`} style={activityCategoryStyle(row.category)}><i />{row.category.label}</small></span><strong>{formatStat(row.seconds)}</strong></div>)}</div></> : <div className="entries-empty"><Browsers size={22} /><span>No application activity yet.</span></div>}</div></section></section></div></div></main>;
+  return <main className="page supporting-page stats-page"><header className="supporting-header activities-page-header"><div><span>{api.connected ? `Native statistics · ${statsPeriod === "week" ? "This week" : statsPeriod === "month" ? "This month" : "This year"}` : "Local preview"}</span><h1>Stats</h1></div><div className="activities-page-actions"><div className="date-controls"><DatePickerControl dateKey={dateKey} onChange={setDateKey} label="Choose Stats date" /><button type="button" className="quiet-pill" onClick={() => setDateKey(localDateKey())}>Today</button><IconButton label="Previous day" onClick={() => setDateKey((value) => offsetDateKey(value, -1))}><CaretLeft size={18} /></IconButton><IconButton label="Next day" onClick={() => setDateKey((value) => offsetDateKey(value, 1))}><CaretRight size={18} /></IconButton></div><label className="stats-period-picker"><span>Period</span><select value={statsPeriod} onChange={(event) => setStatsPeriod(event.target.value)} aria-label="Stats period"><option value="week">This Week</option><option value="month">This Month</option><option value="year">This Year</option></select></label><button className="quiet-pill" type="button" onClick={() => setPage?.("activities")}>Open Activities</button><button className="quiet-pill" type="button" onClick={() => api.refresh()}>{api.loading || statsRangeLoading ? "Loading…" : "Refresh"}</button></div></header><div className="stats-workspace"><StatsProjectScope projects={api.projects} segments={allSegments} entries={allWeeklyEntries} selectedID={projectScopeID} onChange={setProjectScopeID} /><div className="stats-main"><section className="stats-summary"><div><Clock size={22} /><span>Total time</span><strong>{formatStat(totalActive)}</strong><small>Active app usage</small></div><div><ShieldCheck size={22} /><span>Productivity score</span><strong>{totalActive ? `${productivityScore}%` : "—"}</strong><small>Weighted by project relevance</small></div><div><Timer size={22} /><span>Related time</span><strong>{formatStat(totalFocused)}</strong><small>Task-related activity</small></div><div><TrendUp size={22} /><span>Distraction</span><strong>{formatStat(totalDistracted)}</strong><small>Detected locally</small></div></section><section className="stats-grid"><section className="stats-panel"><div className="chart-heading"><div><h2>{statsPeriod === "week" ? "Time by Day" : "Time by Week"}</h2><p>Active minutes by Category.</p></div><div className="legend stats-category-legend">{categoryRows.slice(0, 5).map((category) => <span key={category.key + category.label}><i style={{ background: activityCategoryStyle(category).color }} />{category.label}</span>)}</div></div><div className={`stats-bars stats-category-bars stats-period-bars-${statsPeriod}`}><span className="stats-visually-hidden">Active minutes by Category and period</span>{periodRows.map((day) => <div className="stats-bar-column" key={day.date}><div className="stats-bar-track stats-category-bar-track">{day.categories.map((category) => <i key={category.key + category.label} className={category.key} style={{ height: Math.max(0.8, (category.seconds / Math.max(1, maxDay)) * 100) + "%", background: activityCategoryStyle(category).color }} />)}</div><strong>{day.active ? formatStat(day.active) : "—"}</strong><span>{day.label}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most productive weekdays</h2><p>Productivity score</p></div></div><div className="stats-bars stats-score-bars"><span className="stats-visually-hidden">Productivity score by weekday</span>{weekdayRows.map((day) => <div className="stats-bar-column" key={day.date}><div className="stats-bar-track"><i style={{ height: Math.max(3, day.productivityScore) + "%", background: "var(--success)" }} /></div><strong>{day.productivityScore}%</strong><span>{day.label}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most active hours</h2><p>Active minutes</p></div></div><div className="stats-hour-bars"><span className="stats-visually-hidden">Active minutes by hour</span>{hourRows.map((row) => <div className="stats-hour-column" key={row.hour}><div className="stats-hour-track"><i style={{ height: Math.max(3, (row.active / maxHour) * 100) + "%" }} /></div><span>{row.hour % 6 === 0 || row.hour === 23 ? String(row.hour).padStart(2, "0") : ""}</span></div>)}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most productive hours</h2><p>Productivity score</p></div></div><div className="stats-hour-bars stats-score-bars"><span className="stats-visually-hidden">Productivity score by hour</span>{hourRows.map((row) => <div className="stats-hour-column" key={row.hour}><div className="stats-hour-track"><i style={{ height: Math.max(3, row.productivityScore) + "%", background: "var(--success)" }} /></div><span>{row.hour % 6 === 0 || row.hour === 23 ? String(row.hour).padStart(2, "0") : ""}</span></div>)}</div></section><section className="stats-panel stats-category-panel"><div className="chart-heading"><div><h2>Productivity pulse</h2><p>Category-weighted activity quality.</p></div></div><div className="stats-donut-layout">{categoryRows.length ? <><StatsDonut rows={categoryDonutRows} total={categoryTotal} centerLabel={totalActive ? `${productivityScore}` : "—"} centerCaption="score" label="Productivity pulse" /><div className="stats-donut-legend">{categoryRows.map((row) => { const categoryStyle = activityCategoryStyle({ color: row.color }); const percentage = categoryTotal ? Math.round((row.seconds / categoryTotal) * 100) : 0; return <div className="stats-donut-legend-row" key={row.key + row.label}><i style={{ background: categoryStyle.color }} /><span>{row.label}</span><strong>{percentage}% · {formatStat(row.seconds)}</strong></div>; })}</div></> : <div className="entries-empty"><ChartBar size={22} /><span>No categorized activity yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Time per Project</h2><p>Tracked activity and time entries.</p></div><label className="stats-unit-picker">Unit<select value={projectUnit} onChange={(event) => setProjectUnit(event.target.value)} aria-label="Project time unit"><option value="hour">Hour</option><option value="day">Day</option></select></label></div><div className="stats-ranking">{projectRows.length ? projectRows.map(([name, seconds]) => <div className="stats-ranking-row" key={name}><span>{name}</span><i><b style={{ width: `${Math.max(4, (seconds / Math.max(1, projectRows[0][1])) * 100)}%` }} /></i><strong>{formatProjectValue(seconds)}</strong></div>) : <div className="entries-empty"><FolderSimple size={22} /><span>No project activity yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Projects &amp; Time Entries</h2><p>Tracked activity and time entries</p></div><span className="api-badge">{formatStat(projectRows.reduce((total, row) => total + row[1], 0))}</span></div><div className="stats-donut-layout">{projectRows.length ? <><StatsDonut rows={projectDonutRows} total={projectRows.reduce((total, row) => total + row[1], 0)} label="Projects and Time Entries" /><div className="stats-donut-legend">{projectDonutRows.map((row) => <div className="stats-donut-legend-row" key={"entries-" + row.key}><i style={{ background: row.color }} /><span>{row.label}</span><strong>{formatStat(row.seconds)}</strong></div>)}</div></> : <div className="entries-empty"><Clock size={22} /><span>No project-assigned activity or time entry yet.</span></div>}</div></section><section className="stats-panel"><div className="chart-heading"><div><h2>Most active applications</h2><p>Top App / website sources by captured time.</p></div></div><div className="stats-donut-layout">{appRows.length ? <><StatsDonut rows={applicationDonutRows} total={appRows.reduce((total, row) => total + row.seconds, 0)} label="Most active applications" /><div className="stats-donut-legend">{appRows.map((row) => <div className="stats-donut-legend-row stats-app-legend-row" key={row.name + ":" + row.category.label}><span className="stats-app-identity"><row.icon size={15} weight="duotone" /></span><span>{row.name}<small className={`activity-category ${row.category.key}`} style={activityCategoryStyle(row.category)}><i />{row.category.label}</small></span><strong>{formatStat(row.seconds)}</strong></div>)}</div></> : <div className="entries-empty"><Browsers size={22} /><span>No application activity yet.</span></div>}</div></section></section></div></div></main>;
 }
 
 function ReportsPage({ api, dateKey, setDateKey }) {

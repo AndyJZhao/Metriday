@@ -1,6 +1,29 @@
 import Charts
 import SwiftUI
 
+private enum StatsPeriod: String, CaseIterable, Identifiable {
+    case week
+    case month
+    case year
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .week: return "This Week"
+        case .month: return "This Month"
+        case .year: return "This Year"
+        }
+    }
+
+    var chartTitle: String {
+        switch self {
+        case .week: return "Time by Day"
+        case .month, .year: return "Time by Week"
+        }
+    }
+}
+
 struct StatsView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var monitor: AppActivityMonitor
@@ -12,6 +35,7 @@ struct StatsView: View {
     let selectedDate: Date
 
     @State private var projectUnit: StatsProjectUnit = .hour
+    @State private var statsPeriod: StatsPeriod = .week
 
     private var projectScope: StatsProjectScope {
         StatsProjectScope(appState.activityScope)
@@ -38,9 +62,22 @@ struct StatsView: View {
 
                     VStack(alignment: .leading, spacing: 22) {
                         HStack(spacing: 10) {
-                            Text(weekRangeLabel)
-                                .font(.system(size: 13, weight: .semibold))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(periodRangeLabel)
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text(statsPeriod.label)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(MetridayTheme.secondary)
+                            }
                             Spacer()
+                            Picker("Stats range", selection: $statsPeriod) {
+                                ForEach(StatsPeriod.allCases) { period in
+                                    Text(period.label).tag(period)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 250)
+                            .accessibilityIdentifier("stats.period-picker")
                             Button("Open Activities") {
                                 appState.section = .activities
                             }
@@ -72,14 +109,14 @@ struct StatsView: View {
                             )
                             statCard(
                                 title: "Related time",
-                                value: formatSeconds(weeklySummary.relatedDurationSeconds),
+                                value: formatSeconds(periodSummary.relatedDurationSeconds),
                                 note: "Task-related activity",
                                 color: MetridayTheme.success,
                                 symbol: "target"
                             )
                             statCard(
                                 title: "Distraction",
-                                value: formatSeconds(weeklySummary.distractedDurationSeconds),
+                                value: formatSeconds(periodSummary.distractedDurationSeconds),
                                 note: "Detected locally",
                                 color: MetridayTheme.danger,
                                 symbol: "exclamationmark.triangle"
@@ -88,9 +125,9 @@ struct StatsView: View {
 
                         HStack(alignment: .top, spacing: 16) {
                             weekdayCategoryChart(
-                                title: "Time by Week",
+                                title: statsPeriod.chartTitle,
                                 subtitle: "Active minutes by Category",
-                                points: weekdayPoints,
+                                points: periodPoints,
                                 identifier: "stats.active-weekdays"
                             )
                             weekdayChart(
@@ -363,18 +400,22 @@ struct StatsView: View {
                 }
             }
 
-            Chart {
-                ForEach(bars) { bar in
-                    BarMark(
-                        x: .value("Day", bar.label),
-                        yStart: .value("Start", bar.startMinutes),
-                        yEnd: .value("End", bar.endMinutes)
-                    )
-                    .foregroundStyle(bar.color)
+            ScrollView(.horizontal, showsIndicators: false) {
+                Chart {
+                    ForEach(bars) { bar in
+                        BarMark(
+                            x: .value("Day", bar.label),
+                            yStart: .value("Start", bar.startMinutes),
+                            yEnd: .value("End", bar.endMinutes)
+                        )
+                        .foregroundStyle(bar.color)
+                    }
                 }
+                .chartYAxis { AxisMarks(position: .leading) }
+                .frame(minWidth: max(320, CGFloat(bars.count) * 30))
+                .frame(height: 170)
             }
-            .chartYAxis { AxisMarks(position: .leading) }
-            .frame(height: 170)
+            .frame(maxWidth: .infinity)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -663,19 +704,19 @@ struct StatsView: View {
         .accessibilityIdentifier("stats.projects-and-time-entries")
     }
 
-    private var weeklySummary: ActivitySummary {
-        ActivitySummary(segments: weekDates.flatMap(activitySegments(for:)))
+    private var periodSummary: ActivitySummary {
+        ActivitySummary(segments: periodDates.flatMap(activitySegments(for:)))
     }
 
     private var totalActiveSeconds: Int {
-        weeklySummary.relatedDurationSeconds
-            + weeklySummary.distractedDurationSeconds
-            + weeklySummary.otherDurationSeconds
+        periodSummary.relatedDurationSeconds
+            + periodSummary.distractedDurationSeconds
+            + periodSummary.otherDurationSeconds
     }
 
     private var productivityScore: Int {
         guard totalActiveSeconds > 0 else { return 0 }
-        let weighted = datedWeekSegments
+        let weighted = datedPeriodSegments
             .filter { $0.segment.relevance != .idle }
             .reduce(0.0) { total, item in
                 total + productivityValue(for: item.segment, date: item.date) * Double(item.segment.durationSeconds)
@@ -683,23 +724,57 @@ struct StatsView: View {
         return Int((weighted / Double(totalActiveSeconds)).rounded()).clamped(to: -100...100)
     }
 
-    private var weekDates: [Date] {
-        guard let interval = calendar.dateInterval(of: .weekOfYear, for: selectedDate) else {
-            return [selectedDate]
+    private var periodDates: [Date] {
+        switch statsPeriod {
+        case .week:
+            guard let interval = calendar.dateInterval(of: .weekOfYear, for: selectedDate) else {
+                return [selectedDate]
+            }
+            return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: interval.start) }
+        case .month:
+            guard let interval = calendar.dateInterval(of: .month, for: selectedDate) else {
+                return [selectedDate]
+            }
+            return dates(in: interval)
+        case .year:
+            guard let interval = calendar.dateInterval(of: .year, for: selectedDate) else {
+                return [selectedDate]
+            }
+            return dates(in: interval)
         }
-        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: interval.start) }
     }
 
-    private var weekRangeLabel: String {
-        guard let first = weekDates.first, let last = weekDates.last else { return "This week" }
+    private var periodRangeLabel: String {
+        guard let first = periodDates.first, let last = periodDates.last else { return statsPeriod.label }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "MMM d"
-        return "\(formatter.string(from: first))–\(formatter.string(from: last))"
+        formatter.dateFormat = statsPeriod == .year ? "MMM yyyy" : "MMM d"
+        return statsPeriod == .year
+            ? formatter.string(from: first)
+            : "\(formatter.string(from: first))–\(formatter.string(from: last))"
     }
 
-    private var datedWeekSegments: [(date: Date, segment: ActivitySegment)] {
-        weekDates.flatMap { date in
+    private func dates(in interval: DateInterval) -> [Date] {
+        var dates: [Date] = []
+        var date = interval.start
+        while date < interval.end {
+            dates.append(date)
+            guard let next = calendar.date(byAdding: .day, value: 1, to: date) else { break }
+            date = next
+        }
+        return dates
+    }
+
+    private var periodStartDate: Date {
+        calendar.startOfDay(for: periodDates.first ?? selectedDate)
+    }
+
+    private var periodEndDate: Date {
+        calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: periodDates.last ?? selectedDate)) ?? selectedDate
+    }
+
+    private var datedPeriodSegments: [(date: Date, segment: ActivitySegment)] {
+        periodDates.flatMap { date in
             activitySegments(for: date).map { (date: date, segment: $0) }
         }
     }
@@ -708,22 +783,66 @@ struct StatsView: View {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "EEE"
-        return weekDates.map { date in
-            let segments = activitySegments(for: date).filter { $0.relevance != .idle }
-            var categoryTotals: [UUID: (category: ActivityCategoryDefinition, seconds: Int)] = [:]
-            for segment in segments {
+        var activeSeconds = Array(repeating: 0, count: 7)
+        var weightedSeconds = Array(repeating: 0.0, count: 7)
+        var categoryTotals = Array(repeating: [UUID: (category: ActivityCategoryDefinition, seconds: Int)](), count: 7)
+        for date in periodDates {
+            let weekday = calendar.component(.weekday, from: date)
+            let index = (weekday + 5) % 7
+            for segment in activitySegments(for: date) where segment.relevance != .idle {
                 let definition = category(for: segment, date: date)
-                categoryTotals[definition.id, default: (category: definition, seconds: 0)].seconds += segment.durationSeconds
+                categoryTotals[index][definition.id, default: (category: definition, seconds: 0)].seconds += segment.durationSeconds
+                activeSeconds[index] += segment.durationSeconds
+                weightedSeconds[index] += productivityValue(for: segment, date: date) * Double(segment.durationSeconds)
             }
-            let activeSeconds = segments.reduce(0) { $0 + $1.durationSeconds }
-            let score = activeSeconds > 0
-                ? Int((segments.reduce(0.0) { $0 + productivityValue(for: $1, date: date) * Double($1.durationSeconds) } / Double(activeSeconds)).rounded())
-                : 0
+        }
+        let monday = periodDates.first(where: { calendar.component(.weekday, from: $0) == 2 })
+            ?? calendar.dateInterval(of: .weekOfYear, for: selectedDate)?.start
+            ?? selectedDate
+        return (0..<7).map { index in
+            let date = calendar.date(byAdding: .day, value: index, to: monday) ?? monday
+            let seconds = activeSeconds[index]
             return StatsDayPoint(
                 id: date,
                 label: formatter.string(from: date),
+                activeMinutes: Int((Double(seconds) / 60.0).rounded()),
+                productivityScore: seconds > 0 ? Int((weightedSeconds[index] / Double(seconds)).rounded()) : 0,
+                categories: categoryTotals[index].values
+                    .filter { $0.seconds > 0 }
+                    .map { StatsDayCategorySegment(category: $0.category, seconds: $0.seconds) }
+                    .sorted { $0.seconds > $1.seconds }
+            )
+        }
+    }
+
+    private var periodPoints: [StatsDayPoint] {
+        let buckets: [StatsPeriodBucket]
+        switch statsPeriod {
+        case .week:
+            buckets = periodDates.map { StatsPeriodBucket(label: dayLabel($0), dates: [$0]) }
+        case .month, .year:
+            buckets = stride(from: 0, to: periodDates.count, by: 7).map { start in
+                let dates = Array(periodDates[start..<min(start + 7, periodDates.count)])
+                return StatsPeriodBucket(label: shortDateLabel(dates[0]), dates: dates)
+            }
+        }
+        return buckets.map { bucket in
+            var categoryTotals: [UUID: (category: ActivityCategoryDefinition, seconds: Int)] = [:]
+            var activeSeconds = 0
+            var weightedSeconds = 0.0
+            for date in bucket.dates {
+                for segment in activitySegments(for: date) where segment.relevance != .idle {
+                    let definition = category(for: segment, date: date)
+                    categoryTotals[definition.id, default: (category: definition, seconds: 0)].seconds += segment.durationSeconds
+                    activeSeconds += segment.durationSeconds
+                    weightedSeconds += productivityValue(for: segment, date: date) * Double(segment.durationSeconds)
+                }
+            }
+            return StatsDayPoint(
+                id: bucket.dates[0],
+                label: bucket.label,
                 activeMinutes: Int((Double(activeSeconds) / 60.0).rounded()),
-                productivityScore: score,
+                productivityScore: activeSeconds > 0 ? Int((weightedSeconds / Double(activeSeconds)).rounded()) : 0,
                 categories: categoryTotals.values
                     .filter { $0.seconds > 0 }
                     .map { StatsDayCategorySegment(category: $0.category, seconds: $0.seconds) }
@@ -732,11 +851,25 @@ struct StatsView: View {
         }
     }
 
+    private func dayLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date)
+    }
+
+    private func shortDateLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: date)
+    }
+
     private var hourPoints: [StatsHourPoint] {
         var active = Array(repeating: 0, count: 24)
         var weighted = Array(repeating: 0.0, count: 24)
         var totals = Array(repeating: 0, count: 24)
-        for item in datedWeekSegments where item.segment.relevance != .idle {
+        for item in datedPeriodSegments where item.segment.relevance != .idle {
             let hour = min(23, max(0, item.segment.startSecond / 3600))
             active[hour] += item.segment.durationSeconds
             totals[hour] += item.segment.durationSeconds
@@ -754,14 +887,14 @@ struct StatsView: View {
 
     private var projectPoints: [StatsProjectPoint] {
         var totals: [UUID?: Int] = [:]
-        for segment in weekDates.flatMap(activitySegments(for:)) where segment.relevance != .idle {
+        for segment in periodDates.flatMap(activitySegments(for:)) where segment.relevance != .idle {
             totals[segment.projectID, default: 0] += segment.durationSeconds
         }
-        let weekStart = calendar.startOfDay(for: weekDates.first ?? selectedDate)
-        let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
-        for entry in timeEntryStore.materializedEntries() where entry.start < weekEnd && entry.end > weekStart && matchesProjectScope(entry.projectID) {
-            let clippedStart = max(entry.start, weekStart)
-            let clippedEnd = min(entry.end, weekEnd)
+        let periodStart = periodStartDate
+        let periodEnd = periodEndDate
+        for entry in timeEntryStore.materializedEntries() where entry.start < periodEnd && entry.end > periodStart && matchesProjectScope(entry.projectID) {
+            let clippedStart = max(entry.start, periodStart)
+            let clippedEnd = min(entry.end, periodEnd)
             totals[entry.projectID, default: 0] += max(0, Int(clippedEnd.timeIntervalSince(clippedStart)))
         }
         return totals
@@ -782,7 +915,7 @@ struct StatsView: View {
 
     private var categoryPoints: [StatsCategoryPoint] {
         var totals: [String: (name: String, seconds: Int, color: Color)] = [:]
-        for item in datedWeekSegments {
+        for item in datedPeriodSegments {
             let definition = category(for: item.segment, date: item.date)
             guard definition.role != .idle else { continue }
             let key = definition.name + "::" + definition.role.rawValue
@@ -808,7 +941,7 @@ struct StatsView: View {
 
     private var applicationPoints: [StatsApplicationPoint] {
         var totals: [String: (name: String, categoryName: String, bundleIdentifier: String, seconds: Int, color: Color)] = [:]
-        for item in datedWeekSegments where item.segment.relevance != .idle {
+        for item in datedPeriodSegments where item.segment.relevance != .idle {
             let definition = category(for: item.segment, date: item.date)
             let key = "\(item.segment.displayTitle)::\(definition.name)::\(definition.role.rawValue)"
             let existing = totals[key, default: (
@@ -842,18 +975,18 @@ struct StatsView: View {
 
     private var projectScopePoints: [StatsProjectScopePoint] {
         var totals: [UUID?: (seconds: Int, segmentCount: Int)] = [:]
-        for segment in weekDates.flatMap(allActivitySegments(for:)) where segment.relevance != .idle {
+        for segment in periodDates.flatMap(allActivitySegments(for:)) where segment.relevance != .idle {
             let current = totals[segment.projectID, default: (seconds: 0, segmentCount: 0)]
             totals[segment.projectID] = (
                 seconds: current.seconds + segment.durationSeconds,
                 segmentCount: current.segmentCount + 1
             )
         }
-        let weekStart = calendar.startOfDay(for: weekDates.first ?? selectedDate)
-        let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
-        for entry in timeEntryStore.materializedEntries() where entry.start < weekEnd && entry.end > weekStart {
-            let clippedStart = max(entry.start, weekStart)
-            let clippedEnd = min(entry.end, weekEnd)
+        let periodStart = periodStartDate
+        let periodEnd = periodEndDate
+        for entry in timeEntryStore.materializedEntries() where entry.start < periodEnd && entry.end > periodStart {
+            let clippedStart = max(entry.start, periodStart)
+            let clippedEnd = min(entry.end, periodEnd)
             let current = totals[entry.projectID, default: (seconds: 0, segmentCount: 0)]
             totals[entry.projectID] = (
                 seconds: current.seconds + max(0, Int(clippedEnd.timeIntervalSince(clippedStart))),
@@ -899,23 +1032,23 @@ struct StatsView: View {
 
     private func projectScopeSeconds(for projectID: UUID) -> Int {
         let projectIDs = projectStore.descendantProjectIDs(including: projectID)
-        let activitySeconds = weekDates
+        let activitySeconds = periodDates
             .flatMap(allActivitySegments(for:))
             .filter { segment in
                 guard let assignedProjectID = segment.projectID else { return false }
                 return projectIDs.contains(assignedProjectID) && segment.relevance != .idle
             }
             .reduce(0) { $0 + $1.durationSeconds }
-        let weekStart = calendar.startOfDay(for: weekDates.first ?? selectedDate)
-        let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
+        let periodStart = periodStartDate
+        let periodEnd = periodEndDate
         let entrySeconds = timeEntryStore.materializedEntries()
             .filter { entry in
                 guard let assignedProjectID = entry.projectID else { return false }
-                return projectIDs.contains(assignedProjectID) && entry.start < weekEnd && entry.end > weekStart
+                return projectIDs.contains(assignedProjectID) && entry.start < periodEnd && entry.end > periodStart
             }
             .reduce(0) { total, entry in
-                let clippedStart = max(entry.start, weekStart)
-                let clippedEnd = min(entry.end, weekEnd)
+                let clippedStart = max(entry.start, periodStart)
+                let clippedEnd = min(entry.end, periodEnd)
                 return total + max(0, Int(clippedEnd.timeIntervalSince(clippedStart)))
             }
         return activitySeconds + entrySeconds
@@ -989,6 +1122,11 @@ private struct StatsDayPoint: Identifiable {
     let activeMinutes: Int
     let productivityScore: Int
     let categories: [StatsDayCategorySegment]
+}
+
+private struct StatsPeriodBucket {
+    let label: String
+    let dates: [Date]
 }
 
 private struct StatsDayCategorySegment: Identifiable {
