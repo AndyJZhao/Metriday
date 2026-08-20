@@ -462,6 +462,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-bar-column strong { color: #454a55; font-size: 10px; }
 .stats-bar-track { display: flex; align-items: end; width: min(38px, 100%); height: 145px; border-radius: 6px 6px 2px 2px; background: #f1f2f5; }
 .stats-bar-track i { display: block; width: 100%; min-height: 3px; border-radius: 6px 6px 2px 2px; background: var(--accent); }
+.stats-category-legend { max-width: 58%; flex-wrap: wrap; justify-content: flex-end; gap: 5px 9px; }
+.stats-category-legend span { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-category-legend i { flex: 0 0 auto; border-radius: 50%; }
+.stats-category-bar-track { flex-direction: column; justify-content: flex-end; }
+.stats-category-bar-track i { min-height: 0; border-radius: 0; }
+.stats-category-bar-track i:first-child { border-radius: 0 0 2px 2px; }
+.stats-category-bar-track i:last-child { border-radius: 6px 6px 0 0; }
 .stats-score-bars .stats-bar-track { background: #f1f7f2; }
 .stats-hour-bars { display: flex; align-items: end; gap: 4px; min-height: 215px; padding-top: 20px; }
 .stats-hour-column { display: grid; flex: 1; align-items: end; justify-items: center; gap: 5px; min-width: 0; color: var(--muted); font-size: 9px; }

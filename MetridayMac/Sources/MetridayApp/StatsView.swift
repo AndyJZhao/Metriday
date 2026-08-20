@@ -87,12 +87,10 @@ struct StatsView: View {
                         }
 
                         HStack(alignment: .top, spacing: 16) {
-                            weekdayChart(
-                                title: "Most active weekdays",
-                                subtitle: "Active minutes",
+                            weekdayCategoryChart(
+                                title: "Time by Week",
+                                subtitle: "Active minutes by Category",
                                 points: weekdayPoints,
-                                value: { $0.activeMinutes },
-                                color: MetridayTheme.accent,
                                 identifier: "stats.active-weekdays"
                             )
                             weekdayChart(
@@ -298,6 +296,81 @@ struct StatsView: View {
                         y: .value(subtitle, value(point))
                     )
                     .foregroundStyle(color)
+                }
+            }
+            .chartYAxis { AxisMarks(position: .leading) }
+            .frame(height: 170)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .metridayPanel()
+        .accessibilityIdentifier(identifier)
+    }
+
+    private func weekdayCategoryChart(
+        title: String,
+        subtitle: String,
+        points: [StatsDayPoint],
+        identifier: String
+    ) -> some View {
+        let bars = points.flatMap { point -> [StatsDayCategoryBar] in
+            var cursor = 0.0
+            return point.categories.map { segment in
+                let start = cursor
+                cursor += Double(segment.seconds) / 60.0
+                return StatsDayCategoryBar(
+                    id: "\(point.id.timeIntervalSinceReferenceDate)-\(segment.category.id.uuidString)",
+                    label: point.label,
+                    startMinutes: start,
+                    endMinutes: cursor,
+                    color: categoryColor(for: segment.category)
+                )
+            }
+        }
+        let categories = points.flatMap(\.categories).reduce(into: [UUID: ActivityCategoryDefinition]()) { result, segment in
+            result[segment.category.id] = segment.category
+        }.values.sorted { $0.name < $1.name }
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .bold))
+                    Text(subtitle)
+                        .font(.system(size: 10))
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
+                Spacer()
+                Image(systemName: "chart.bar.xaxis")
+                    .foregroundStyle(MetridayTheme.accentDeep)
+            }
+
+            if !categories.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(categories) { category in
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(categoryColor(for: category))
+                                    .frame(width: 6, height: 6)
+                                Text(category.name)
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(MetridayTheme.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Chart {
+                ForEach(bars) { bar in
+                    BarMark(
+                        x: .value("Day", bar.label),
+                        yStart: .value("Start", bar.startMinutes),
+                        yEnd: .value("End", bar.endMinutes)
+                    )
+                    .foregroundStyle(bar.color)
                 }
             }
             .chartYAxis { AxisMarks(position: .leading) }
@@ -626,6 +699,11 @@ struct StatsView: View {
         formatter.dateFormat = "EEE"
         return weekDates.map { date in
             let segments = activitySegments(for: date).filter { $0.relevance != .idle }
+            var categoryTotals: [UUID: (category: ActivityCategoryDefinition, seconds: Int)] = [:]
+            for segment in segments {
+                let definition = category(for: segment, date: date)
+                categoryTotals[definition.id, default: (category: definition, seconds: 0)].seconds += segment.durationSeconds
+            }
             let activeSeconds = segments.reduce(0) { $0 + $1.durationSeconds }
             let score = activeSeconds > 0
                 ? Int((segments.reduce(0.0) { $0 + productivityValue(for: $1, date: date) * Double($1.durationSeconds) } / Double(activeSeconds)).rounded())
@@ -634,7 +712,11 @@ struct StatsView: View {
                 id: date,
                 label: formatter.string(from: date),
                 activeMinutes: Int((Double(activeSeconds) / 60.0).rounded()),
-                productivityScore: score
+                productivityScore: score,
+                categories: categoryTotals.values
+                    .filter { $0.seconds > 0 }
+                    .map { StatsDayCategorySegment(category: $0.category, seconds: $0.seconds) }
+                    .sorted { $0.seconds > $1.seconds }
             )
         }
     }
@@ -895,6 +977,21 @@ private struct StatsDayPoint: Identifiable {
     let label: String
     let activeMinutes: Int
     let productivityScore: Int
+    let categories: [StatsDayCategorySegment]
+}
+
+private struct StatsDayCategorySegment: Identifiable {
+    var id: UUID { category.id }
+    let category: ActivityCategoryDefinition
+    let seconds: Int
+}
+
+private struct StatsDayCategoryBar: Identifiable {
+    let id: String
+    let label: String
+    let startMinutes: Double
+    let endMinutes: Double
+    let color: Color
 }
 
 private struct StatsHourPoint: Identifiable {
