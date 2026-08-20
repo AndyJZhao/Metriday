@@ -1059,7 +1059,7 @@ struct ActivitiesView: View {
             for activity in activities {
                 let name = URL(string: activity.resource)?.host ?? activity.appName
                 guard let projectID = projectStore.createProject(name: name, parentID: selectedProjectID) else { continue }
-                assignActivity(activity.id, to: projectID)
+                assignActivity(activity.id, to: projectID, date: activity.activityDate)
                 if createActivityRules {
                     _ = createRule(for: activity, projectID: projectID)
                 }
@@ -1071,7 +1071,7 @@ struct ActivitiesView: View {
         let name = host ?? first.appName
         guard let projectID = projectStore.createProject(name: name, parentID: selectedProjectID) else { return }
         for activity in activities {
-            assignActivity(activity.id, to: projectID)
+            assignActivity(activity.id, to: projectID, date: activity.activityDate)
             if createActivityRules {
                 _ = createRule(for: activity, projectID: projectID)
             }
@@ -1084,7 +1084,7 @@ struct ActivitiesView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(filterTitle)
                         .font(.system(size: 17, weight: .bold))
-                    Text("\(filteredSegments.count) activities · \(formatMinutes(totalSeconds)) tracked")
+                    Text("\(filteredSegments.count) activities · \(formatMinutes(totalSeconds)) tracked · \(activityRangeLabel)")
                         .font(.system(size: 11))
                         .foregroundStyle(MetridayTheme.secondary)
                 }
@@ -1726,12 +1726,12 @@ struct ActivitiesView: View {
 
             Menu {
                 Button("Unassigned") {
-                    assignActivity(segment.id, to: nil)
+                    assignActivity(segment.id, to: nil, date: segment.activityDate)
                 }
                 Divider()
                 ForEach(projectStore.activeProjects) { project in
                     Button {
-                        assignActivity(segment.id, to: project.id)
+                        assignActivity(segment.id, to: project.id, date: segment.activityDate)
                     } label: {
                         Label(project.name, systemImage: project.id == segment.projectID ? "checkmark" : "folder")
                     }
@@ -1788,7 +1788,7 @@ struct ActivitiesView: View {
         categoryStore.category(
             for: segment,
             filterStore: filterStore,
-            date: selectedDate
+            date: segment.activityDate ?? selectedDate
         )
     }
 
@@ -1831,17 +1831,27 @@ struct ActivitiesView: View {
     }
 
     private func appContext(for segment: ActivitySegment) -> String? {
+        let context: String?
         if preferences.showWindowTitles {
             let title = segment.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !title.isEmpty { return title }
+            context = title.isEmpty ? nil : title
+        } else if preferences.showResourcePaths, !segment.resource.isEmpty {
+            context = resourceLabel(segment.resource)
+        } else if segment.deviceName != ActivityDeviceFilter.local {
+            context = segment.deviceName
+        } else {
+            context = nil
         }
-        if preferences.showResourcePaths, !segment.resource.isEmpty {
-            return resourceLabel(segment.resource)
+        guard let activityDate = segment.activityDate,
+              !Calendar.current.isDate(activityDate, inSameDayAs: selectedDate) else {
+            return context
         }
-        if segment.deviceName != ActivityDeviceFilter.local {
-            return segment.deviceName
-        }
-        return nil
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d"
+        return [formatter.string(from: activityDate), context]
+            .compactMap { $0 }
+            .joined(separator: " · ")
     }
 
     private func filterButton(
@@ -2083,24 +2093,53 @@ struct ActivitiesView: View {
     private var allActivitySegments: [ActivitySegment] {
         segmentsForSelectedRange
             .sorted {
+                let firstDate = $0.activityDate ?? selectedDate
+                let secondDate = $1.activityDate ?? selectedDate
+                if firstDate != secondDate { return firstDate < secondDate }
                 if $0.startSecond == $1.startSecond { return $0.endSecond < $1.endSecond }
                 return $0.startSecond < $1.startSecond
             }
     }
 
     private var segmentsForSelectedRange: [ActivitySegment] {
-        let source: [ActivitySegment]
+        let calendar = Calendar.current
+        let dates: [Date]
         switch preferences.activityTimeRange {
         case .selectedDay:
-            source = monitor.observedSegments + screenTimeStore.segments
+            dates = [selectedDate]
         case .lastSevenDays:
-            let calendar = Calendar.current
-            source = (0..<7).flatMap { offset in
-                let date = calendar.date(byAdding: .day, value: -offset, to: selectedDate) ?? selectedDate
-                return monitor.segments(for: date) + screenTimeStore.segments(for: date)
+            dates = (0..<7).compactMap { offset in
+                calendar.date(byAdding: .day, value: -offset, to: selectedDate)
+            }
+        case .lastThirtyDays:
+            dates = (0..<30).compactMap { offset in
+                calendar.date(byAdding: .day, value: -offset, to: selectedDate)
+            }
+        case .lastNinetyDays:
+            dates = (0..<90).compactMap { offset in
+                calendar.date(byAdding: .day, value: -offset, to: selectedDate)
             }
         }
-        return categoryStore.applyingCategories(to: source, filterStore: filterStore, date: selectedDate)
+        return dates.flatMap { date in
+            let rawSegments = calendar.isDate(date, inSameDayAs: selectedDate)
+                ? monitor.observedSegments + screenTimeStore.segments
+                : monitor.segments(for: date) + screenTimeStore.segments(for: date)
+            let taggedSegments = rawSegments.map { segment in
+                var tagged = segment
+                tagged.activityDate = calendar.startOfDay(for: date)
+                return tagged
+            }
+            return categoryStore.applyingCategories(to: taggedSegments, filterStore: filterStore, date: date)
+        }
+    }
+
+    private var activityRangeLabel: String {
+        switch preferences.activityTimeRange {
+        case .selectedDay: return "Selected day"
+        case .lastSevenDays: return "Last 7 days"
+        case .lastThirtyDays: return "Last 30 days"
+        case .lastNinetyDays: return "Last 90 days"
+        }
     }
 
     private var filteredSegments: [ActivitySegment] {
@@ -2163,7 +2202,7 @@ struct ActivitiesView: View {
             }
         case .saved(let id):
             guard let savedFilter = filterStore.filter(id) else { return [] }
-            return source.filter { filterStore.matches(savedFilter, activity: $0, date: selectedDate) }
+            return source.filter { filterStore.matches(savedFilter, activity: $0, date: $0.activityDate ?? selectedDate) }
         }
     }
 
@@ -2210,11 +2249,11 @@ struct ActivitiesView: View {
         )
     }
 
-    private func assignActivity(_ id: UUID, to projectID: UUID?) {
+    private func assignActivity(_ id: UUID, to projectID: UUID?, date: Date? = nil) {
         if screenTimeStore.contains(id) {
-            screenTimeStore.assignActivity(id, to: projectID)
+            screenTimeStore.assignActivity(id, to: projectID, date: date)
         } else {
-            monitor.assignActivity(id, to: projectID)
+            monitor.assignActivity(id, to: projectID, date: date)
         }
     }
 
@@ -2222,7 +2261,7 @@ struct ActivitiesView: View {
     private func createRule(for activity: ActivitySegment, projectID: UUID) -> UUID? {
         let ruleID = monitor.createRule(for: activity, projectID: projectID)
         if screenTimeStore.contains(activity.id) {
-            screenTimeStore.assignActivity(activity.id, to: projectID)
+            screenTimeStore.assignActivity(activity.id, to: projectID, date: activity.activityDate)
         }
         return ruleID
     }
@@ -2416,7 +2455,8 @@ struct ActivitiesView: View {
     private func prepareNewEntry(
         for event: CalendarEventItem? = nil,
         startMinute: Int? = nil,
-        endMinute: Int? = nil
+        endMinute: Int? = nil,
+        date: Date? = nil
     ) {
         newEntryTitle = ""
         newEntryNotes = ""
@@ -2441,7 +2481,7 @@ struct ActivitiesView: View {
         }
         let calendar = Calendar.current
         if let startMinute, let endMinute, endMinute > startMinute {
-            let day = calendar.startOfDay(for: selectedDate)
+            let day = calendar.startOfDay(for: date ?? selectedDate)
             newEntryStart = day.addingTimeInterval(TimeInterval(startMinute * 60))
             newEntryEnd = day.addingTimeInterval(TimeInterval(endMinute * 60))
             return
@@ -2469,7 +2509,7 @@ struct ActivitiesView: View {
     }
 
     private func prepareNewEntry(for activity: ActivitySegment) {
-        prepareNewEntry(startMinute: activity.startMinute, endMinute: activity.endMinute)
+        prepareNewEntry(startMinute: activity.startMinute, endMinute: activity.endMinute, date: activity.activityDate)
         newEntryTitle = activity.appName.isEmpty ? "App activity" : activity.appName
         newEntryNotes = activity.displayTitle
         newEntryProjectID = activity.projectID ?? selectedProjectID
@@ -3048,8 +3088,8 @@ private struct ActivityDisplaySettingsSheet: View {
             }
             .pickerStyle(.menu)
 
-            if preferences.activityTimeRange == .lastSevenDays {
-                Label("The timeline stays on the selected day; the activity list includes the previous seven days.", systemImage: "info.circle")
+            if preferences.activityTimeRange != .selectedDay {
+                Label("The timeline stays on the selected day; the activity list includes the chosen history range.", systemImage: "info.circle")
                     .font(.system(size: 10))
                     .foregroundStyle(MetridayTheme.secondary)
                     .fixedSize(horizontal: false, vertical: true)

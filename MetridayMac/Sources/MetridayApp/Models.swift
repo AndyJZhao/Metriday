@@ -148,6 +148,10 @@ struct ActivitySegment: Identifiable, Hashable, Codable {
     var endSecond: Int
     var relevance: ActivityRelevance
     var projectID: UUID?
+    /// The day this segment was captured on when Activities is showing a
+    /// multi-day history. It is display-only and intentionally not persisted
+    /// because the daily history file already provides the source of truth.
+    var activityDate: Date?
 
     init(
         id: UUID = UUID(),
@@ -161,7 +165,8 @@ struct ActivitySegment: Identifiable, Hashable, Codable {
         startSecond: Int? = nil,
         endSecond: Int? = nil,
         relevance: ActivityRelevance,
-        projectID: UUID? = nil
+        projectID: UUID? = nil,
+        activityDate: Date? = nil
     ) {
         self.id = id
         self.appName = appName
@@ -173,6 +178,7 @@ struct ActivitySegment: Identifiable, Hashable, Codable {
         self.endSecond = endSecond ?? endMinute * 60
         self.relevance = relevance
         self.projectID = projectID
+        self.activityDate = activityDate
     }
 
     var startMinute: Int {
@@ -217,6 +223,7 @@ struct ActivitySegment: Identifiable, Hashable, Codable {
         endSecond = try container.decodeIfPresent(Int.self, forKey: .endSecond) ?? legacyEnd * 60
         relevance = try container.decode(ActivityRelevance.self, forKey: .relevance)
         projectID = try container.decodeIfPresent(UUID.self, forKey: .projectID)
+        activityDate = nil
     }
 
     func encode(to encoder: Encoder) throws {

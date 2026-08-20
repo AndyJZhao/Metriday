@@ -4,6 +4,8 @@ import Foundation
 enum ActivityTimeRange: String, CaseIterable, Codable, Identifiable {
     case selectedDay
     case lastSevenDays
+    case lastThirtyDays
+    case lastNinetyDays
 
     var id: Self { self }
 
@@ -11,6 +13,8 @@ enum ActivityTimeRange: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .selectedDay: return "Selected day"
         case .lastSevenDays: return "Last 7 days"
+        case .lastThirtyDays: return "Last 30 days"
+        case .lastNinetyDays: return "Last 90 days"
         }
     }
 }
