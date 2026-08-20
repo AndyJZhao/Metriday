@@ -3426,6 +3426,14 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
   const [contextMenu, setContextMenu] = useState(null);
   const rowClickTimer = useRef(null);
   useEffect(() => () => { if (rowClickTimer.current) window.clearTimeout(rowClickTimer.current); }, []);
+  const openActivityContextMenu = (event, activity) => {
+    if (event.target.closest(".activity-row-action")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (rowClickTimer.current) window.clearTimeout(rowClickTimer.current);
+    rowClickTimer.current = null;
+    setContextMenu({ activity: { ...activity, __deleteActivity: api?.connected && api?.deleteActivity ? () => api.deleteActivity(activity.id, activity.date || dateKey) : null }, x: event.clientX, y: event.clientY });
+  };
   const displayActivities = viewMode === "category"
     ? activities
     : collapseShortActivities(activities, displayPreferences?.collapse_activities_shorter_than_seconds);
@@ -3511,12 +3519,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
       }
     };
     const openContextMenu = (event) => {
-      if (event.target.closest(".activity-row-action")) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (rowClickTimer.current) window.clearTimeout(rowClickTimer.current);
-      rowClickTimer.current = null;
-      setContextMenu({ activity: { ...activity, __deleteActivity: api?.connected && api?.deleteActivity ? () => api.deleteActivity(activity.id, activity.date || dateKey) : null }, x: event.clientX, y: event.clientY });
+      openActivityContextMenu(event, activity);
     };
     const selected = selectedActivityIDs.has(resourceID(activity.id));
     return <div className={`activity-table-row ${selected ? "selected" : ""}`} key={activity.id} role="button" tabIndex={0} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-metriday-activity", activity.id); event.dataTransfer.setData("text/plain", activity.id); event.dataTransfer.setData("application/x-metriday-activity-date", activity.date || dateKey); }} onClick={openDetails} onDoubleClick={openTimeEntry} onContextMenu={openContextMenu} onKeyDown={handleKeyDown} aria-label={`Open details for ${app} ${formatRange(start, end)}`} title="Drag this activity to a project to assign it">
@@ -3532,7 +3535,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     </div>;
   };
   if (viewMode === "category") {
-    return <WebActivityCategoryCards activities={rows} dateKey={dateKey} displayPreferences={displayPreferences} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} selectedActivityIDs={selectedActivityIDs} onToggleActivitySelection={onToggleActivitySelection} onCreateSelectedTimeEntries={onCreateSelectedTimeEntries} />;
+    return <><WebActivityCategoryCards activities={rows} dateKey={dateKey} displayPreferences={displayPreferences} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} selectedActivityIDs={selectedActivityIDs} onToggleActivitySelection={onToggleActivitySelection} onCreateSelectedTimeEntries={onCreateSelectedTimeEntries} onContextMenu={openActivityContextMenu} />{contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} selectedCount={selectedActivityIDs.size} onCreateSelectedTimeEntries={onCreateSelectedTimeEntries} /> : null}</>;
   }
   const resolvedListGrouping = viewMode === "unified"
     ? "none"
@@ -3687,7 +3690,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
   </div>;
 }
 
-function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onSelect, onCreateTimeEntry, selectedActivityIDs = new Set(), onToggleActivitySelection }) {
+function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onSelect, onCreateTimeEntry, selectedActivityIDs = new Set(), onToggleActivitySelection, onContextMenu }) {
   const durationFor = (activity) => activityDurationSeconds(activity);
   const websiteName = (activity) => {
     try {
@@ -3761,7 +3764,7 @@ function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onS
   return <div className="activity-category-card-grid">
     {cards.map(({ key, title, Icon, segments, rows }) => <section className="activity-category-card" key={key} aria-label={title}>
       <header className="activity-category-card-heading"><span><Icon size={17} /><strong>{title}</strong></span><small>{formatDurationSeconds(segments.reduce((total, activity) => total + durationFor(activity), 0))}</small></header>
-      {rows.length ? <div className="activity-category-card-rows" aria-label={`${title} activity items`}>{rows.map((row) => { const rowIDs = row.activities.map((activity) => resourceID(activity.id)).filter(Boolean); const selectedCount = rowIDs.filter((id) => selectedActivityIDs.has(id)).length; const selected = rowIDs.length > 0 && selectedCount === rowIDs.length; return <div className={`activity-category-card-row ${selected ? "selected" : ""}`} key={row.name} role="button" tabIndex={0} draggable onDragStart={(event) => dragStart(event, row)} onClick={(event) => openDetails(event, row.activities[0])} onDoubleClick={(event) => createTimeEntry(event, row.activities[0])} onKeyDown={(event) => handleKeyDown(event, row.activities[0])} aria-label={`Open ${row.name} in ${title}`} title="Click for details · double-click to create a time entry · drag to a project">
+      {rows.length ? <div className="activity-category-card-rows" aria-label={`${title} activity items`}>{rows.map((row) => { const rowIDs = row.activities.map((activity) => resourceID(activity.id)).filter(Boolean); const selectedCount = rowIDs.filter((id) => selectedActivityIDs.has(id)).length; const selected = rowIDs.length > 0 && selectedCount === rowIDs.length; return <div className={`activity-category-card-row ${selected ? "selected" : ""}`} key={row.name} role="button" tabIndex={0} draggable onDragStart={(event) => dragStart(event, row)} onClick={(event) => openDetails(event, row.activities[0])} onDoubleClick={(event) => createTimeEntry(event, row.activities[0])} onContextMenu={(event) => onContextMenu?.(event, row.activities[0])} onKeyDown={(event) => handleKeyDown(event, row.activities[0])} aria-label={`Open ${row.name} in ${title}`} title="Click for details · double-click to create a time entry · right-click for actions · drag to a project">
         <span className={`activity-category-card-dot ${row.category.key}`} style={{ background: activityCategoryStyle(row.category).color }} title={row.category.label} aria-label={row.category.label} />
         {onToggleActivitySelection ? <button type="button" className={`activity-category-card-select activity-row-action ${selected ? "selected" : ""}`} aria-label={selected ? `Deselect ${row.name}` : `Select ${row.name}`} aria-pressed={selected} onClick={(event) => toggleRowSelection(event, row)}><CheckCircle size={15} weight={selected ? "fill" : "regular"} /></button> : null}<strong>{row.name}</strong><span>{formatDurationSeconds(row.seconds)}</span>
       </div>; })}</div> : <p className="activity-category-card-empty">No matching activity</p>}
