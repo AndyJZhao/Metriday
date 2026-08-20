@@ -4512,6 +4512,7 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     if (!targets.length || !window.confirm(`Delete ${targets.length} selected app usage record${targets.length === 1 ? "" : "s"}?`)) return;
     setActivityDeletionBusy(true);
     setDisplayMessage("");
+    setEntryOMaticUndo(null);
     const deleted = [];
     try {
       for (const activity of targets) {
@@ -4758,15 +4759,16 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   };
   useEffect(() => {
     const handleUndo = (event) => {
-      if (!entryOMaticUndo || !event.metaKey || event.altKey || event.shiftKey || event.key.toLowerCase() !== "z") return;
+      if ((!entryOMaticUndo && !lastDeletedActivities.length) || !event.metaKey || event.altKey || event.shiftKey || event.key.toLowerCase() !== "z") return;
       const target = event.target;
       if (target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
       event.preventDefault();
-      void undoEntryOMatic();
+      if (entryOMaticUndo) void undoEntryOMatic();
+      else void undoDeletedActivities();
     };
     window.addEventListener("keydown", handleUndo);
     return () => window.removeEventListener("keydown", handleUndo);
-  }, [entryOMaticUndo]);
+  }, [entryOMaticUndo, lastDeletedActivities]);
   useEffect(() => { setSelectedActivity(null); setSelectedTimeEntry(null); setTimelineSelection(null); setSelectedActivityIDs(new Set()); }, [dateKey]);
   const activityHeading = dateKey === localDateKey() ? "Today’s activity" : `${planDateLabel(dateKey)} activity`;
   const activityRangeDescription = activityRangeLoading
