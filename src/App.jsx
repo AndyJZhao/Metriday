@@ -2055,17 +2055,35 @@ function TimeEntryEditRow({ entry, api, dateKey, projects, onCancel, dialog = fa
   const [billingStatus, setBillingStatus] = useState(entry.billing_status || "billable");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const save = async (event) => {
-    event.preventDefault();
+  const [overlapEntries, setOverlapEntries] = useState([]);
+  const save = async (event, overlapDecision = null) => {
+    event?.preventDefault();
     const startDate = localEntryDate(dateKey, start);
     const endDate = localEntryDate(dateKey, end);
     if (!title.trim() || !startDate || !endDate || new Date(endDate) <= new Date(startDate)) {
       setMessage("Enter a valid title and time range.");
       return;
     }
+    const startTime = new Date(startDate).getTime();
+    const endTime = new Date(endDate).getTime();
+    const overlaps = api.entries.filter((candidate) => {
+      if (entryID(candidate) === entryID(entry)) return false;
+      const candidateStart = new Date(candidate.start_date || candidate.start).getTime();
+      const candidateEnd = new Date(candidate.end_date || candidate.end).getTime();
+      return Number.isFinite(candidateStart) && Number.isFinite(candidateEnd) && startTime < candidateEnd && endTime > candidateStart;
+    });
+    if (overlapDecision === null && overlaps.length > 0) {
+      setOverlapEntries(overlaps);
+      setMessage(`This range overlaps ${overlaps.length} existing time ${overlaps.length === 1 ? "entry" : "entries"}.`);
+      return;
+    }
     setBusy(true);
     try {
+      if (overlapDecision === "replace" && overlapEntries.length > 0) {
+        await api.deleteTimeEntries(overlapEntries.map((candidate) => entryID(candidate)));
+      }
       await api.updateTimeEntry(entry.id, { title: title.trim(), start_date: startDate, end_date: endDate, project: project || "", billing_status: billingStatus });
+      setOverlapEntries([]);
       onCancel();
     } catch (error) {
       setMessage(error.message || "Could not update the time entry.");
@@ -2079,7 +2097,7 @@ function TimeEntryEditRow({ entry, api, dateKey, projects, onCancel, dialog = fa
     {dialog ? <label>Project<select value={project} onChange={(event) => setProject(event.target.value)} aria-label="Edit time entry project"><option value="">Unassigned</option>{projects.map((item) => <option key={item.id} value={resourceID(item.id)}>{item.title}</option>)}</select></label> : <select value={project} onChange={(event) => setProject(event.target.value)} aria-label="Edit time entry project"><option value="">Unassigned</option>{projects.map((item) => <option key={item.id} value={resourceID(item.id)}>{item.title}</option>)}</select>}
     {dialog ? <label>Billing status<select value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)} aria-label="Edit time entry billing status"><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select></label> : <select value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)} aria-label="Edit time entry billing status"><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select>}
   </>;
-  return <form className={dialog ? "time-entry-edit-form" : "entry-edit-row"} onSubmit={save} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); onCancel(); } }}>{fields}<span className={dialog ? "time-entry-edit-actions" : "project-actions"}><button type="submit" disabled={busy} aria-label="Save time entry">{dialog ? "Save changes" : <Check size={16} />}</button><IconButton label="Cancel time entry edit" onClick={onCancel}>{dialog ? "Cancel" : <X size={15} />}</IconButton></span>{message ? <small className="entry-edit-message">{message}</small> : null}</form>;
+  return <form className={dialog ? "time-entry-edit-form" : "entry-edit-row"} onSubmit={save} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); onCancel(); } }}>{fields}{overlapEntries.length > 0 ? <div className="time-entry-overlap-callout" role="alert"><strong>Overlapping Time Entry</strong><p>This range overlaps {overlapEntries.length} existing time {overlapEntries.length === 1 ? "entry" : "entries"}. Replace them or keep parallel entries?</p><div><button type="button" className="secondary-button" onClick={() => { setOverlapEntries([]); setMessage(""); }}>Cancel</button><button type="button" className="secondary-button" onClick={() => save(null, "keep")} disabled={busy}>Keep Both</button><button type="button" className="secondary-button danger-pill" onClick={() => save(null, "replace")} disabled={busy}>Replace Existing</button></div></div> : null}<span className={dialog ? "time-entry-edit-actions" : "project-actions"}><button type="submit" disabled={busy} aria-label="Save time entry">{dialog ? "Save changes" : <Check size={16} />}</button><IconButton label="Cancel time entry edit" onClick={onCancel}>{dialog ? "Cancel" : <X size={15} />}</IconButton></span>{message ? <small className="entry-edit-message">{message}</small> : null}</form>;
 }
 
 function TimeEntriesPanel({ api, dateKey, onNewEntry = () => window.dispatchEvent(new CustomEvent("metriday:open-new-time-entry")) }) {

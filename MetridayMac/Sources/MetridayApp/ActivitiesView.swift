@@ -296,7 +296,8 @@ struct ActivitiesView: View {
             )
         }
         .sheet(item: $editingEntry) { entry in
-            TimeEntryEditorSheet(entry: entry, projects: projectStore.activeProjects) { updatedEntry in
+            TimeEntryEditorSheet(entry: entry, projects: projectStore.activeProjects, existingEntries: timeEntryStore.entries) { updatedEntry, replacements in
+                replacements.forEach { timeEntryStore.delete($0) }
                 timeEntryStore.update(updatedEntry)
                 editingEntry = nil
             }
@@ -5250,7 +5251,8 @@ private struct TimeEntryEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     let entry: TimeEntry
     let projects: [TrackingProject]
-    let onSave: (TimeEntry) -> Void
+    let existingEntries: [TimeEntry]
+    let onSave: (TimeEntry, [TimeEntry]) -> Void
 
     @State private var title: String
     @State private var projectID: UUID?
@@ -5258,14 +5260,18 @@ private struct TimeEntryEditorSheet: View {
     @State private var start: Date
     @State private var end: Date
     @State private var notes: String
+    @State private var overlappingEntries: [TimeEntry] = []
+    @State private var showingOverlapConfirmation = false
 
     init(
         entry: TimeEntry,
         projects: [TrackingProject],
-        onSave: @escaping (TimeEntry) -> Void
+        existingEntries: [TimeEntry],
+        onSave: @escaping (TimeEntry, [TimeEntry]) -> Void
     ) {
         self.entry = entry
         self.projects = projects
+        self.existingEntries = existingEntries
         self.onSave = onSave
         _title = State(initialValue: entry.title)
         _projectID = State(initialValue: entry.projectID)
@@ -5306,18 +5312,7 @@ private struct TimeEntryEditorSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
-                Button("Save") {
-                    var updated = entry
-                    updated.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-                    updated.projectID = projectID
-                    updated.billingStatus = billingStatus
-                    updated.start = start
-                    updated.end = end
-                    updated.notes = notes
-                    guard !updated.title.isEmpty, updated.end > updated.start else { return }
-                    onSave(updated)
-                    dismiss()
-                }
+                Button("Save", action: requestSave)
                 .buttonStyle(.borderedProminent)
                 .disabled(
                     title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -5327,5 +5322,54 @@ private struct TimeEntryEditorSheet: View {
         }
         .padding(24)
         .frame(width: 420)
+        .alert("Overlapping Time Entry", isPresented: $showingOverlapConfirmation) {
+            Button("Cancel", role: .cancel) {
+                overlappingEntries = []
+            }
+            Button("Keep Both") {
+                commitSave(replacing: false)
+            }
+            Button("Replace Existing", role: .destructive) {
+                commitSave(replacing: true)
+            }
+        } message: {
+            let noun = overlappingEntries.count == 1 ? "entry" : "entries"
+            Text("This range overlaps \(overlappingEntries.count) existing time \(noun). Replace them or keep parallel entries?")
+        }
+    }
+
+    private func requestSave() {
+        var updated = entry
+        updated.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.projectID = projectID
+        updated.billingStatus = billingStatus
+        updated.start = start
+        updated.end = end
+        updated.notes = notes
+        guard !updated.title.isEmpty, updated.end > updated.start else { return }
+        overlappingEntries = existingEntries.filter { existing in
+            existing.id != entry.id && existing.start < updated.end && existing.end > updated.start
+        }
+        if !overlappingEntries.isEmpty {
+            showingOverlapConfirmation = true
+            return
+        }
+        onSave(updated, [])
+        dismiss()
+    }
+
+    private func commitSave(replacing: Bool) {
+        var updated = entry
+        updated.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.projectID = projectID
+        updated.billingStatus = billingStatus
+        updated.start = start
+        updated.end = end
+        updated.notes = notes
+        guard !updated.title.isEmpty, updated.end > updated.start else { return }
+        onSave(updated, replacing ? overlappingEntries : [])
+        overlappingEntries = []
+        showingOverlapConfirmation = false
+        dismiss()
     }
 }
