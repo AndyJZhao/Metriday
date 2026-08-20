@@ -3890,6 +3890,7 @@ function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onS
     onCreateTimeEntry?.(activity);
   };
   const handleKeyDown = (event, activity) => {
+    if (event.target.closest(".activity-row-action")) return;
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onSelect?.(activity);
