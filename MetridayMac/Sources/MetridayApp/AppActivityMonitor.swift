@@ -23,7 +23,10 @@ final class AppActivityMonitor: ObservableObject {
     let preferences: PreferencesStore
     let exclusionStore: ExclusionStore
     private let calendar = Calendar.current
-    private let sampleInterval: TimeInterval = 5
+    // Timing samples the frontmost app roughly once per second. Keeping the
+    // native loop at that cadence preserves short-lived app and website usage
+    // in the local activity history and timeline.
+    private let sampleInterval: TimeInterval = 1
 
     private var timer: Timer?
     private var trackedDate: Date

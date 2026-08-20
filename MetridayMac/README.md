@@ -30,7 +30,7 @@ Metriday records a local activity history under:
 ~/Library/Application Support/Metriday/Activity/YYYY-MM-DD.json
 ```
 
-While tracking is enabled, the native macOS monitor samples the frontmost application every five seconds and closes an activity segment when the application, focused window title, or idle state changes. It also detects two minutes without keyboard or pointer input as `Idle`; when activity resumes, Metriday offers an Idle interval form so the user can account for time away from the Mac or skip it. The Today `Actual` timeline and Review metrics read these segments directly instead of using placeholder activity rows.
+While tracking is enabled, the native macOS monitor samples the frontmost application every second and closes an activity segment when the application, focused window title, or idle state changes. It also detects two minutes without keyboard or pointer input as `Idle`; when activity resumes, Metriday offers an Idle interval form so the user can account for time away from the Mac or skip it. The Today `Actual` timeline and Review metrics read these segments directly instead of using placeholder activity rows.
 
 Application names are available without additional permission. To include focused window titles and document context, allow Metriday under System Settings → Privacy & Security → Accessibility. Safari, Chrome, Firefox, and Brave domain capture uses macOS Automation permission when available. For native document-based apps, Metriday also reads the focused document path through Accessibility when the app exposes it; captured activity data remains local-first and is written only to the Metriday Application Support directory.
 
