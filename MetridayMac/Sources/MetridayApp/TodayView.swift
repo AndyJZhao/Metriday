@@ -358,7 +358,7 @@ struct TodayView: View {
     }
 
     private var insightBar: some View {
-        let summary = ActivitySummary(segments: monitor.observedSegments + screenTimeStore.segments)
+        let summary = ActivitySummary(segments: effectiveActivitySegments)
         return HStack(spacing: 14) {
             Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.system(size: 23))
@@ -388,6 +388,14 @@ struct TodayView: View {
         .padding(.horizontal, 18)
         .frame(height: 68)
         .metridayPanel(radius: 10)
+    }
+
+    private var effectiveActivitySegments: [ActivitySegment] {
+        categoryStore.applyingCategories(
+            to: monitor.observedSegments + screenTimeStore.segments,
+            filterStore: filterStore,
+            date: appState.selectedDate
+        )
     }
 
     private func insightText(summary: ActivitySummary) -> String {

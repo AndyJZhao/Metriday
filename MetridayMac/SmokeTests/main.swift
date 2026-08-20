@@ -250,6 +250,14 @@ Task { @MainActor in
     let distractingCategory = categoryStore.category(for: youtubeActivity, filterStore: categoryFilterStore, date: date)
     expect(focusedCategory.role == .focused && focusedCategory.color == .blue, "Focused application rules should resolve to the deep-blue category")
     expect(distractingCategory.role == .distracting && distractingCategory.color == .red, "Distracting domain rules should resolve to the red category")
+    let categorizedSummary = ActivitySummary(
+        segments: categoryStore.applyingCategories(
+            to: [youtubeActivity],
+            filterStore: categoryFilterStore,
+            date: date
+        )
+    )
+    expect(categorizedSummary.distractedMinutes == 12 && categorizedSummary.taskRelatedPercentage == 0, "Category-owned relevance should drive Today and report summaries")
 
     let teamRoot = tempRoot.appendingPathComponent("Teams", isDirectory: true)
     let teamStore = TeamStore(rootDirectory: teamRoot)
