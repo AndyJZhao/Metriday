@@ -48,6 +48,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
     @Published var showWindowTitles: Bool { didSet { persist() } }
     @Published var showResourcePaths: Bool { didSet { persist() } }
     @Published var showActivityDateRanges: Bool { didSet { persist() } }
+    @Published var includeTitlesInAdditionToPaths: Bool { didSet { persist() } }
     @Published var groupWebsitesIndependently: Bool { didSet { persist() } }
     @Published var groupPathsIndependently: Bool { didSet { persist() } }
     @Published var activityTimeRange: ActivityTimeRange { didSet { persist() } }
@@ -70,6 +71,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             showWindowTitles = payload.showWindowTitles
             showResourcePaths = payload.showResourcePaths
             showActivityDateRanges = payload.showActivityDateRanges
+            includeTitlesInAdditionToPaths = payload.includeTitlesInAdditionToPaths
             groupWebsitesIndependently = payload.groupWebsitesIndependently
             groupPathsIndependently = payload.groupPathsIndependently
             activityTimeRange = payload.activityTimeRange
@@ -85,6 +87,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             showWindowTitles = true
             showResourcePaths = true
             showActivityDateRanges = false
+            includeTitlesInAdditionToPaths = true
             groupWebsitesIndependently = false
             groupPathsIndependently = false
             activityTimeRange = .selectedDay
@@ -110,6 +113,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
                 showWindowTitles: showWindowTitles,
                 showResourcePaths: showResourcePaths,
                 showActivityDateRanges: showActivityDateRanges,
+                includeTitlesInAdditionToPaths: includeTitlesInAdditionToPaths,
                 groupWebsitesIndependently: groupWebsitesIndependently,
                 groupPathsIndependently: groupPathsIndependently,
                 activityTimeRange: activityTimeRange,
@@ -142,6 +146,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
         let showWindowTitles: Bool
         let showResourcePaths: Bool
         let showActivityDateRanges: Bool
+        let includeTitlesInAdditionToPaths: Bool
         let groupWebsitesIndependently: Bool
         let groupPathsIndependently: Bool
         let activityTimeRange: ActivityTimeRange
@@ -158,6 +163,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             showWindowTitles: Bool,
             showResourcePaths: Bool,
             showActivityDateRanges: Bool,
+            includeTitlesInAdditionToPaths: Bool,
             groupWebsitesIndependently: Bool,
             groupPathsIndependently: Bool,
             activityTimeRange: ActivityTimeRange,
@@ -173,6 +179,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             self.showWindowTitles = showWindowTitles
             self.showResourcePaths = showResourcePaths
             self.showActivityDateRanges = showActivityDateRanges
+            self.includeTitlesInAdditionToPaths = includeTitlesInAdditionToPaths
             self.groupWebsitesIndependently = groupWebsitesIndependently
             self.groupPathsIndependently = groupPathsIndependently
             self.activityTimeRange = activityTimeRange
@@ -191,6 +198,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             showWindowTitles = try container.decodeIfPresent(Bool.self, forKey: .showWindowTitles) ?? true
             showResourcePaths = try container.decodeIfPresent(Bool.self, forKey: .showResourcePaths) ?? true
             showActivityDateRanges = try container.decodeIfPresent(Bool.self, forKey: .showActivityDateRanges) ?? false
+            includeTitlesInAdditionToPaths = try container.decodeIfPresent(Bool.self, forKey: .includeTitlesInAdditionToPaths) ?? true
             groupWebsitesIndependently = try container.decodeIfPresent(Bool.self, forKey: .groupWebsitesIndependently) ?? false
             groupPathsIndependently = try container.decodeIfPresent(Bool.self, forKey: .groupPathsIndependently) ?? false
             activityTimeRange = try container.decodeIfPresent(ActivityTimeRange.self, forKey: .activityTimeRange) ?? .selectedDay

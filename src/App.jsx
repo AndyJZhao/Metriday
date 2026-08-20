@@ -920,17 +920,21 @@ function activityBlockStyle(color) {
 function activityContext(activity, options = {}) {
   const showWindowTitles = options.showWindowTitles !== false;
   const showResourcePaths = options.showResourcePaths !== false;
+  const includeTitlesInAdditionToPaths = options.includeTitlesInAdditionToPaths !== false;
   const title = String(activity?.windowTitle || "").trim();
   const resource = String(activity?.resource || "").trim();
   const app = String(activity?.appName || "").trim();
-  if (showWindowTitles && title && title.toLowerCase() !== app.toLowerCase()) return title;
   if (showResourcePaths && resource) {
+    let path = resource;
     try {
-      return new URL(resource).host || resource;
+      path = new URL(resource).host || resource;
     } catch {
-      return resource;
+      // Keep the raw path when it is not a URL.
     }
+    if (showWindowTitles && includeTitlesInAdditionToPaths && title && title.toLowerCase() !== app.toLowerCase()) return `${path} · ${title}`;
+    return path;
   }
+  if (showWindowTitles && title && title.toLowerCase() !== app.toLowerCase()) return title;
   return "";
 }
 
@@ -3201,6 +3205,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     const context = activityContext(activity, {
       showWindowTitles: displayPreferences?.show_window_titles,
       showResourcePaths: displayPreferences?.show_resource_paths,
+      includeTitlesInAdditionToPaths: displayPreferences?.include_titles_in_addition_to_paths,
     });
     const start = Math.floor(Number(activity.startSecond || 0) / 60);
     const end = Math.ceil(Number(activity.endSecond || 0) / 60);
@@ -3440,6 +3445,7 @@ function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = nul
   const context = activityContext(activity, {
     showWindowTitles: displayPreferences?.show_window_titles,
     showResourcePaths: displayPreferences?.show_resource_paths,
+    includeTitlesInAdditionToPaths: displayPreferences?.include_titles_in_addition_to_paths,
   });
   const startSecond = Math.max(0, Number(activity.startSecond || 0));
   const endSecond = Math.max(startSecond, Number(activity.endSecond || 0));
@@ -3735,13 +3741,14 @@ function WebActivityDisplayMenu({ open, onToggle, preferences, devices, onChange
     show_window_titles: true,
     show_resource_paths: true,
     show_activity_date_ranges: false,
+    include_titles_in_addition_to_paths: true,
     group_websites_independently: false,
     group_paths_independently: false,
     activity_time_range: "selectedDay",
     selected_device: "All Devices",
     collapse_activities_shorter_than_seconds: 0,
   };
-  return <div className="activity-display-menu"><button type="button" className={`quiet-pill activity-display-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />Display</button>{open ? <div className="activity-display-popover" role="dialog" aria-label="Activity display settings"><strong>Display settings</strong><label><input type="checkbox" checked={Boolean(values.include_time_entries)} onChange={(event) => onChange({ include_time_entries: event.target.checked })} />Include time entries</label><label><input type="checkbox" checked={Boolean(values.show_window_titles)} onChange={(event) => onChange({ show_window_titles: event.target.checked })} />Show window titles</label><label><input type="checkbox" checked={Boolean(values.show_resource_paths)} onChange={(event) => onChange({ show_resource_paths: event.target.checked })} />Show website paths</label><label><input type="checkbox" checked={Boolean(values.show_activity_date_ranges)} onChange={(event) => onChange({ show_activity_date_ranges: event.target.checked })} />Show app-usage date ranges</label><label className="activity-display-select">Collapse activities shorter than<select value={Number(values.collapse_activities_shorter_than_seconds || 0)} onChange={(event) => onChange({ collapse_activities_shorter_than_seconds: Number(event.target.value) })}><option value="0">Never</option><option value="5">5 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option></select></label><label><input type="checkbox" checked={Boolean(values.group_websites_independently)} onChange={(event) => onChange({ group_websites_independently: event.target.checked })} />Group websites independently of browser</label><label><input type="checkbox" checked={Boolean(values.group_paths_independently)} onChange={(event) => onChange({ group_paths_independently: event.target.checked })} />Group paths independently of app</label><label className="activity-display-select">Activity range<select value={values.activity_time_range || "selectedDay"} onChange={(event) => onChange({ activity_time_range: event.target.value })}><option value="selectedDay">Selected day</option><option value="lastSevenDays">Last 7 days</option><option value="lastThirtyDays">Last 30 days</option><option value="lastNinetyDays">Last 90 days</option></select></label></div> : null}</div>;
+  return <div className="activity-display-menu"><button type="button" className={`quiet-pill activity-display-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />Display</button>{open ? <div className="activity-display-popover" role="dialog" aria-label="Activity display settings"><strong>Display settings</strong><label><input type="checkbox" checked={Boolean(values.include_time_entries)} onChange={(event) => onChange({ include_time_entries: event.target.checked })} />Include time entries</label><label><input type="checkbox" checked={Boolean(values.show_window_titles)} onChange={(event) => onChange({ show_window_titles: event.target.checked })} />Show window titles</label><label><input type="checkbox" checked={Boolean(values.show_resource_paths)} onChange={(event) => onChange({ show_resource_paths: event.target.checked })} />Show website paths</label><label><input type="checkbox" checked={Boolean(values.show_activity_date_ranges)} onChange={(event) => onChange({ show_activity_date_ranges: event.target.checked })} />Show app-usage date ranges</label><label><input type="checkbox" checked={Boolean(values.include_titles_in_addition_to_paths)} onChange={(event) => onChange({ include_titles_in_addition_to_paths: event.target.checked })} />Create entries for titles in addition to paths</label><label className="activity-display-select">Collapse activities shorter than<select value={Number(values.collapse_activities_shorter_than_seconds || 0)} onChange={(event) => onChange({ collapse_activities_shorter_than_seconds: Number(event.target.value) })}><option value="0">Never</option><option value="5">5 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option></select></label><label><input type="checkbox" checked={Boolean(values.group_websites_independently)} onChange={(event) => onChange({ group_websites_independently: event.target.checked })} />Group websites independently of browser</label><label><input type="checkbox" checked={Boolean(values.group_paths_independently)} onChange={(event) => onChange({ group_paths_independently: event.target.checked })} />Group paths independently of app</label><label className="activity-display-select">Activity range<select value={values.activity_time_range || "selectedDay"} onChange={(event) => onChange({ activity_time_range: event.target.value })}><option value="selectedDay">Selected day</option><option value="lastSevenDays">Last 7 days</option><option value="lastThirtyDays">Last 30 days</option><option value="lastNinetyDays">Last 90 days</option></select></label></div> : null}</div>;
 }
 
 function WebActivityDevicesMenu({ open, devices, selectedDevice, hideDevicesWithoutTime, onToggle, onSelect, onToggleHide }) {

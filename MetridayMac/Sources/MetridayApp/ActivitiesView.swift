@@ -2332,12 +2332,21 @@ struct ActivitiesView: View {
     }
 
     private func appContext(for segment: ActivitySegment) -> String? {
+        let title = segment.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let usefulTitle = title.isEmpty || title.caseInsensitiveCompare(segment.appName) == .orderedSame ? nil : title
+        let path = preferences.showResourcePaths && !segment.resource.isEmpty
+            ? resourceLabel(segment.resource)
+            : nil
         let context: String?
-        if preferences.showWindowTitles {
-            let title = segment.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-            context = title.isEmpty ? nil : title
-        } else if preferences.showResourcePaths, !segment.resource.isEmpty {
-            context = resourceLabel(segment.resource)
+        if preferences.showWindowTitles,
+           let usefulTitle,
+           let path,
+           preferences.includeTitlesInAdditionToPaths {
+            context = "\(path) · \(usefulTitle)"
+        } else if preferences.showWindowTitles, let usefulTitle {
+            context = usefulTitle
+        } else if let path {
+            context = path
         } else if segment.deviceName != ActivityDeviceFilter.local {
             context = segment.deviceName
         } else {
@@ -3807,6 +3816,12 @@ private struct ActivityDisplaySettingsSheet: View {
             Toggle("Show app-usage date ranges", isOn: $preferences.showActivityDateRanges)
                 .toggleStyle(.checkbox)
             Text("Adds the exact start and end time below each activity, matching Timing's detailed activity list.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Toggle("Create entries for titles in addition to paths", isOn: $preferences.includeTitlesInAdditionToPaths)
+                .toggleStyle(.checkbox)
+            Text("When an activity has both a path and a window title, keep both visible in the activity row.")
                 .font(.system(size: 10))
                 .foregroundStyle(MetridayTheme.secondary)
                 .fixedSize(horizontal: false, vertical: true)
