@@ -2172,63 +2172,69 @@ struct ActivitiesView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
-                ForEach((rows ?? categoryRows(segments, nameFor: nameFor)).prefix(6)) { row in
-                    HStack(spacing: 7) {
-                        Circle()
-                            .fill(categoryColor(for: row.category))
-                            .frame(width: 6, height: 6)
-                        Text(row.name)
-                            .font(.system(size: 11))
-                            .lineLimit(1)
-                        Spacer()
-                        Text(formatMinutes(row.seconds))
-                            .font(.system(size: 10, weight: .semibold))
-                    }
-                    .contentShape(Rectangle())
-                    .gesture(
-                        TapGesture(count: 2)
-                            .exclusively(before: TapGesture())
-                            .onEnded { result in
-                                guard let activity = row.segments.first else { return }
-                                switch result {
-                                case .first:
-                                    prepareNewEntry(for: activity)
-                                    showingNewEntry = true
-                                case .second:
-                                    selectedActivity = activity
+                ScrollView(.vertical) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows ?? categoryRows(segments, nameFor: nameFor)) { row in
+                            HStack(spacing: 7) {
+                                Circle()
+                                    .fill(categoryColor(for: row.category))
+                                    .frame(width: 6, height: 6)
+                                Text(row.name)
+                                    .font(.system(size: 11))
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(formatMinutes(row.seconds))
+                                    .font(.system(size: 10, weight: .semibold))
                             }
-                        }
-                    )
-                    .onDrag {
-                        let ids = row.segments.map(\.id.uuidString).joined(separator: "\n")
-                        return NSItemProvider(object: NSString(string: ids))
-                    }
-                    .contextMenu {
-                        if let activity = row.segments.first {
-                            Button("Select \(row.segments.count) activities") {
-                                selectedActivityIDs.formUnion(row.segments.map(\.id))
+                            .contentShape(Rectangle())
+                            .gesture(
+                                TapGesture(count: 2)
+                                    .exclusively(before: TapGesture())
+                                    .onEnded { result in
+                                        guard let activity = row.segments.first else { return }
+                                        switch result {
+                                        case .first:
+                                            prepareNewEntry(for: activity)
+                                            showingNewEntry = true
+                                        case .second:
+                                            selectedActivity = activity
+                                        }
+                                    }
+                            )
+                            .onDrag {
+                                let ids = row.segments.map(\.id.uuidString).joined(separator: "\n")
+                                return NSItemProvider(object: NSString(string: ids))
                             }
-                            if !selectedActivityIDs.isEmpty {
-                                Button("Create Time Entries from Selected Activities") {
-                                    showingEntryOMatic = true
+                            .contextMenu {
+                                if let activity = row.segments.first {
+                                    Button("Select \(row.segments.count) activities") {
+                                        selectedActivityIDs.formUnion(row.segments.map(\.id))
+                                    }
+                                    if !selectedActivityIDs.isEmpty {
+                                        Button("Create Time Entries from Selected Activities") {
+                                            showingEntryOMatic = true
+                                        }
+                                    }
+                                    Divider()
+                                    Button("Create Time Entry") {
+                                        prepareNewEntry(for: activity)
+                                        showingNewEntry = true
+                                    }
+                                    Button("Delete \(row.segments.count) Activities", role: .destructive) {
+                                        requestDeleteActivities(row.segments)
+                                    }
                                 }
                             }
-                            Divider()
-                            Button("Create Time Entry") {
-                                prepareNewEntry(for: activity)
-                                showingNewEntry = true
-                            }
-                            Button("Delete \(row.segments.count) Activities", role: .destructive) {
-                                requestDeleteActivities(row.segments)
-                            }
+                            .help("Click for details · double-click to create a time entry")
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Open \(row.name) in \(title)")
+                            .accessibilityHint("Double-click to create a time entry")
+                            .accessibilityAddTraits(.isButton)
+                            .padding(.vertical, 2)
                         }
                     }
-                    .help("Click for details · double-click to create a time entry")
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Open \(row.name) in \(title)")
-                    .accessibilityHint("Double-click to create a time entry")
-                    .accessibilityAddTraits(.isButton)
                 }
+                .frame(maxHeight: 184)
             }
         }
         .padding(14)
