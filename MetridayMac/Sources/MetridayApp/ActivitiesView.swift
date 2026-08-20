@@ -4378,6 +4378,9 @@ private struct ActivityTimelinePanel: View {
                         }
                         .frame(width: hitWidth, height: 18)
                         .contentShape(Rectangle())
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityLabel("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
+                        .accessibilityIdentifier("activities.timeline.activity.\(segment.id.uuidString)")
                         .gesture(
                             TapGesture(count: 2)
                                 .exclusively(before: TapGesture())
@@ -4427,18 +4430,26 @@ private struct ActivityTimelinePanel: View {
                             4,
                             proxy.size.width * CGFloat(endSecond - startSecond) / 86_400
                         )
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(MetridayTheme.accent.opacity(0.13))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                    .strokeBorder(
-                                        MetridayTheme.accent,
-                                        style: StrokeStyle(lineWidth: 1, dash: [3, 2])
-                                    )
-                            )
-                            .frame(width: width, height: 12)
+                        let hitWidth = max(12, width)
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                .fill(MetridayTheme.accent.opacity(0.13))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                        .strokeBorder(
+                                            MetridayTheme.accent,
+                                            style: StrokeStyle(lineWidth: 1, dash: [3, 2])
+                                        )
+                                )
+                                .frame(width: width, height: 12)
+                                .offset(x: -(hitWidth - width) / 2)
+                        }
+                            .frame(width: hitWidth, height: 12)
                             .position(x: left + width / 2, y: 96)
                             .contentShape(Rectangle())
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityLabel("Calendar event · \(event.title)")
+                            .accessibilityIdentifier("activities.timeline.calendar.\(event.id)")
                             .onHover { isHovered in
                                 if isHovered {
                                     hoveredCalendarEventID = event.id
@@ -4464,15 +4475,23 @@ private struct ActivityTimelinePanel: View {
                                 4,
                                 proxy.size.width * CGFloat(range.end - range.start) / 86_400
                             )
-                            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .fill(MetridayTheme.warning.opacity(0.22))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                        .stroke(MetridayTheme.warning, lineWidth: 1)
-                                )
-                                .frame(width: width, height: 12)
+                            let hitWidth = max(12, width)
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                    .fill(MetridayTheme.warning.opacity(0.22))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                            .stroke(MetridayTheme.warning, lineWidth: 1)
+                                    )
+                                    .frame(width: width, height: 12)
+                                    .offset(x: -(hitWidth - width) / 2)
+                            }
+                                .frame(width: hitWidth, height: 12)
                                 .position(x: left + width / 2, y: 114)
                                 .contentShape(Rectangle())
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityLabel("Recorded time · \(entry.title)")
+                                .accessibilityIdentifier("activities.timeline.time-entry.\(entry.id.uuidString)")
                                 .onHover { isHovered in
                                     if isHovered {
                                         hoveredTimeEntryID = entry.id
@@ -4580,6 +4599,9 @@ private struct ActivityTimelinePanel: View {
                         .frame(width: hitWidth, height: 16, alignment: .leading)
                         .offset(x: left)
                             .contentShape(Rectangle())
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityLabel("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
+                            .accessibilityIdentifier("activities.vertical-timeline.activity.\(segment.id.uuidString)")
                             .gesture(
                                 TapGesture(count: 2)
                                     .exclusively(before: TapGesture())
@@ -4614,16 +4636,24 @@ private struct ActivityTimelinePanel: View {
                     ForEach(timeEntries) { entry in
                         if let range = clippedRange(for: entry) {
                             let left = chartWidth * CGFloat(range.start) / 86_400
-                            let width = max(2, chartWidth * CGFloat(range.end - range.start) / 86_400)
-                            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                .fill(MetridayTheme.warning.opacity(0.18))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                        .stroke(MetridayTheme.warning, lineWidth: 1)
-                                )
-                                .frame(width: width, height: 16)
+                        let width = max(2, chartWidth * CGFloat(range.end - range.start) / 86_400)
+                        let hitWidth = max(12, width)
+                        ZStack {
+                                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                    .fill(MetridayTheme.warning.opacity(0.18))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                            .stroke(MetridayTheme.warning, lineWidth: 1)
+                                    )
+                                    .frame(width: width, height: 16)
+                                    .offset(x: -(hitWidth - width) / 2)
+                            }
+                                .frame(width: hitWidth, height: 16, alignment: .leading)
                                 .offset(x: left)
                                 .contentShape(Rectangle())
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityLabel("Recorded time · \(entry.title)")
+                                .accessibilityIdentifier("activities.vertical-timeline.time-entry.\(entry.id.uuidString)")
                                 .onTapGesture { onEditTimeEntry(entry) }
                                 .help("Recorded time · \(entry.title)")
                         }
@@ -4633,24 +4663,32 @@ private struct ActivityTimelinePanel: View {
                         let end = max(start + 900, min(86_400, second(of: event.end)))
                         let left = chartWidth * CGFloat(start) / 86_400
                         let width = max(2, chartWidth * CGFloat(end - start) / 86_400)
-                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .fill(MetridayTheme.accent.opacity(0.10))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                    .strokeBorder(
-                                        MetridayTheme.accent,
-                                        style: StrokeStyle(lineWidth: 1, dash: [3, 2])
-                                    )
-                            )
-                            .frame(width: width, height: 16)
+                        let hitWidth = max(12, width)
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(MetridayTheme.accent.opacity(0.10))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                        .strokeBorder(
+                                            MetridayTheme.accent,
+                                            style: StrokeStyle(lineWidth: 1, dash: [3, 2])
+                                        )
+                                )
+                                .frame(width: width, height: 16)
+                                .offset(x: -(hitWidth - width) / 2)
+                        }
+                            .frame(width: hitWidth, height: 16, alignment: .leading)
                             .offset(x: left)
                             .contentShape(Rectangle())
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityLabel("Calendar event · \(event.title)")
+                            .accessibilityIdentifier("activities.vertical-timeline.calendar.\(event.id)")
                             .onTapGesture {
                                 onRecordCalendarEvent(event, NSEvent.modifierFlags.contains(.option))
                             }
                             .help("Calendar event · \(event.title)")
+                        }
                     }
-                }
 
                 HStack(spacing: 0) {
                     Color.clear.frame(width: labelWidth)
