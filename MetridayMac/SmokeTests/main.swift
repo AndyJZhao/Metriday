@@ -275,6 +275,33 @@ Task { @MainActor in
         return
     }
     expect(teamProjectStore.project(teamProjectID)?.teamID == teamID, "Project should preserve its team assignment")
+    guard let childProjectID = teamProjectStore.createProject(name: "Child Project", parentID: teamProjectID),
+          let nestedProjectID = teamProjectStore.createProject(name: "Nested Project", parentID: childProjectID) else {
+        expect(false, "Projects should create nested descendants")
+        return
+    }
+    let nestedScope = teamProjectStore.descendantProjectIDs(including: teamProjectID)
+    expect(
+        nestedScope == Set([teamProjectID, childProjectID, nestedProjectID]),
+        "Selecting a parent project should include every active descendant"
+    )
+    var nestedReportOptions = ReportOptions()
+    nestedReportOptions.projectIDs = [teamProjectID]
+    let nestedActivity = ActivitySegment(
+        appName: "Nested Editor",
+        windowTitle: "Nested activity",
+        startMinute: 9 * 60,
+        endMinute: 10 * 60,
+        relevance: .related,
+        projectID: nestedProjectID
+    )
+    let nestedReport = ReportExporter.csv(
+        activityDays: [(date: date, segments: [nestedActivity])],
+        timeEntries: [],
+        projectStore: teamProjectStore,
+        options: nestedReportOptions
+    )
+    expect(nestedReport.contains("Nested activity"), "Parent project report scope should include nested activity")
     let reloadedTeamStore = TeamStore(rootDirectory: teamRoot)
     expect(reloadedTeamStore.team(teamID)?.members.count == 2, "Teams and members should round-trip through local JSON")
 

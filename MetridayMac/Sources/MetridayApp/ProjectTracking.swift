@@ -245,11 +245,24 @@ final class ProjectStore: ObservableObject {
         activeProjects.filter { $0.parentID == parentID }
     }
 
+    /// Returns the selected project plus every active descendant. Selecting a
+    /// parent in Activities, Stats, or Reports scopes the whole project tree.
+    func descendantProjectIDs(including projectID: UUID) -> Set<UUID> {
+        var ids: Set<UUID> = [projectID]
+        var pending = [projectID]
+        while let parentID = pending.popLast() {
+            for child in activeProjects where child.parentID == parentID && ids.insert(child.id).inserted {
+                pending.append(child.id)
+            }
+        }
+        return ids
+    }
+
     /// Returns active projects that can safely become the parent of a project.
     /// Excluding descendants prevents hierarchy cycles, which would otherwise
     /// make report paths and project navigation ambiguous.
     func validParentProjects(for projectID: UUID) -> [TrackingProject] {
-        let descendants = descendantIDs(of: projectID)
+        let descendants = descendantProjectIDs(including: projectID)
         return activeProjects.filter {
             $0.id != projectID && !descendants.contains($0.id)
         }
@@ -638,18 +651,6 @@ final class ProjectStore: ObservableObject {
         } catch {
             statusMessage = "Could not save projects: \(error.localizedDescription)"
         }
-    }
-
-    private func descendantIDs(of projectID: UUID) -> Set<UUID> {
-        var descendants: Set<UUID> = []
-        var pending = [projectID]
-        while let parentID = pending.popLast() {
-            for child in projects where child.parentID == parentID && !descendants.contains(child.id) {
-                descendants.insert(child.id)
-                pending.append(child.id)
-            }
-        }
-        return descendants
     }
 
     private static func seedProjects() -> [TrackingProject] {

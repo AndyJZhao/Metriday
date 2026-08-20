@@ -180,11 +180,10 @@ struct StatsView: View {
                 }
 
                 ForEach(projectStore.activeProjects) { project in
-                    let point = projectScopePoints.first(where: { $0.projectID == project.id })
                     projectScopeButton(
                         scope: .project(project.id),
                         name: project.name,
-                        detail: formatSeconds(point?.seconds ?? 0),
+                        detail: formatSeconds(projectScopeSeconds(for: project.id)),
                         symbol: "folder"
                     )
                 }
@@ -793,8 +792,33 @@ struct StatsView: View {
         case .unassigned:
             return projectID == nil
         case .project(let selectedID):
-            return projectID == selectedID
+            guard let projectID else { return false }
+            return projectStore.descendantProjectIDs(including: selectedID).contains(projectID)
         }
+    }
+
+    private func projectScopeSeconds(for projectID: UUID) -> Int {
+        let projectIDs = projectStore.descendantProjectIDs(including: projectID)
+        let activitySeconds = weekDates
+            .flatMap(allActivitySegments(for:))
+            .filter { segment in
+                guard let assignedProjectID = segment.projectID else { return false }
+                return projectIDs.contains(assignedProjectID) && segment.relevance != .idle
+            }
+            .reduce(0) { $0 + $1.durationSeconds }
+        let weekStart = calendar.startOfDay(for: weekDates.first ?? selectedDate)
+        let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
+        let entrySeconds = timeEntryStore.materializedEntries()
+            .filter { entry in
+                guard let assignedProjectID = entry.projectID else { return false }
+                return projectIDs.contains(assignedProjectID) && entry.start < weekEnd && entry.end > weekStart
+            }
+            .reduce(0) { total, entry in
+                let clippedStart = max(entry.start, weekStart)
+                let clippedEnd = min(entry.end, weekEnd)
+                return total + max(0, Int(clippedEnd.timeIntervalSince(clippedStart)))
+            }
+        return activitySeconds + entrySeconds
     }
 
     private func category(for segment: ActivitySegment, date: Date? = nil) -> ActivityCategoryDefinition {

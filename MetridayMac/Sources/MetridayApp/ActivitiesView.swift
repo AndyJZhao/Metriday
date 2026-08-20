@@ -1830,15 +1830,7 @@ struct ActivitiesView: View {
     }
 
     private func descendantProjectIDs(including projectID: UUID) -> Set<UUID> {
-        var ids: Set<UUID> = [projectID]
-        var pending: [UUID] = [projectID]
-        while let parentID = pending.popLast() {
-            for child in projectStore.childProjects(of: parentID) where !ids.contains(child.id) {
-                ids.insert(child.id)
-                pending.append(child.id)
-            }
-        }
-        return ids
+        projectStore.descendantProjectIDs(including: projectID)
     }
 
     private func projectTree(_ project: TrackingProject, depth: Int) -> AnyView {
@@ -2049,7 +2041,11 @@ struct ActivitiesView: View {
         case .unassigned:
             return source.filter { $0.projectID == nil }
         case .project(let id):
-            return source.filter { $0.projectID == id }
+            let projectIDs = descendantProjectIDs(including: id)
+            return source.filter { segment in
+                guard let projectID = segment.projectID else { return false }
+                return projectIDs.contains(projectID)
+            }
         case .saved(let id):
             guard let savedFilter = filterStore.filter(id) else { return [] }
             return source.filter { filterStore.matches(savedFilter, activity: $0, date: selectedDate) }

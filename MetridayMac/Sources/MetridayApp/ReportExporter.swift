@@ -509,7 +509,7 @@ enum ReportExporter {
                 for segment in reportSegments
                 where segment.relevance != .idle
                     && (options.includeShortEntries || segment.durationSeconds >= 60) {
-                    guard includesProject(segment.projectID, options: options) else { continue }
+                    guard includesProject(segment.projectID, projectStore: projectStore, options: options) else { continue }
                     let project = projectStore.project(segment.projectID)
                     let hourlyRate = project?.billingRate ?? 0
                     raw.append(ReportRecord(
@@ -536,7 +536,7 @@ enum ReportExporter {
             if options.include == .timeEntries || options.include == .both {
                 for entry in dayTimeEntries {
                     guard options.billingFilter.matches(entry.billingStatus) else { continue }
-                    guard includesProject(entry.projectID, options: options) else { continue }
+                    guard includesProject(entry.projectID, projectStore: projectStore, options: options) else { continue }
                     let project = projectStore.project(entry.projectID)
                     let hourlyRate = entry.billingStatus == .notBillable ? 0 : (project?.billingRate ?? 0)
                     let entryStart = max(entry.start, dayStart)
@@ -616,10 +616,16 @@ enum ReportExporter {
         }
     }
 
-    private static func includesProject(_ projectID: UUID?, options: ReportOptions) -> Bool {
+    private static func includesProject(
+        _ projectID: UUID?,
+        projectStore: ProjectStore,
+        options: ReportOptions
+    ) -> Bool {
         guard !options.projectIDs.isEmpty else { return true }
         guard let projectID else { return false }
-        return options.projectIDs.contains(projectID)
+        return options.projectIDs.contains { selectedID in
+            projectStore.descendantProjectIDs(including: selectedID).contains(projectID)
+        }
     }
 
     private static func uncoveredSegments(

@@ -1855,6 +1855,23 @@ function projectParentID(project) {
   return resourceID(project?.parent || project?.parent_id || project?.parentID);
 }
 
+function descendantProjectIDs(projects, projectID) {
+  const rootID = resourceID(projectID);
+  const ids = new Set(rootID ? [rootID] : []);
+  const pending = rootID ? [rootID] : [];
+  while (pending.length) {
+    const parentID = pending.pop();
+    projects.forEach((project) => {
+      const id = resourceID(project.id);
+      if (projectParentID(project) === parentID && !ids.has(id)) {
+        ids.add(id);
+        pending.push(id);
+      }
+    });
+  }
+  return ids;
+}
+
 const projectColorOptions = [
   ["blue", "Blue"],
   ["green", "Green"],
@@ -2313,7 +2330,8 @@ function WebReportPanel({ api, dateKey }) {
       const project = api.projects.find((item) => resourceID(item.id) === resourceID(value));
       return { rate: project?.billing_rate || 0, currency: project?.currency || "USD" };
     };
-    const includesProject = (value) => projectIDs.length === 0 || projectIDs.includes(resourceID(value));
+    const selectedProjectIDs = new Set(projectIDs.flatMap((projectID) => [...descendantProjectIDs(api.projects, projectID)]));
+    const includesProject = (value) => projectIDs.length === 0 || selectedProjectIDs.has(resourceID(value));
     const coveredRanges = dataset.entries
       .map((entry) => ({ start: new Date(entry.start_date || entry.start), end: new Date(entry.end_date || entry.end) }))
       .filter((range) => !Number.isNaN(range.start.getTime()) && !Number.isNaN(range.end.getTime()) && range.end > range.start);
@@ -3152,23 +3170,8 @@ function WebActivityProjectSidebar({ projects, filters, activities, projectFilte
   useEffect(() => () => { if (projectClickTimer.current) window.clearTimeout(projectClickTimer.current); }, []);
   const activeActivities = activities.filter((activity) => activityCategory(activity).key !== "idle");
   const secondsFor = (items) => items.reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
-  const descendantProjectIDs = (projectID) => {
-    const ids = new Set([resourceID(projectID)]);
-    const pending = [resourceID(projectID)];
-    while (pending.length) {
-      const parentID = pending.pop();
-      projects.forEach((project) => {
-        const id = resourceID(project.id);
-        if (projectParentID(project) === parentID && !ids.has(id)) {
-          ids.add(id);
-          pending.push(id);
-        }
-      });
-    }
-    return ids;
-  };
   const projectActivitiesFor = (project) => {
-    const projectIDs = descendantProjectIDs(project.id);
+    const projectIDs = descendantProjectIDs(projects, project.id);
     return activeActivities.filter((activity) => projectIDs.has(resourceID(activity.projectID)));
   };
   const sidebarButton = (active, onClick, icon, title, detail, style = {}, onDoubleClick) => <button type="button" className={`activity-project-filter ${active ? "active" : ""}`} style={style} onClick={onClick} onDoubleClick={onDoubleClick}><span className="activity-project-filter-icon">{icon}</span><span><strong>{title}</strong><small>{detail}</small></span></button>;
@@ -3403,13 +3406,16 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   const normalizedQuery = query.trim().toLowerCase();
   const builtinFilterKey = categoryFilter.startsWith("builtin:") ? categoryFilter.slice("builtin:".length) : "all";
   const savedFilter = api.filters.find((filter) => resourceID(filter.id) === savedFilterID);
+  const scopedProjectIDs = projectFilterID !== "all" && projectFilterID !== "unassigned"
+    ? descendantProjectIDs(api.projects, projectFilterID)
+    : null;
   const filterActivity = (activity) => {
     const category = activityCategory(activity);
     const searchable = `${activityLabel(activity)} ${activityContext(activity)} ${activity.appName || ""} ${activity.deviceName || ""} ${category.label}`.toLowerCase();
     return (!normalizedQuery || searchable.includes(normalizedQuery))
       && (builtinFilterKey !== "all" ? activityMatchesBuiltinFilter(activity, builtinFilterKey) : categoryFilter === "all" || category.key === categoryFilter)
       && (deviceFilter === "all" || (activity.deviceName || "This Mac") === deviceFilter)
-      && (projectFilterID === "all" || (projectFilterID === "unassigned" ? !activity.projectID : resourceID(activity.projectID) === projectFilterID))
+      && (projectFilterID === "all" || (projectFilterID === "unassigned" ? !activity.projectID : scopedProjectIDs.has(resourceID(activity.projectID))))
       && (!savedFilter || activityMatchesFilter(activity, savedFilter));
   };
   const recordedActivities = allActivities.filter((activity) => includeIdle || activityCategory(activity).key !== "idle");
@@ -3627,11 +3633,20 @@ function StatsProjectScope({ projects, segments, entries, selectedID, onChange }
     projectSeconds.set(key, (projectSeconds.get(key) || 0) + Math.max(0, Number(entry.duration || 0)));
   });
   const totalSeconds = [...projectSeconds.values()].reduce((sum, value) => sum + value, 0);
-  const projectRows = projects.filter((project) => !project.archived && !project.is_archived).map((project) => ({
-    id: resourceID(project.id),
-    name: project.title || project.name || "Untitled project",
-    seconds: projectSeconds.get(resourceID(project.id)) || 0,
-  })).sort((left, right) => right.seconds - left.seconds || left.name.localeCompare(right.name));
+  const projectRows = projects.filter((project) => !project.archived && !project.is_archived).map((project) => {
+    const ids = descendantProjectIDs(projects, project.id);
+    const activitySeconds = activeSegments
+      .filter((activity) => ids.has(resourceID(activity.projectID)))
+      .reduce((total, activity) => total + secondsForActivity(activity), 0);
+    const entrySeconds = entries
+      .filter((entry) => ids.has(resourceID(entry.project)))
+      .reduce((total, entry) => total + Math.max(0, Number(entry.duration || 0)), 0);
+    return {
+      id: resourceID(project.id),
+      name: project.title || project.name || "Untitled project",
+      seconds: activitySeconds + entrySeconds,
+    };
+  }).sort((left, right) => right.seconds - left.seconds || left.name.localeCompare(right.name));
   const scopeButton = (id, label, detail, Icon) => <button type="button" className={`stats-project-scope-option${selectedID === id ? " active" : ""}`} aria-pressed={selectedID === id} onClick={() => onChange(id)}><Icon size={16} /><span><strong>{label}</strong><small>{detail}</small></span></button>;
   return <aside className="stats-project-scope" aria-label="Stats projects"><div className="stats-project-scope-heading"><h2>Projects</h2><span>{formatDurationSeconds(totalSeconds)}</span></div><div className="stats-project-scope-list">{scopeButton("all", "All Activities", `${activeSegments.length} segments`, Waveform)}{scopeButton("unassigned", "Unassigned", formatDurationSeconds(projectSeconds.get("unassigned") || 0), TrayIcon)}{projectRows.length ? <div className="stats-project-scope-label">My Projects</div> : null}{projectRows.map((project) => scopeButton(project.id, project.name, formatDurationSeconds(project.seconds), FolderSimple))}</div><p className="stats-project-scope-hint">Select a project to scope every chart and total to the same activity evidence.</p></aside>;
 }
@@ -3641,7 +3656,10 @@ function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProje
   const days = (api.calendarWeekly.length >= 7 ? api.calendarWeekly : api.weekly).slice(-7);
   const secondsForActivity = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
   const productivityValue = (activity) => activityProductivityValue(activity, api.projects);
-  const inProjectScope = (activity) => projectScopeID === "all" || (projectScopeID === "unassigned" ? !activity.projectID : resourceID(activity.projectID) === projectScopeID);
+  const scopedProjectIDs = projectScopeID !== "all" && projectScopeID !== "unassigned"
+    ? descendantProjectIDs(api.projects, projectScopeID)
+    : null;
+  const inProjectScope = (activity) => projectScopeID === "all" || (projectScopeID === "unassigned" ? !activity.projectID : scopedProjectIDs.has(resourceID(activity.projectID)));
   const allSegments = days.flatMap((day) => day.activities || []);
   const segments = allSegments.filter(inProjectScope);
   const dayRows = days.map((day) => {
@@ -3656,7 +3674,7 @@ function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProje
   const totalDistracted = segments.filter((activity) => activityCategory(activity).key === "distracting").reduce((total, activity) => total + secondsForActivity(activity), 0);
   const productivityScore = totalActive > 0 ? Math.round(segments.filter((activity) => activityCategory(activity).key !== "idle").reduce((total, activity) => total + productivityValue(activity) * secondsForActivity(activity), 0) / totalActive) : 0;
   const allWeeklyEntries = days.flatMap((day) => day.entries || []);
-  const weeklyEntries = allWeeklyEntries.filter((entry) => projectScopeID === "all" || (projectScopeID === "unassigned" ? !entry.project : resourceID(entry.project) === projectScopeID));
+  const weeklyEntries = allWeeklyEntries.filter((entry) => projectScopeID === "all" || (projectScopeID === "unassigned" ? !entry.project : scopedProjectIDs.has(resourceID(entry.project))));
   const hourRows = Array.from({ length: 24 }, (_, hour) => {
     const activities = segments.filter((activity) => activityCategory(activity).key !== "idle" && Math.min(23, Math.max(0, Math.floor(Number(activity.startSecond || 0) / 3600))) === hour);
     const active = activities.reduce((total, activity) => total + secondsForActivity(activity), 0);
