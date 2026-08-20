@@ -1142,6 +1142,9 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
     automatically_zoom_timeline_to_working_hours: false,
     start_tracking_when_app_opens: true,
     auto_stop_timer_on_sleep: true,
+    review_reminder_interval_minutes: 0,
+    review_reminder_notifications_authorized: false,
+    review_reminder_notification_status: "Notifications not requested",
     allow_local_network_api: false,
     launch_at_login: false,
     launch_at_login_status: "Login item not configured",
@@ -1266,6 +1269,10 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
         <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.track_only_during_working_hours)} onChange={(event) => updatePreference("track_only_during_working_hours", event.target.checked)} disabled={!connected || saving} />Track only during working hours</span></label>
         <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.automatically_zoom_timeline_to_working_hours)} onChange={(event) => updatePreference("automatically_zoom_timeline_to_working_hours", event.target.checked)} disabled={!connected || saving} />Automatically zoom timeline to working hours</span><small>Keep the Activities timeline focused on the configured work window</small></label>
         <div className="settings-time-row"><label>From<input type="time" value={preferenceTime(preferences.working_hours_start_minute)} onChange={(event) => updatePreference("working_hours_start_minute", Math.max(0, Math.min(1439, Number(event.target.value.split(":")[0]) * 60 + Number(event.target.value.split(":")[1] || 0))))} disabled={!connected || saving} /></label><span>to</span><label>To<input type="time" value={preferenceTime(preferences.working_hours_end_minute)} onChange={(event) => updatePreference("working_hours_end_minute", Math.max(0, Math.min(1439, Number(event.target.value.split(":")[0]) * 60 + Number(event.target.value.split(":")[1] || 0))))} disabled={!connected || saving} /></label></div>
+      </div>
+      <div className="settings-section"><div className="settings-section-heading"><strong>Activity review reminders</strong><span className={`settings-state-dot ${preferences.review_reminder_notifications_authorized ? "connected" : ""}`} /></div>
+        <label className="settings-field-row"><span>Remind to review activities</span><select value={Number(preferences.review_reminder_interval_minutes || 0)} onChange={(event) => updatePreference("review_reminder_interval_minutes", Number(event.target.value))} disabled={!connected || saving}><option value={0}>Never</option><option value={15}>Every 15 minutes</option><option value={30}>Every 30 minutes</option><option value={60}>Every hour</option><option value={120}>Every 2 hours</option></select></label>
+        <small className="settings-help-text">The native app sends a local notification summarizing today's tracked time. {preferences.review_reminder_notification_status || "Notifications not requested"}</small>
       </div>
       <div className="settings-section"><div className="settings-section-heading"><strong>Privacy & connection</strong></div>
         <div className="settings-toggle-row"><label><input type="checkbox" checked={Boolean(preferences.allow_local_network_api)} onChange={(event) => updatePreference("allow_local_network_api", event.target.checked)} disabled={!connected || saving} />Allow local network access</label><small>Required for another device to use this Web companion</small></div>

@@ -27,6 +27,9 @@ final class PreferencesStore: ObservableObject {
     @Published var autoStopTimerOnSleep: Bool {
         didSet { persist() }
     }
+    @Published var reviewReminderIntervalMinutes: Int {
+        didSet { persist() }
+    }
     @Published var allowLocalNetworkAPI: Bool {
         didSet { persist() }
     }
@@ -47,6 +50,7 @@ final class PreferencesStore: ObservableObject {
             self.automaticallyZoomTimelineToWorkingHours = payload.automaticallyZoomTimelineToWorkingHours
             self.startTrackingWhenAppOpens = payload.startTrackingWhenAppOpens
             self.autoStopTimerOnSleep = payload.autoStopTimerOnSleep
+            self.reviewReminderIntervalMinutes = payload.reviewReminderIntervalMinutes
             self.allowLocalNetworkAPI = payload.allowLocalNetworkAPI
         } else {
             self.idleThresholdSeconds = 120
@@ -57,6 +61,7 @@ final class PreferencesStore: ObservableObject {
             self.automaticallyZoomTimelineToWorkingHours = false
             self.startTrackingWhenAppOpens = true
             self.autoStopTimerOnSleep = true
+            self.reviewReminderIntervalMinutes = 0
             self.allowLocalNetworkAPI = false
             persist()
         }
@@ -98,6 +103,7 @@ final class PreferencesStore: ObservableObject {
                 automaticallyZoomTimelineToWorkingHours: automaticallyZoomTimelineToWorkingHours,
                 startTrackingWhenAppOpens: startTrackingWhenAppOpens,
                 autoStopTimerOnSleep: autoStopTimerOnSleep,
+                reviewReminderIntervalMinutes: reviewReminderIntervalMinutes,
                 allowLocalNetworkAPI: allowLocalNetworkAPI
             )
             let encoder = JSONEncoder()
@@ -125,6 +131,7 @@ final class PreferencesStore: ObservableObject {
         let automaticallyZoomTimelineToWorkingHours: Bool
         let startTrackingWhenAppOpens: Bool
         let autoStopTimerOnSleep: Bool
+        let reviewReminderIntervalMinutes: Int
         let allowLocalNetworkAPI: Bool
 
         init(
@@ -136,6 +143,7 @@ final class PreferencesStore: ObservableObject {
             automaticallyZoomTimelineToWorkingHours: Bool,
             startTrackingWhenAppOpens: Bool,
             autoStopTimerOnSleep: Bool,
+            reviewReminderIntervalMinutes: Int,
             allowLocalNetworkAPI: Bool
         ) {
             self.idleThresholdSeconds = idleThresholdSeconds
@@ -146,6 +154,7 @@ final class PreferencesStore: ObservableObject {
             self.automaticallyZoomTimelineToWorkingHours = automaticallyZoomTimelineToWorkingHours
             self.startTrackingWhenAppOpens = startTrackingWhenAppOpens
             self.autoStopTimerOnSleep = autoStopTimerOnSleep
+            self.reviewReminderIntervalMinutes = reviewReminderIntervalMinutes
             self.allowLocalNetworkAPI = allowLocalNetworkAPI
         }
 
@@ -159,6 +168,7 @@ final class PreferencesStore: ObservableObject {
             automaticallyZoomTimelineToWorkingHours = try container.decodeIfPresent(Bool.self, forKey: .automaticallyZoomTimelineToWorkingHours) ?? false
             startTrackingWhenAppOpens = try container.decode(Bool.self, forKey: .startTrackingWhenAppOpens)
             autoStopTimerOnSleep = try container.decodeIfPresent(Bool.self, forKey: .autoStopTimerOnSleep) ?? true
+            reviewReminderIntervalMinutes = max(0, min(24 * 60, try container.decodeIfPresent(Int.self, forKey: .reviewReminderIntervalMinutes) ?? 0))
             allowLocalNetworkAPI = try container.decodeIfPresent(Bool.self, forKey: .allowLocalNetworkAPI) ?? false
         }
     }

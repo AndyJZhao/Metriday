@@ -602,7 +602,8 @@ struct SidebarView: View {
                 loginItemManager: appState.loginItemManager,
                 syncStore: appState.syncStore,
                 integrationStore: appState.integrationStore,
-                teamStore: appState.teamStore
+                teamStore: appState.teamStore,
+                reviewReminderService: appState.reviewReminderService
             )
         }
     }

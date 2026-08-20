@@ -17,6 +17,7 @@ struct SettingsSheet: View {
     @ObservedObject var syncStore: SyncStore
     @ObservedObject var integrationStore: IntegrationStore
     @ObservedObject var teamStore: TeamStore
+    @ObservedObject var reviewReminderService: ReviewReminderService
     @State private var transferStatus = ""
     @State private var showingExclusionEditor = false
 
@@ -38,6 +39,7 @@ struct SettingsSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     trackingPanel
+                    reviewReminderPanel
                     workingHoursPanel
                     permissionsPanel
                     calendarPreferencesPanel
@@ -158,6 +160,50 @@ struct SettingsSheet: View {
                 }
             }
             .disabled(!preferences.trackOnlyDuringWorkingHours)
+        }
+        .settingsPanel()
+    }
+
+    private var reviewReminderPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Activity review reminders", systemImage: "bell.badge")
+                .font(.system(size: 15, weight: .bold))
+
+            HStack {
+                Text("Remind to review activities")
+                    .font(.system(size: 12))
+                Spacer()
+                Picker("Review reminder frequency", selection: $preferences.reviewReminderIntervalMinutes) {
+                    Text("Never").tag(0)
+                    Text("Every 15 minutes").tag(15)
+                    Text("Every 30 minutes").tag(30)
+                    Text("Every hour").tag(60)
+                    Text("Every 2 hours").tag(120)
+                }
+                .labelsHidden()
+                .frame(width: 160)
+            }
+
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(reviewReminderService.notificationsAuthorized ? MetridayTheme.success : MetridayTheme.warning)
+                    .frame(width: 7, height: 7)
+                Text(reviewReminderService.notificationStatus)
+                    .font(.system(size: 10))
+                    .foregroundStyle(MetridayTheme.secondary)
+                Spacer()
+                Button("Allow Notifications") {
+                    reviewReminderService.requestAuthorization()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(preferences.reviewReminderIntervalMinutes == 0)
+            }
+
+            Text("When enabled, Metriday sends a local notification summarizing today's tracked time. Activity data stays on this Mac.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .lineSpacing(2)
         }
         .settingsPanel()
     }

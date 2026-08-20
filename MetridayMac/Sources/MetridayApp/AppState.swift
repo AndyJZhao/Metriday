@@ -42,6 +42,7 @@ final class AppState: ObservableObject {
     let integrationStore: IntegrationStore
     let teamStore: TeamStore
     let activityMonitor: AppActivityMonitor
+    let reviewReminderService: ReviewReminderService
     let blocker: WebBlockerService
     private var workspaceCancellables = Set<AnyCancellable>()
 
@@ -68,6 +69,10 @@ final class AppState: ObservableObject {
             projectStore: projectStore,
             preferences: preferences,
             exclusionStore: exclusionStore
+        )
+        self.reviewReminderService = ReviewReminderService(
+            monitor: activityMonitor,
+            preferences: preferences
         )
         self.syncStore = SyncStore(
             projectStore: projectStore,
@@ -106,6 +111,7 @@ final class AppState: ObservableObject {
         if preferences.startTrackingWhenAppOpens {
             self.activityMonitor.start()
         }
+        self.reviewReminderService.start()
     }
 
     var currentTask: PlanTask? {
@@ -280,6 +286,9 @@ final class AppState: ObservableObject {
             }
             if let value = body["auto_stop_timer_on_sleep"] as? Bool {
                 preferences.autoStopTimerOnSleep = value
+            }
+            if let value = body["review_reminder_interval_minutes"] as? Int {
+                preferences.reviewReminderIntervalMinutes = min(max(value, 0), 24 * 60)
             }
             if let value = body["allow_local_network_api"] as? Bool {
                 preferences.allowLocalNetworkAPI = value
@@ -2370,6 +2379,9 @@ final class AppState: ObservableObject {
             "automatically_zoom_timeline_to_working_hours": preferences.automaticallyZoomTimelineToWorkingHours,
             "start_tracking_when_app_opens": preferences.startTrackingWhenAppOpens,
             "auto_stop_timer_on_sleep": preferences.autoStopTimerOnSleep,
+            "review_reminder_interval_minutes": preferences.reviewReminderIntervalMinutes,
+            "review_reminder_notifications_authorized": reviewReminderService.notificationsAuthorized,
+            "review_reminder_notification_status": reviewReminderService.notificationStatus,
             "allow_local_network_api": preferences.allowLocalNetworkAPI,
             "launch_at_login": loginItemManager.isEnabled,
             "launch_at_login_status": loginItemManager.statusMessage,
