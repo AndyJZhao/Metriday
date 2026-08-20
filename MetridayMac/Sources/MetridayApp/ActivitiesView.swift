@@ -151,6 +151,7 @@ struct ActivitiesView: View {
                             segments: timelineScopedSegments,
                             calendarEvents: calendarStore.events,
                             timeEntries: preferences.includeTimeEntries ? timelineTimeEntries : [],
+                            suggestions: timelineSuggestions,
                             selectedDate: selectedDate,
                             project: { projectStore.project($0) },
                             orientation: timelineOrientation,
@@ -163,6 +164,14 @@ struct ActivitiesView: View {
                             onCreateTimeEntry: { startMinute, endMinute in
                                 prepareNewEntry(startMinute: startMinute, endMinute: endMinute)
                                 showingNewEntry = true
+                            },
+                            onSelectTimelineSuggestion: { suggestion, immediate in
+                                prepareNewEntry(for: suggestion)
+                                if immediate {
+                                    addNewEntry()
+                                } else {
+                                    showingNewEntry = true
+                                }
                             },
                             onRecordCalendarEvent: { event, immediate in
                                 prepareNewEntry(for: event)
@@ -2473,6 +2482,10 @@ struct ActivitiesView: View {
         }
     }
 
+    private var timelineSuggestions: [ActivityTimelineSuggestion] {
+        ActivityInsights.generateTimelineSuggestions(from: timelineScopedSegments)
+    }
+
     private var newProjectSheet: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("New Project")
@@ -2667,6 +2680,19 @@ struct ActivitiesView: View {
         newEntryTitle = activity.appName.isEmpty ? "App activity" : activity.appName
         newEntryNotes = activity.displayTitle
         newEntryProjectID = activity.projectID ?? selectedProjectID
+        newEntryBillingStatus = newEntryProjectID
+            .flatMap { projectStore.project($0)?.defaultBillingStatus }
+            ?? .billable
+    }
+
+    private func prepareNewEntry(for suggestion: ActivityTimelineSuggestion) {
+        prepareNewEntry(
+            startMinute: suggestion.startMinute,
+            endMinute: suggestion.endMinute
+        )
+        newEntryTitle = suggestion.title
+        newEntryNotes = suggestion.notes
+        newEntryProjectID = suggestion.projectID ?? selectedProjectID
         newEntryBillingStatus = newEntryProjectID
             .flatMap { projectStore.project($0)?.defaultBillingStatus }
             ?? .billable
@@ -4632,6 +4658,7 @@ private struct TimelineLegend: View {
             item("Focused", color: ActivityCategoryKind.focused.color)
             item("Distracting", color: ActivityCategoryKind.distracting.color)
             item("Other / idle", color: ActivityCategoryKind.other.color)
+            item("Summary", color: MetridayTheme.accent, outlined: true)
             item("Time entry", color: MetridayTheme.warning, outlined: true)
             item("Calendar", color: MetridayTheme.accent, outlined: true)
         }
@@ -4663,6 +4690,7 @@ private struct ActivityTimelinePanel: View {
     let segments: [ActivitySegment]
     let calendarEvents: [CalendarEventItem]
     let timeEntries: [TimeEntry]
+    let suggestions: [ActivityTimelineSuggestion]
     let selectedDate: Date
     let project: (UUID?) -> TrackingProject?
     let orientation: ActivityTimelineOrientation
@@ -4671,6 +4699,7 @@ private struct ActivityTimelinePanel: View {
     @Binding var selectionStart: Int?
     @Binding var selectionEnd: Int?
     let onCreateTimeEntry: (Int?, Int?) -> Void
+    let onSelectTimelineSuggestion: (ActivityTimelineSuggestion, Bool) -> Void
     let onRecordCalendarEvent: (CalendarEventItem, Bool) -> Void
     let onSelectActivity: (ActivitySegment) -> Void
     let onEditTimeEntry: (TimeEntry) -> Void
@@ -4679,6 +4708,7 @@ private struct ActivityTimelinePanel: View {
     @State private var hoveredSegmentID: UUID?
     @State private var hoveredTimeEntryID: UUID?
     @State private var hoveredCalendarEventID: String?
+    @State private var hoveredSuggestionID: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -4811,6 +4841,7 @@ private struct ActivityTimelinePanel: View {
                                 hoveredSegmentID = segment.id
                                 hoveredTimeEntryID = nil
                                 hoveredCalendarEventID = nil
+                                hoveredSuggestionID = nil
                             }
                         }
                         .contextMenu {
@@ -4859,6 +4890,7 @@ private struct ActivityTimelinePanel: View {
                                     hoveredCalendarEventID = event.id
                                     hoveredSegmentID = nil
                                     hoveredTimeEntryID = nil
+                                    hoveredSuggestionID = nil
                                 }
                             }
                             .onTapGesture {
@@ -4901,6 +4933,7 @@ private struct ActivityTimelinePanel: View {
                                         hoveredTimeEntryID = entry.id
                                         hoveredSegmentID = nil
                                         hoveredCalendarEventID = nil
+                                        hoveredSuggestionID = nil
                                     }
                                 }
                                 .onTapGesture {
@@ -4967,6 +5000,7 @@ private struct ActivityTimelinePanel: View {
                         hoveredSegmentID = nil
                         hoveredTimeEntryID = nil
                         hoveredCalendarEventID = nil
+                        hoveredSuggestionID = nil
                     }
                 }
             }
@@ -5033,6 +5067,61 @@ private struct ActivityTimelinePanel: View {
                             .frame(width: width, height: 16)
                             .offset(x: left)
                             .help("Project: \(project(segment.projectID)?.name ?? "None")")
+                    }
+                }
+
+                if !suggestions.isEmpty {
+                    verticalLane(label: "SUMMARY", chartWidth: chartWidth) {
+                        ForEach(suggestions) { suggestion in
+                            let left = chartWidth * CGFloat(suggestion.startSecond) / 86_400
+                            let width = max(
+                                2,
+                                chartWidth * CGFloat(suggestion.endSecond - suggestion.startSecond) / 86_400
+                            )
+                            let hitWidth = max(12, width)
+                            ZStack(alignment: .topTrailing) {
+                                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                    .fill(MetridayTheme.accent.opacity(0.08))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                            .strokeBorder(
+                                                MetridayTheme.accent,
+                                                style: StrokeStyle(lineWidth: 1, dash: [3, 2])
+                                            )
+                                    )
+                                    .frame(width: width, height: 16)
+                                    .offset(x: -(hitWidth - width) / 2)
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(MetridayTheme.accent)
+                                    .padding(.trailing, 2)
+                            }
+                            .frame(width: hitWidth, height: 16, alignment: .leading)
+                            .offset(x: left)
+                            .contentShape(Rectangle())
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityLabel(
+                                "Summary suggestion · \(suggestion.title) · \(TimeFormat.range(start: suggestion.startMinute, end: suggestion.endMinute))"
+                            )
+                            .accessibilityIdentifier("activities.vertical-timeline.summary.\(suggestion.id)")
+                            .onHover { isHovered in
+                                if isHovered {
+                                    hoveredSuggestionID = suggestion.id
+                                    hoveredSegmentID = nil
+                                    hoveredTimeEntryID = nil
+                                    hoveredCalendarEventID = nil
+                                }
+                            }
+                            .onTapGesture {
+                                onSelectTimelineSuggestion(
+                                    suggestion,
+                                    NSEvent.modifierFlags.contains(.option)
+                                )
+                            }
+                            .help(
+                                "\(suggestion.title) · \(TimeFormat.range(start: suggestion.startMinute, end: suggestion.endMinute)) · ⌥-click to create immediately"
+                            )
+                        }
                     }
                 }
 
@@ -5132,6 +5221,7 @@ private struct ActivityTimelinePanel: View {
                     hoveredSegmentID = nil
                     hoveredTimeEntryID = nil
                     hoveredCalendarEventID = nil
+                    hoveredSuggestionID = nil
                 }
             }
             .accessibilityElement(children: .contain)
@@ -5156,8 +5246,16 @@ private struct ActivityTimelinePanel: View {
                     }
                 }
             }
+            .overlay(alignment: .top) {
+                if let detail = hoveredTimelineDetail {
+                    TimelineHoverBanner(detail: detail)
+                        .padding(.horizontal, 16)
+                        .allowsHitTesting(false)
+                        .zIndex(10)
+                }
+            }
         }
-        .frame(height: 156)
+        .frame(height: suggestions.isEmpty ? 156 : 180)
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
     }
@@ -5234,6 +5332,22 @@ private struct ActivityTimelinePanel: View {
                 projectName: project?.name ?? "None",
                 projectColor: color(for: project?.color),
                 projectQualifier: project == nil ? "From the app usage" : nil
+            )
+        }
+
+        if let hoveredSuggestionID,
+           let suggestion = suggestions.first(where: { $0.id == hoveredSuggestionID }) {
+            let project = project(suggestion.projectID)
+            return TimelineHoverDetail(
+                id: "summary-\(suggestion.id)",
+                sourceLabel: "Summary",
+                sourceColor: MetridayTheme.accent,
+                title: suggestion.title,
+                timeRange: secondRange(start: suggestion.startSecond, end: suggestion.endSecond),
+                duration: durationLabel(suggestion.endSecond - suggestion.startSecond),
+                projectName: project?.name ?? "None",
+                projectColor: color(for: project?.color),
+                projectQualifier: "⌥-click to create immediately"
             )
         }
 

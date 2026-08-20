@@ -65,6 +65,8 @@ Recorded entries in the Activities timeline are clickable and open the full Time
 
 Timeline colors are explained inline: filled deep-blue/red/gray blocks are Focused, Distracting, and Other/Idle app usage; the amber outlined lane is a manual or timer Time Entry; the blue dashed lane is a Calendar event. Hovering any block opens a Timing-style detail banner with the exact second-level range, duration, source, and Project marker; an unassigned App block shows `None · From the app usage`.
 
+The vertical timeline also shows local Smart Summary suggestions as sparkle-marked dashed blocks. A normal click opens a prefilled Time Entry editor; Option-click creates the suggested entry immediately with the explainable local summary as notes. Suggestions are derived from the selected activity scope and are unavailable in horizontal mode, matching Timing's timeline interaction while keeping Metriday local-first.
+
 Activity rows follow a RescueTime-style App / Category layout. App identity is shown with a graphite icon on a light-gray tile, while the category owns the visual color: Focused uses the deep-blue accent, Distracting uses red, and Other/Idle use neutral tones. The same category palette is used for category summaries and app-usage timeline blocks; project color remains reserved for the separate Project lane.
 Categories are local and editable from Activities → display settings → Manage Categories. A custom App, Website, or Item rule wins before the built-in relevance fallback, and definitions persist in `ActivityCategories.json` beside the other local stores. Today’s Actual timeline, Stats application bars, Review metrics, and Reports resolve the same category color and effective relevance instead of keeping separate app palettes.
 

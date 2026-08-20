@@ -75,6 +75,41 @@ expect(activitySummary.distractedMinutes == 12, "Activity summary should count d
 expect(activitySummary.idleMinutes == 18, "Activity summary should count idle minutes")
 expect(activitySummary.activeMinutes == 72, "Activity summary should exclude idle time from active minutes")
 expect(activitySummary.taskRelatedPercentage == 83, "Activity summary should calculate task relevance from active time")
+let suggestionProjectID = UUID()
+let timelineSuggestionSegments = [
+    ActivitySegment(
+        appName: "Visual Studio Code",
+        bundleIdentifier: "com.microsoft.VSCode",
+        windowTitle: "ActivityInsights.swift",
+        startMinute: 540,
+        endMinute: 555,
+        relevance: .related,
+        projectID: suggestionProjectID
+    ),
+    ActivitySegment(
+        appName: "Google Chrome",
+        bundleIdentifier: "com.google.Chrome",
+        windowTitle: "GitHub",
+        startMinute: 557,
+        endMinute: 575,
+        relevance: .related,
+        projectID: suggestionProjectID
+    ),
+    ActivitySegment(
+        appName: "Idle",
+        bundleIdentifier: "com.metriday.idle",
+        startMinute: 575,
+        endMinute: 590,
+        relevance: .idle,
+        projectID: suggestionProjectID
+    )
+]
+let timelineSuggestions = ActivityInsights.generateTimelineSuggestions(from: timelineSuggestionSegments)
+expect(timelineSuggestions.count == 1, "Vertical timeline summaries should merge related app activity")
+expect(timelineSuggestions[0].startMinute == 540 && timelineSuggestions[0].endMinute == 575, "Timeline summary should cover active evidence but exclude idle time")
+expect(timelineSuggestions[0].projectID == suggestionProjectID, "Timeline summary should preserve the dominant project")
+expect(timelineSuggestions[0].title.contains("Focused work"), "Focused timeline summaries should offer a focused title")
+expect(timelineSuggestions[0].notes.contains("captured activities"), "Timeline summaries should explain their local evidence")
 expect(ActivityClassifier.relevance(appName: "Visual Studio Code", bundleIdentifier: "com.microsoft.VSCode", windowTitle: "") == .related, "Known work apps should be related")
 expect(ActivityClassifier.relevance(appName: "Google Chrome", bundleIdentifier: "com.google.Chrome", windowTitle: "YouTube") == .distracted, "Distracting window titles should be classified")
 expect(ActivityClassifier.relevance(appName: "Google Chrome", bundleIdentifier: "com.google.Chrome", windowTitle: "") == .distracted, "Browser activity should have a safe default classification")
