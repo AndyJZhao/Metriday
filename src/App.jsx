@@ -825,7 +825,12 @@ function activityApplicationGroupNames(activity, displayPreferences = null) {
 function activityCategory(activity) {
   const categoryRole = String(activity?.categoryRole || "").toLowerCase();
   if (["focused", "distracting", "other", "idle"].includes(categoryRole)) {
-    return { key: categoryRole, label: activity.categoryName || categoryRole[0].toUpperCase() + categoryRole.slice(1), color: activity.categoryColor || categoryRoleColor(categoryRole) };
+    const color = categoryRole === "focused"
+      ? "blue"
+      : categoryRole === "distracting"
+      ? "red"
+      : activity.categoryColor || categoryRoleColor(categoryRole);
+    return { key: categoryRole, label: activity.categoryName || categoryRole[0].toUpperCase() + categoryRole.slice(1), color };
   }
   switch (activity?.relevance) {
     case "related":
