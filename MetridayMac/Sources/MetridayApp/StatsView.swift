@@ -260,23 +260,39 @@ struct StatsView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
-                ForEach(categoryPoints) { point in
-                    VStack(alignment: .leading, spacing: 5) {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(point.color)
-                                .frame(width: 8, height: 8)
-                            Text(point.name)
-                                .font(.system(size: 11, weight: .medium))
-                                .lineLimit(1)
-                            Spacer()
-                            Text("\(point.percentage)% · \(formatSeconds(point.seconds))")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(MetridayTheme.secondary)
+                HStack(alignment: .center, spacing: 14) {
+                    Chart {
+                        ForEach(categoryPoints) { point in
+                            SectorMark(
+                                angle: .value("Time", point.seconds),
+                                innerRadius: .ratio(0.62),
+                                angularInset: 1.5
+                            )
+                            .foregroundStyle(point.color)
                         }
-                        ProgressView(value: Double(point.seconds), total: Double(categoryPoints.first?.seconds ?? 1))
-                            .tint(point.color)
                     }
+                    .chartLegend(.hidden)
+                    .frame(width: 170, height: 170)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(categoryPoints) { point in
+                            HStack(spacing: 7) {
+                                Circle()
+                                    .fill(point.color)
+                                    .frame(width: 8, height: 8)
+                                Text(point.name)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .lineLimit(1)
+                                Spacer(minLength: 6)
+                                Text("\(point.percentage)%")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text(formatSeconds(point.seconds))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(MetridayTheme.secondary)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -340,33 +356,39 @@ struct StatsView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
-                let maximum = applicationPoints.first?.seconds ?? 1
-                ForEach(applicationPoints) { point in
-                    VStack(alignment: .leading, spacing: 5) {
-                        HStack(spacing: 8) {
-                            AppIdentityIcon(
-                                symbol: "rectangle.on.rectangle",
-                                bundleIdentifier: point.bundleIdentifier,
-                                size: 22
+                HStack(alignment: .center, spacing: 14) {
+                    Chart {
+                        ForEach(applicationPoints) { point in
+                            SectorMark(
+                                angle: .value("Time", point.seconds),
+                                innerRadius: .ratio(0.62),
+                                angularInset: 1.5
                             )
-                            Text(point.name)
-                                .font(.system(size: 11, weight: .medium))
-                                .lineLimit(1)
-                            Text(point.categoryName)
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(point.color)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
-                                .background(point.color.opacity(0.10))
-                                .clipShape(Capsule())
-                            Spacer()
-                            Text(formatSeconds(point.seconds))
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(MetridayTheme.secondary)
+                            .foregroundStyle(point.color)
                         }
-                        ProgressView(value: Double(point.seconds), total: Double(maximum))
-                            .tint(point.color)
                     }
+                    .chartLegend(.hidden)
+                    .frame(width: 170, height: 170)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(applicationPoints) { point in
+                            HStack(spacing: 7) {
+                                AppIdentityIcon(
+                                    symbol: "rectangle.on.rectangle",
+                                    bundleIdentifier: point.bundleIdentifier,
+                                    size: 22
+                                )
+                                Text(point.name)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .lineLimit(1)
+                                Spacer(minLength: 6)
+                                Text(formatSeconds(point.seconds))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(MetridayTheme.secondary)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -392,18 +414,37 @@ struct StatsView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
-                ForEach(projectPoints) { point in
-                    HStack(spacing: 9) {
-                        Circle()
-                            .fill(point.color)
-                            .frame(width: 8, height: 8)
-                        Text(point.name)
-                            .font(.system(size: 12))
-                            .lineLimit(1)
-                        Spacer()
-                        Text(formatSeconds(point.seconds))
-                            .font(.system(size: 12, weight: .semibold))
+                HStack(alignment: .center, spacing: 14) {
+                    Chart {
+                        ForEach(projectPoints) { point in
+                            SectorMark(
+                                angle: .value("Time", point.seconds),
+                                innerRadius: .ratio(0.62),
+                                angularInset: 1.5
+                            )
+                            .foregroundStyle(point.color)
+                        }
                     }
+                    .chartLegend(.hidden)
+                    .frame(width: 170, height: 170)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(projectPoints) { point in
+                            HStack(spacing: 7) {
+                                Circle()
+                                    .fill(point.color)
+                                    .frame(width: 8, height: 8)
+                                Text(point.name)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .lineLimit(1)
+                                Spacer(minLength: 6)
+                                Text(formatSeconds(point.seconds))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(MetridayTheme.secondary)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }

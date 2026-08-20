@@ -472,6 +472,19 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-category-heading small { min-width: 48px; color: var(--muted); font-size: 10px; text-align: right; }
 .stats-category-track { height: 8px; overflow: hidden; border-radius: 99px; background: #eff0f3; }
 .stats-category-track b { display: block; height: 100%; min-width: 4px; border-radius: inherit; }
+.stats-donut-layout { display: flex; align-items: center; gap: 14px; min-width: 0; margin-top: 18px; }
+.stats-donut { position: relative; width: 170px; height: 170px; flex: 0 0 170px; border-radius: 50%; }
+.stats-donut::after { content: ""; position: absolute; inset: 31%; border-radius: 50%; background: #fff; }
+.stats-donut > span { position: absolute; z-index: 1; inset: 0; display: flex; align-items: center; justify-content: center; padding: 22px; color: #4a4f5a; font-size: 11px; font-weight: 650; text-align: center; }
+.stats-donut-legend { display: grid; flex: 1; gap: 8px; min-width: 0; }
+.stats-donut-legend-row { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-width: 0; color: #454a55; font-size: 11px; }
+.stats-donut-legend-row > i { width: 9px; height: 9px; border-radius: 50%; }
+.stats-donut-legend-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-donut-legend-row > strong { color: #353a44; font-size: 10px; white-space: nowrap; }
+.stats-app-legend-row { grid-template-columns: 24px minmax(0, 1fr) auto; align-items: start; }
+.stats-app-identity { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: #f0f1f4; color: #3f434d; }
+.stats-app-legend-row > span:nth-child(2) { display: grid; gap: 3px; min-width: 0; }
+.stats-app-legend-row .activity-category { width: max-content; min-height: 18px; padding: 0 5px; font-size: 9px; }
 .reports-page .web-report-panel { max-width: 1120px; margin: 0 auto; }
 .reports-page .report-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0 0 22px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--border); }
 .reports-page .report-summary > div { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; padding: 18px; background: #fff; }
