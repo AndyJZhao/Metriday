@@ -467,8 +467,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-bar-column strong { color: #454a55; font-size: 10px; }
 .stats-bar-track { display: flex; align-items: end; width: min(38px, 100%); height: 145px; border-radius: 6px 6px 2px 2px; background: #f1f2f5; }
 .stats-bar-track i { display: block; width: 100%; min-height: 3px; border-radius: 6px 6px 2px 2px; background: var(--accent); }
-.stats-period-bars-month, .stats-period-bars-year { justify-content: flex-start; overflow-x: auto; padding-bottom: 6px; }
-.stats-period-bars-month .stats-bar-column, .stats-period-bars-year .stats-bar-column { flex: 0 0 32px; }
+.stats-period-bars-month, .stats-period-bars-lastMonth, .stats-period-bars-year, .stats-period-bars-lastYear { justify-content: flex-start; overflow-x: auto; padding-bottom: 6px; }
+.stats-period-bars-month .stats-bar-column, .stats-period-bars-lastMonth .stats-bar-column, .stats-period-bars-year .stats-bar-column, .stats-period-bars-lastYear .stats-bar-column { flex: 0 0 32px; }
 .stats-category-legend { max-width: 58%; flex-wrap: wrap; justify-content: flex-end; gap: 5px 9px; }
 .stats-category-legend span { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stats-category-legend i { flex: 0 0 auto; border-radius: 50%; }

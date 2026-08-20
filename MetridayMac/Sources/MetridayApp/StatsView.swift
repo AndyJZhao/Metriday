@@ -3,25 +3,33 @@ import SwiftUI
 
 private enum StatsPeriod: String, CaseIterable, Identifiable {
     case day
+    case yesterday
     case week
+    case lastWeek
     case month
+    case lastMonth
     case year
+    case lastYear
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .day: return "Today"
+        case .yesterday: return "Yesterday"
         case .week: return "This Week"
+        case .lastWeek: return "Last Week"
         case .month: return "This Month"
+        case .lastMonth: return "Last Month"
         case .year: return "This Year"
+        case .lastYear: return "Last Year"
         }
     }
 
     var chartTitle: String {
         switch self {
-        case .day, .week: return "Time by Day"
-        case .month, .year: return "Time by Week"
+        case .day, .yesterday, .week, .lastWeek: return "Time by Day"
+        case .month, .lastMonth, .year, .lastYear: return "Time by Week"
         }
     }
 }
@@ -77,8 +85,8 @@ struct StatsView: View {
                                     Text(period.label).tag(period)
                                 }
                             }
-                            .pickerStyle(.segmented)
-                            .frame(width: 250)
+                            .pickerStyle(.menu)
+                            .frame(minWidth: 130)
                             .accessibilityIdentifier("stats.period-picker")
                             ShareLink(
                                 item: statsShareText,
@@ -760,21 +768,44 @@ struct StatsView: View {
         switch statsPeriod {
         case .day:
             return [calendar.startOfDay(for: selectedDate)]
+        case .yesterday:
+            let today = calendar.startOfDay(for: selectedDate)
+            return [calendar.date(byAdding: .day, value: -1, to: today) ?? today]
         case .week:
             guard let interval = calendar.dateInterval(of: .weekOfYear, for: selectedDate) else {
                 return [selectedDate]
             }
             return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: interval.start) }
+        case .lastWeek:
+            guard let interval = calendar.dateInterval(of: .weekOfYear, for: selectedDate),
+                  let start = calendar.date(byAdding: .day, value: -7, to: interval.start) else {
+                return [selectedDate]
+            }
+            return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
         case .month:
             guard let interval = calendar.dateInterval(of: .month, for: selectedDate) else {
                 return [selectedDate]
             }
             return dates(in: interval)
+        case .lastMonth:
+            guard let current = calendar.dateInterval(of: .month, for: selectedDate),
+                  let previousDate = calendar.date(byAdding: .month, value: -1, to: current.start),
+                  let previous = calendar.dateInterval(of: .month, for: previousDate) else {
+                return [selectedDate]
+            }
+            return dates(in: previous)
         case .year:
             guard let interval = calendar.dateInterval(of: .year, for: selectedDate) else {
                 return [selectedDate]
             }
             return dates(in: interval)
+        case .lastYear:
+            guard let current = calendar.dateInterval(of: .year, for: selectedDate),
+                  let previousDate = calendar.date(byAdding: .year, value: -1, to: current.start),
+                  let previous = calendar.dateInterval(of: .year, for: previousDate) else {
+                return [selectedDate]
+            }
+            return dates(in: previous)
         }
     }
 
@@ -782,11 +813,11 @@ struct StatsView: View {
         guard let first = periodDates.first, let last = periodDates.last else { return statsPeriod.label }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = statsPeriod == .year ? "MMM yyyy" : "MMM d"
-        if statsPeriod == .day {
+        formatter.dateFormat = statsPeriod == .year || statsPeriod == .lastYear ? "MMM yyyy" : "MMM d"
+        if statsPeriod == .day || statsPeriod == .yesterday {
             return formatter.string(from: first)
         }
-        return statsPeriod == .year
+        return statsPeriod == .year || statsPeriod == .lastYear
             ? formatter.string(from: first)
             : "\(formatter.string(from: first))–\(formatter.string(from: last))"
     }
@@ -860,9 +891,9 @@ struct StatsView: View {
     private var periodPoints: [StatsDayPoint] {
         let buckets: [StatsPeriodBucket]
         switch statsPeriod {
-        case .day, .week:
+        case .day, .yesterday, .week, .lastWeek:
             buckets = periodDates.map { StatsPeriodBucket(label: dayLabel($0), dates: [$0]) }
-        case .month, .year:
+        case .month, .lastMonth, .year, .lastYear:
             buckets = stride(from: 0, to: periodDates.count, by: 7).map { start in
                 let dates = Array(periodDates[start..<min(start + 7, periodDates.count)])
                 return StatsPeriodBucket(label: shortDateLabel(dates[0]), dates: dates)
