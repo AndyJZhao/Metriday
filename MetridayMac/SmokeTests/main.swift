@@ -962,6 +962,12 @@ Task { @MainActor in
         pattern: "README.md",
         comparison: .endsWith
     )
+    _ = projectStore.addRule(
+        projectID: childProjectID,
+        field: .device,
+        pattern: "Studio Mac",
+        comparison: .equals
+    )
     let titleOrPathActivity = ActivitySegment(
         appName: "TextEdit",
         windowTitle: "Metriday",
@@ -997,6 +1003,19 @@ Task { @MainActor in
     expect(
         projectStore.matchingProjectID(for: webFileActivity, date: date) == nil,
         "File path rules should not treat web URLs as local files"
+    )
+    let deviceActivity = ActivitySegment(
+        appName: "TextEdit",
+        deviceName: "Studio Mac",
+        windowTitle: "Unrelated document",
+        resource: "",
+        startMinute: 600,
+        endMinute: 610,
+        relevance: .related
+    )
+    expect(
+        projectStore.matchingProjectID(for: deviceActivity, date: date) == childProjectID,
+        "Device rules should match the activity source device"
     )
     expect(
         projectStore.hierarchyPath(for: childProjectID) == "Smoke Research > Smoke Subproject",

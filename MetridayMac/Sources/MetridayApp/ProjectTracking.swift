@@ -159,6 +159,7 @@ enum ProjectRuleField: String, CaseIterable, Codable, Identifiable {
     case domain
     case fullURL
     case keyword
+    case device
     case startTime
     case dayOfWeek
 
@@ -184,6 +185,8 @@ enum ProjectRuleField: String, CaseIterable, Codable, Identifiable {
             return "Full website URL"
         case .keyword:
             return "Keyword"
+        case .device:
+            return "Device"
         case .startTime:
             return "Start time"
         case .dayOfWeek:
@@ -723,6 +726,8 @@ final class ProjectStore: ObservableObject {
             candidates = [activity.resource]
         case .keyword:
             candidates = ["\(activity.windowTitle) \(activity.resource)"]
+        case .device:
+            candidates = [activity.deviceName]
         case .startTime:
             candidates = [String(format: "%02d:%02d", activity.startMinute / 60, activity.startMinute % 60)]
         case .dayOfWeek:
