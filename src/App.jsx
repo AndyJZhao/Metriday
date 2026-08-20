@@ -3366,14 +3366,14 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
     const endSecond = Math.max(0, Math.min(totalSeconds, Math.ceil((endDate.getTime() - dayStart.getTime()) / 1000)));
     return endSecond > startSecond ? { event, startSecond, endSecond } : null;
   }).filter(Boolean) : [];
-  const recordCalendarEvent = async (calendarEvent) => {
+  const recordCalendarEvent = async (calendarEvent, immediate = false) => {
     if (onRecordCalendarEvent) {
-      onRecordCalendarEvent(calendarEvent);
+      onRecordCalendarEvent(calendarEvent, immediate);
       return;
     }
     if (!api.connected) return;
     try {
-      await api.addTimeEntry({ title: calendarEvent.title || "Calendar event", start: calendarEvent.start, end: calendarEvent.end, billingStatus: "billable" });
+      await api.addTimeEntry({ title: calendarEvent.title || "Calendar event", start: calendarEvent.start, end: calendarEvent.end, projectID: resourceID(calendarEvent.suggested_project_id || calendarEvent.suggestedProjectID) || undefined, billingStatus: "billable" });
       setTimelineMessage("Recorded calendar event.");
     } catch (error) {
       setTimelineMessage(error.message || "Could not record the calendar event.");
@@ -3512,7 +3512,7 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
       {calendarEvents.map(({ event, startSecond, endSecond }) => {
         const timelineRange = rangeStyle(startSecond, endSecond, "#4e5ff2");
         if (!timelineRange) return null;
-        return <button type="button" key={`calendar-${event.id || event.title}`} className="web-activity-timeline-overlay calendar-event" style={timelineRange.outer} aria-label={`Record calendar event ${event.title || "Untitled event"}`} title={`Calendar · ${event.title || "Untitled event"}`} onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setOverlayContextMenu({ kind: "calendar-event", event, x: event.clientX, y: event.clientY }); }} onClick={() => recordCalendarEvent(event)}><span style={timelineRange.visual} /></button>;
+        return <button type="button" key={`calendar-${event.id || event.title}`} className="web-activity-timeline-overlay calendar-event" style={timelineRange.outer} aria-label={`Record calendar event ${event.title || "Untitled event"}`} title={`Calendar · ${event.title || "Untitled event"} · Alt-click to record immediately`} onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setOverlayContextMenu({ kind: "calendar-event", event, x: event.clientX, y: event.clientY }); }} onClick={(clickEvent) => recordCalendarEvent(event, clickEvent.altKey)}><span style={timelineRange.visual} /></button>;
       })}
       {selection ? <div className="web-activity-timeline-selection" style={selectionStyle} aria-label={`Selected ${formatRange(selection.start, selection.end)}`} /> : null}
     </div>
@@ -4849,7 +4849,7 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
       window.removeEventListener("metriday:open-entry-omatic", handleOpenEntryOMatic);
     };
   }, []);
-  const openSourceTimeEntry = (source) => {
+  const openSourceTimeEntry = async (source, immediate = false) => {
     if (source?.completed_at) {
       const completed = new Date(source.completed_at);
       if (Number.isNaN(completed.getTime())) return;
@@ -4868,7 +4868,7 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     const title = isPhoneCall
       ? source.address ? "Call · " + source.address : "Phone call"
       : source.title || "Calendar event";
-    openNewTimeEntry({
+    const prefill = {
       title,
       notes: isPhoneCall
         ? [source.service_provider, source.address].filter(Boolean).join(" · ")
@@ -4877,7 +4877,17 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
       end: source.end,
       projectID: isPhoneCall ? "" : resourceID(source.suggested_project_id || source.suggestedProjectID) || "",
       billingStatus: "billable",
-    });
+    };
+    if (immediate && !isPhoneCall && api.connected) {
+      try {
+        await api.addTimeEntry(prefill);
+        setDisplayMessage("Recorded calendar event.");
+      } catch (error) {
+        setDisplayMessage(error.message || "Could not record the calendar event.");
+      }
+      return;
+    }
+    openNewTimeEntry(prefill);
   };
   const openActivityTimeEntry = (activity) => {
     const activityDateKey = activity?.date || dateKey;
