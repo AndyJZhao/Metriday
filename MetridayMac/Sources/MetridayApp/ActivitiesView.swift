@@ -1461,6 +1461,8 @@ struct ActivitiesView: View {
                 categoryCards
             } else if activityMode == .unified {
                 unifiedActivityList
+            } else if groupActivitiesByProject && groupActivitiesByDevice {
+                groupedActivityListByProjectAndDevice
             } else if groupActivitiesByDevice {
                 groupedActivityListByDevice
             } else if groupActivitiesByProject {
@@ -1806,7 +1808,10 @@ struct ActivitiesView: View {
     private var unifiedActivityList: some View {
         let groups: [ActivityGroup]
         let headerKind: UnifiedGroupHeaderKind
-        if groupActivitiesByDevice {
+        if groupActivitiesByProject && groupActivitiesByDevice {
+            groups = activityGroups
+            headerKind = .project
+        } else if groupActivitiesByDevice {
             groups = deviceActivityGroups
             headerKind = .device
         } else if groupActivitiesByProject {
@@ -1831,11 +1836,11 @@ struct ActivitiesView: View {
         }
     }
 
-    @ViewBuilder
     private func unifiedActivityGroup(
         _ group: ActivityGroup,
-        headerKind: UnifiedGroupHeaderKind
-    ) -> some View {
+        headerKind: UnifiedGroupHeaderKind,
+        headerIndent: CGFloat = 0
+    ) -> AnyView {
         let isCollapsed: Bool = {
             switch headerKind {
             case .project: return collapsedProjectGroups.contains(group.id)
@@ -1843,6 +1848,7 @@ struct ActivitiesView: View {
             case .none: return false
             }
         }()
+        return AnyView(VStack(alignment: .leading, spacing: 0) {
         if headerKind != .none {
             Button {
                 switch headerKind {
@@ -1872,7 +1878,8 @@ struct ActivitiesView: View {
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(MetridayTheme.secondary)
                 }
-                .padding(.horizontal, 18)
+                .padding(.leading, 18 + headerIndent)
+                .padding(.trailing, 18)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -1885,7 +1892,12 @@ struct ActivitiesView: View {
         }
 
         if !isCollapsed {
-            ForEach(unifiedAppGroups(for: group)) { appGroup in
+            if groupActivitiesByProject && groupActivitiesByDevice && headerKind == .project {
+                ForEach(deviceActivityGroups(for: group.segments)) { deviceGroup in
+                    unifiedActivityGroup(deviceGroup, headerKind: .device, headerIndent: 24)
+                }
+            } else {
+                ForEach(unifiedAppGroups(for: group)) { appGroup in
                 let groupKey = "\(headerKind.key)::\(group.id)::\(appGroup.id)"
                 let appCollapsed = collapsedUnifiedAppGroups.contains(groupKey)
                 Button {
@@ -1924,7 +1936,7 @@ struct ActivitiesView: View {
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(MetridayTheme.secondary)
                     }
-                    .padding(.leading, headerKind == .none ? 18 : 42)
+                    .padding(.leading, headerKind == .none ? 18 : 42 + headerIndent)
                     .padding(.trailing, 18)
                     .padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1939,12 +1951,14 @@ struct ActivitiesView: View {
                     ForEach(appGroup.segments) { segment in
                         activityRow(segment)
                         if segment.id != appGroup.segments.last?.id {
-                            Divider().padding(.leading, headerKind == .none ? 64 : 88)
+                            Divider().padding(.leading, headerKind == .none ? 64 : 88 + headerIndent)
                         }
                     }
                 }
             }
+            }
         }
+        })
     }
 
     private func unifiedAppGroups(for projectGroup: ActivityGroup) -> [ActivityGroup] {
@@ -1985,8 +1999,8 @@ struct ActivitiesView: View {
         ]
     }
 
-    private var deviceActivityGroups: [ActivityGroup] {
-        Dictionary(grouping: activityListSegments) { $0.deviceName }
+    private func deviceActivityGroups(for segments: [ActivitySegment]) -> [ActivityGroup] {
+        Dictionary(grouping: segments) { $0.deviceName }
             .map { name, segments in
                 ActivityGroup(
                     name: name,
@@ -1998,6 +2012,10 @@ struct ActivitiesView: View {
                 if first.seconds == second.seconds { return first.name < second.name }
                 return first.seconds > second.seconds
             }
+    }
+
+    private var deviceActivityGroups: [ActivityGroup] {
+        deviceActivityGroups(for: activityListSegments)
     }
 
     private var groupedActivityListByDevice: some View {
@@ -2041,6 +2059,89 @@ struct ActivitiesView: View {
                     }
                 }
                 if group.id != groups.last?.id {
+                    Divider()
+                }
+            }
+        }
+    }
+
+    private var groupedActivityListByProjectAndDevice: some View {
+        LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(activityGroups) { projectGroup in
+                let projectCollapsed = collapsedProjectGroups.contains(projectGroup.id)
+                Button {
+                    if projectCollapsed {
+                        collapsedProjectGroups.remove(projectGroup.id)
+                    } else {
+                        collapsedProjectGroups.insert(projectGroup.id)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: projectCollapsed ? "chevron.right" : "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                            .frame(width: 10)
+                        Label(
+                            projectGroup.name,
+                            systemImage: projectGroup.name == "Unassigned" ? "tray" : "folder"
+                        )
+                        .font(.system(size: 12, weight: .bold))
+                        Spacer()
+                        Text(formatMinutes(projectGroup.seconds))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(MetridayTheme.secondary)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(MetridayTheme.canvas)
+
+                if !projectCollapsed {
+                    ForEach(deviceActivityGroups(for: projectGroup.segments)) { deviceGroup in
+                        let deviceCollapsed = collapsedDeviceGroups.contains(deviceGroup.id)
+                        Button {
+                            if deviceCollapsed {
+                                collapsedDeviceGroups.remove(deviceGroup.id)
+                            } else {
+                                collapsedDeviceGroups.insert(deviceGroup.id)
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: deviceCollapsed ? "chevron.right" : "chevron.down")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .frame(width: 10)
+                                Label(deviceGroup.name, systemImage: "laptopcomputer.and.iphone")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Spacer()
+                                Text(formatMinutes(deviceGroup.seconds))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(MetridayTheme.secondary)
+                            }
+                            .padding(.leading, 42)
+                            .padding(.trailing, 18)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .background(MetridayTheme.canvas.opacity(0.7))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Text("Device \(deviceGroup.name) \(deviceCollapsed ? "Expand" : "Collapse")"))
+                        .accessibilityIdentifier("activities.chronological.device.\(projectGroup.id).\(deviceGroup.id)")
+
+                        if !deviceCollapsed {
+                            ForEach(deviceGroup.segments) { segment in
+                                activityRow(segment)
+                                if segment.id != deviceGroup.segments.last?.id {
+                                    Divider().padding(.leading, 88)
+                                }
+                            }
+                        }
+                    }
+                }
+                if projectGroup.id != activityGroups.last?.id {
                     Divider()
                 }
             }
@@ -2920,7 +3021,6 @@ struct ActivitiesView: View {
             get: { groupActivitiesByProject },
             set: { enabled in
                 groupActivitiesByProject = enabled
-                if enabled { groupActivitiesByDevice = false }
             }
         )
     }
@@ -2930,7 +3030,6 @@ struct ActivitiesView: View {
             get: { groupActivitiesByDevice },
             set: { enabled in
                 groupActivitiesByDevice = enabled
-                if enabled { groupActivitiesByProject = false }
             }
         )
     }

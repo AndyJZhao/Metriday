@@ -3214,11 +3214,17 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     ? activities
     : collapseShortActivities(activities, displayPreferences?.collapse_activities_shorter_than_seconds);
   const rows = [...displayActivities].sort((left, right) => String(left.date || dateKey).localeCompare(String(right.date || dateKey)) || Number(left.startSecond || 0) - Number(right.startSecond || 0));
-  const resolvedUnifiedGroupMode = displayPreferences?.group_by_device
+  const projectGroupingEnabled = displayPreferences
+    ? displayPreferences.group_by_project !== false
+    : unifiedGroupMode === "project";
+  const deviceGroupingEnabled = Boolean(displayPreferences?.group_by_device);
+  const resolvedUnifiedGroupMode = projectGroupingEnabled && deviceGroupingEnabled
+    ? "projectDevice"
+    : deviceGroupingEnabled
     ? "device"
-    : displayPreferences?.group_by_project === false
-    ? "none"
-    : unifiedGroupMode;
+    : projectGroupingEnabled
+    ? "project"
+    : "none";
   const activityRow = (activity) => {
     if (activity.is_collapsed_summary) {
       const count = Array.isArray(activity.collapsed_activity_ids) ? activity.collapsed_activity_ids.length : 0;
@@ -3315,7 +3321,12 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
   if (viewMode === "category") {
     return <WebActivityCategoryCards activities={rows} dateKey={dateKey} displayPreferences={displayPreferences} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} />;
   }
-  const grouping = viewMode === "category" ? "category" : groupMode !== "none" ? groupMode : viewMode === "unified" ? "application" : "none";
+  const resolvedListGrouping = viewMode === "unified"
+    ? "none"
+    : resolvedUnifiedGroupMode === "projectDevice"
+    ? "projectDevice"
+    : groupMode;
+  const grouping = viewMode === "category" ? "category" : resolvedListGrouping !== "none" ? resolvedListGrouping : viewMode === "unified" ? "application" : "none";
   if (grouping === "none") {
     return <div className="activity-table">
       <div className="activity-table-head" aria-hidden="true"><span>App</span><span>Category</span><span>Time</span><span>Device</span><span>Project</span></div>
@@ -3362,7 +3373,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     </section>;
   };
   if (grouping === "application") {
-    const unifiedGroups = resolvedUnifiedGroupMode === "project"
+    const unifiedGroups = resolvedUnifiedGroupMode === "project" || resolvedUnifiedGroupMode === "projectDevice"
       ? groupedFor(rows, "project", "project:")
       : resolvedUnifiedGroupMode === "device"
       ? groupedFor(rows, "device", "device:")
@@ -3385,7 +3396,32 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
             {renderGroupMeta(projectGroup, projectCollapsed)}
           </button> : null}
           {!projectCollapsed ? <div className="activity-group-nested">
-            {appGroups.map((appGroup) => {
+            {(resolvedUnifiedGroupMode === "projectDevice" ? groupedFor(projectGroup.activities, "device", `${projectGroup.key}::device:`) : [null]).map((deviceGroup) => {
+              if (!deviceGroup) return null;
+              const deviceCollapsed = collapsedGroups.has(deviceGroup.key);
+              const deviceAppGroups = groupedFor(deviceGroup.activities, "application", `${deviceGroup.key}::application:`);
+              return <section className="activity-group activity-group-device" key={deviceGroup.key}>
+                <button type="button" className="activity-group-heading activity-group-device-heading" onClick={() => toggleGroup(deviceGroup.key)} aria-expanded={!deviceCollapsed}>
+                  <span className="activity-group-title"><Laptop size={15} /><strong>{deviceGroup.label}</strong></span>
+                  {renderGroupMeta(deviceGroup, deviceCollapsed)}
+                </button>
+                {!deviceCollapsed ? <div className="activity-group-nested activity-group-device-nested">
+                  {deviceAppGroups.map((appGroup) => {
+                    const appCollapsed = collapsedGroups.has(appGroup.key);
+                    const AppIcon = activityIcon(appGroup.activities[0]);
+                    const categories = [...(appGroup.categories?.values?.() || [])];
+                    return <section className="activity-group activity-group-application" key={appGroup.key}>
+                      <button type="button" className="activity-group-heading activity-group-application-heading" onClick={() => toggleGroup(appGroup.key)} aria-expanded={!appCollapsed}>
+                        <span className="activity-group-title"><span className="activity-table-icon activity-group-app-icon"><AppIcon size={17} weight="duotone" /></span><strong>{appGroup.label}</strong>{categorySummary(categories)}</span>
+                        {renderGroupMeta(appGroup, appCollapsed)}
+                      </button>
+                      {!appCollapsed ? <div className="activity-group-rows">{appGroup.activities.map(activityRow)}</div> : null}
+                    </section>;
+                  })}
+                </div> : null}
+              </section>;
+            })}
+            {(resolvedUnifiedGroupMode === "projectDevice" ? [] : appGroups).map((appGroup) => {
               const appCollapsed = collapsedGroups.has(appGroup.key);
               const AppIcon = activityIcon(appGroup.activities[0]);
               const categories = [...(appGroup.categories?.values?.() || [])];
@@ -3395,6 +3431,34 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
                   {renderGroupMeta(appGroup, appCollapsed)}
                 </button>
                 {!appCollapsed ? <div className="activity-group-rows">{appGroup.activities.map(activityRow)}</div> : null}
+              </section>;
+            })}
+          </div> : null}
+        </section>;
+      })}
+      {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} /> : null}
+    </div>;
+  }
+  if (grouping === "projectDevice") {
+    const projectGroups = groupedFor(rows, "project", "project:");
+    return <div className="activity-table activity-table-project-device">
+      {projectGroups.map((projectGroup) => {
+        const projectCollapsed = collapsedGroups.has(projectGroup.key);
+        const deviceGroups = groupedFor(projectGroup.activities, "device", `${projectGroup.key}::device:`);
+        return <section className="activity-group activity-group-project" key={projectGroup.key}>
+          <button type="button" className="activity-group-heading activity-group-project-heading" onClick={() => toggleGroup(projectGroup.key)} aria-expanded={!projectCollapsed}>
+            <span className="activity-group-title"><FolderSimple size={16} /><strong>{projectGroup.label}</strong></span>
+            {renderGroupMeta(projectGroup, projectCollapsed)}
+          </button>
+          {!projectCollapsed ? <div className="activity-group-nested">
+            {deviceGroups.map((deviceGroup) => {
+              const deviceCollapsed = collapsedGroups.has(deviceGroup.key);
+              return <section className="activity-group activity-group-device" key={deviceGroup.key}>
+                <button type="button" className="activity-group-heading activity-group-device-heading" onClick={() => toggleGroup(deviceGroup.key)} aria-expanded={!deviceCollapsed}>
+                  <span className="activity-group-title"><Laptop size={15} /><strong>{deviceGroup.label}</strong></span>
+                  {renderGroupMeta(deviceGroup, deviceCollapsed)}
+                </button>
+                {!deviceCollapsed ? <div className="activity-group-rows">{deviceGroup.activities.map(activityRow)}</div> : null}
               </section>;
             })}
           </div> : null}
@@ -4253,13 +4317,11 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   const setGrouping = (mode, value) => {
     if (mode === "project") {
       setGroupByProject(value);
-      if (value) setGroupByDevice(false);
-      void saveDisplayPreferences({ group_by_project: value, group_by_device: value ? false : groupByDevice });
+      void saveDisplayPreferences({ group_by_project: value });
       return;
     }
     setGroupByDevice(value);
-    if (value) setGroupByProject(false);
-    void saveDisplayPreferences({ group_by_device: value, group_by_project: value ? false : groupByProject });
+    void saveDisplayPreferences({ group_by_device: value });
   };
   const toggleTimer = async () => {
     if (timerBusy || !api.connected) return;

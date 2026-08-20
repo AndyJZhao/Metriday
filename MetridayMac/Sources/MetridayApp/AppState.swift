@@ -377,11 +377,9 @@ final class AppState: ObservableObject {
             }
             if let value = body["group_by_project"] as? Bool {
                 activitiesPreferences.groupByProject = value
-                if value { activitiesPreferences.groupByDevice = false }
             }
             if let value = body["group_by_device"] as? Bool {
                 activitiesPreferences.groupByDevice = value
-                if value { activitiesPreferences.groupByProject = false }
             }
             if let value = body["include_idle"] as? Bool {
                 activitiesPreferences.includeIdle = value
