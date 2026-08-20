@@ -728,6 +728,10 @@ struct GlobalTopHeader: View {
                             .foregroundStyle(MetridayTheme.accent)
                     }
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { appState.section = .rules }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Research Focus; open Rules")
             }
             .padding(.horizontal, 12)
             .frame(height: 90)

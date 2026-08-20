@@ -55,7 +55,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-global-focus { min-height: 38px; padding: 0 12px; font-size: 12px; }
 .web-global-focus:disabled { cursor: not-allowed; opacity: 0.5; }
 .web-global-focus.active { border: 1px solid #cbd1ff; background: #fff; color: var(--accent); }
-.web-global-rule { display: flex; align-items: center; gap: 9px; min-width: 0; padding-left: 16px; border-left: 1px solid var(--border); }
+.web-global-rule { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 10px 8px 16px; border-left: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.web-global-rule:hover, .web-global-rule:focus-visible { background: var(--accent-soft); outline: none; }
 .web-global-rule > div { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
 .web-global-rule strong { color: #343943; font-size: 12px; }
 .web-global-rule span { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }

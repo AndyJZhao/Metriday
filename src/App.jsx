@@ -1439,7 +1439,13 @@ function WebGlobalHeader({ api, setPage, dateKey, setDateKey }) {
       // The page-level controls continue to reflect the native API on the next refresh.
     }
   };
-  return <header className="web-global-header"><div className="web-global-date"><strong>{planDateLabel(dateKey)}</strong><DateControls dateKey={dateKey} onChange={setDateKey} label="Choose selected date" /></div><div className="web-global-context"><div className="web-global-current"><span>Current block</span><strong>{currentTitle}</strong><small>{currentRange} · {focusActive ? "In progress" : currentTask ? "Ready" : "Waiting"}</small></div><button type="button" className={`primary-button web-global-focus ${focusActive ? "active" : ""}`} onClick={toggleFocus} disabled={!api.connected || !currentTask} title={api.connected && !currentTask ? "Schedule a current block to start Focus" : undefined}>{focusActive ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}{focusActive ? "Pause focus" : "Resume focus"}</button><TimerControls api={api} /><div className="web-global-rule"><ShieldCheck size={30} color="#399a55" weight="duotone" /><div><strong>Research Focus</strong><span>{focusActive ? "Blocklist active" : "Blocklist ready"}</span><button type="button" onClick={() => setPage("rules")}>Adjust allowed sites</button></div></div></div></header>;
+  const openRules = () => setPage("rules");
+  const handleRulesKeyDown = (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    openRules();
+  };
+  return <header className="web-global-header"><div className="web-global-date"><strong>{planDateLabel(dateKey)}</strong><DateControls dateKey={dateKey} onChange={setDateKey} label="Choose selected date" /></div><div className="web-global-context"><div className="web-global-current"><span>Current block</span><strong>{currentTitle}</strong><small>{currentRange} · {focusActive ? "In progress" : currentTask ? "Ready" : "Waiting"}</small></div><button type="button" className={`primary-button web-global-focus ${focusActive ? "active" : ""}`} onClick={toggleFocus} disabled={!api.connected || !currentTask} title={api.connected && !currentTask ? "Schedule a current block to start Focus" : undefined}>{focusActive ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}{focusActive ? "Pause focus" : "Resume focus"}</button><TimerControls api={api} /><div className="web-global-rule" role="button" tabIndex={0} aria-label="Open Research Focus rules" onClick={openRules} onKeyDown={handleRulesKeyDown}><ShieldCheck size={30} color="#399a55" weight="duotone" /><div><strong>Research Focus</strong><span>{focusActive ? "Blocklist active" : "Blocklist ready"}</span><button type="button" onClick={(event) => { event.stopPropagation(); openRules(); }}>Adjust allowed sites</button></div></div></div></header>;
 }
 
 function IconButton({ label, children, onClick, className = "", disabled = false }) {
