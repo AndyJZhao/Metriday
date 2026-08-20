@@ -3201,7 +3201,7 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
    event.stopPropagation();
    if (activityClickTimer.current) window.clearTimeout(activityClickTimer.current);
    activityClickTimer.current = null;
-   onCreateTimeEntry?.(activity);
+   onCreateTimeEntry?.(activity, Boolean(event.altKey));
  };
  const hoveredActivity = activities.find((activity) => resourceID(activity.id) === resourceID(hoveredActivityID)) || null;
  const timelineCategories = useMemo(() => {
@@ -3501,7 +3501,7 @@ function WebActivityTimeline({ activities, dateKey, api, onSelect, onEditTimeEnt
           : { top: "0%", height: "100%", left: `${((startPercent - hitStartPercent) / hitDurationPercent) * 100}%`, width: `${(durationPercent / hitDurationPercent) * 100}%` };
         return <div role="button" tabIndex={0} key={activity.id} className={`web-activity-timeline-block ${category.key}`} style={blockStyle} aria-label={`${activityLabel(activity)} · ${category.label} · ${preciseClock(startSecond)}–${preciseClock(endSecond)}`} title={`${activityLabel(activity)} · ${category.label} · ${preciseClock(startSecond)}–${preciseClock(endSecond)}`} onPointerDown={(event) => event.stopPropagation()} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if (activityClickTimer.current) window.clearTimeout(activityClickTimer.current); activityClickTimer.current = null; setContextMenu({ activity: { ...activity, __deleteActivity: onDeleteActivity ? () => onDeleteActivity(activity) : () => window.dispatchEvent(new CustomEvent("metriday:delete-activity", { detail: activity })) }, x: event.clientX, y: event.clientY }); }} onMouseEnter={() => setHoveredActivityID(activity.id)} onClick={() => openActivityDetails(activity)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openActivityDetails(activity); } }}>
           <span className="web-activity-timeline-visual" style={visualStyle} />
-          <span className="web-activity-timeline-plus" role="button" tabIndex={0} aria-label={`Create time entry for ${activityLabel(activity)}`} title="Create time entry" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => createActivityTimeEntry(event, activity)} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter" || event.key === " ") { event.preventDefault(); createActivityTimeEntry(event, activity); } }}><Plus size={11} weight="bold" /></span>
+          <span className="web-activity-timeline-plus" role="button" tabIndex={0} aria-label={`Create time entry for ${activityLabel(activity)}`} title="Create time entry (Alt-click to record immediately)" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => createActivityTimeEntry(event, activity)} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Enter" || event.key === " ") { event.preventDefault(); createActivityTimeEntry(event, activity); } }}><Plus size={11} weight="bold" /></span>
         </div>;
       })}
       {timeEntries.map(({ entry, range }) => {
@@ -4920,18 +4920,28 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     }
     openNewTimeEntry(prefill);
   };
-  const openActivityTimeEntry = (activity) => {
+  const openActivityTimeEntry = async (activity, immediate = false) => {
     const activityDateKey = activity?.date || dateKey;
     const start = localEntryDateSeconds(activityDateKey, activity?.startSecond, wrapAtMinute);
     const end = localEntryDateSeconds(activityDateKey, activity?.endSecond, wrapAtMinute);
     if (!start || !end || new Date(end) <= new Date(start)) return;
-    openNewTimeEntry({
+    const prefill = {
       title: activityLabel(activity),
       start,
       end,
       projectID: activity.projectID || "",
       billingStatus: "billable",
-    });
+    };
+    if (immediate && api.connected) {
+      try {
+        await api.addTimeEntry(prefill);
+        setDisplayMessage(`Recorded ${activityLabel(activity)}.`);
+      } catch (error) {
+        setDisplayMessage(error.message || "Could not record app usage.");
+      }
+      return;
+    }
+    openNewTimeEntry(prefill);
   };
   const openSelectedRangeTimeEntry = (selection) => {
     if (!selection || selection.end <= selection.start) return;
