@@ -5041,13 +5041,21 @@ function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProje
   const productivityScore = totalActive > 0 ? Math.round(segments.filter((activity) => activityCategory(activity).key !== "idle").reduce((total, activity) => total + productivityValue(activity) * secondsForActivity(activity), 0) / totalActive) : 0;
   const rangeStartTime = new Date(`${statsBounds.start}T00:00:00`).getTime();
   const rangeEndTime = new Date(`${offsetDateKey(statsBounds.end, 1)}T00:00:00`).getTime();
-  const allWeeklyEntries = statsRangeData
+  const rawWeeklyEntries = statsRangeData
     ? statsRangeData.entries.filter((entry) => {
       const start = new Date(entry.start_date || entry.start || "").getTime();
       const end = new Date(entry.end_date || entry.end || "").getTime();
       return Number.isFinite(start) && Number.isFinite(end) && start < rangeEndTime && end > rangeStartTime;
     })
     : days.flatMap((day) => day.entries || []);
+  const allWeeklyEntries = rawWeeklyEntries.map((entry) => {
+    const start = new Date(entry.start_date || entry.start || "").getTime();
+    const end = new Date(entry.end_date || entry.end || "").getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return { ...entry, duration: Math.max(0, Number(entry.duration || 0)) };
+    const clippedStart = Math.max(start, rangeStartTime);
+    const clippedEnd = Math.min(end, rangeEndTime);
+    return { ...entry, duration: clippedEnd > clippedStart ? Math.max(1, Math.round((clippedEnd - clippedStart) / 1000)) : 0 };
+  }).filter((entry) => entry.duration > 0);
   const weeklyEntries = allWeeklyEntries.filter((entry) => projectScopeID === "all" || (projectScopeID === "unassigned" ? !entry.project : scopedProjectIDs.has(resourceID(entry.project))));
   const hourRows = Array.from({ length: 24 }, (_, hour) => {
     const activities = segments.filter((activity) => activityCategory(activity).key !== "idle" && Math.min(23, Math.max(0, Math.floor(Number(activity.startSecond || 0) / 3600))) === hour);
