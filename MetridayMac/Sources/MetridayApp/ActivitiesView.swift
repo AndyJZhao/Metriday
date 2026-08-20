@@ -1625,9 +1625,13 @@ struct ActivitiesView: View {
                                     showingNewEntry = true
                                 case .second:
                                     selectedActivity = activity
-                                }
                             }
+                        }
                     )
+                    .onDrag {
+                        let ids = row.segments.map(\.id.uuidString).joined(separator: "\n")
+                        return NSItemProvider(object: NSString(string: ids))
+                    }
                     .contextMenu {
                         if let activity = row.segments.first {
                             Button("Create Time Entry") {
@@ -2031,9 +2035,11 @@ struct ActivitiesView: View {
             group.enter()
             provider.loadDataRepresentation(forTypeIdentifier: UTType.plainText.identifier) { data, _ in
                 if let data,
-                   let rawID = String(data: data, encoding: .utf8),
-                   let activityID = UUID(uuidString: rawID.trimmingCharacters(in: .whitespacesAndNewlines)) {
-                    ids.append(activityID)
+                   let rawIDs = String(data: data, encoding: .utf8) {
+                    let loadedIDs = rawIDs
+                        .split(whereSeparator: \.isNewline)
+                        .compactMap { UUID(uuidString: String($0).trimmingCharacters(in: .whitespacesAndNewlines)) }
+                    ids.append(contentsOf: loadedIDs)
                 }
                 group.leave()
             }
