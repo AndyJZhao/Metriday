@@ -934,6 +934,17 @@ function activityContext(activity, options = {}) {
   return "";
 }
 
+function activityDateRangeLabel(activity, wrapAtMinute = 0) {
+  const wrapSeconds = Math.max(0, Math.min(1439, Number(wrapAtMinute || 0))) * 60;
+  const wallClock = (axisSeconds) => {
+    const value = Number(axisSeconds || 0) >= 24 * 60 * 60
+      ? wrapSeconds
+      : (wrapSeconds + Math.max(0, Number(axisSeconds || 0))) % (24 * 60 * 60);
+    return preciseClock(value);
+  };
+  return `${wallClock(activity?.startSecond)}–${wallClock(activity?.endSecond)}`;
+}
+
 function liveActivityBlocks(activities, projects = []) {
   const primaryKind = (totals) => [...totals.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] || "other";
   const normalized = activities
@@ -3252,7 +3263,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     return <div className="activity-table-row" key={activity.id} role="button" tabIndex={0} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-metriday-activity", activity.id); event.dataTransfer.setData("text/plain", activity.id); event.dataTransfer.setData("application/x-metriday-activity-date", activity.date || dateKey); }} onClick={openDetails} onDoubleClick={openTimeEntry} onContextMenu={openContextMenu} onKeyDown={handleKeyDown} aria-label={`Open details for ${app} ${formatRange(start, end)}`} title="Drag this activity to a project to assign it">
       <div className="activity-app-cell">
         <span className="activity-table-icon"><Icon size={19} weight="duotone" /></span>
-        <span className="activity-app-copy"><strong>{app}</strong>{context ? <small>{context}</small> : null}</span>
+        <span className="activity-app-copy"><strong>{app}</strong>{context ? <small>{context}</small> : null}{displayPreferences?.show_activity_date_ranges ? <small className="activity-date-range">{activityDateRangeLabel(activity, api?.preferences?.wrap_days_at_minute)}</small> : null}</span>
       </div>
       <span className={`activity-category ${category.key}`} style={activityCategoryStyle(category)}><i />{category.label}</span>
       <span>{activity.date && activity.date !== dateKey ? `${activity.date} · ` : ""}{formatRange(start, end)}</span>
@@ -3723,13 +3734,14 @@ function WebActivityDisplayMenu({ open, onToggle, preferences, devices, onChange
     include_time_entries: true,
     show_window_titles: true,
     show_resource_paths: true,
+    show_activity_date_ranges: false,
     group_websites_independently: false,
     group_paths_independently: false,
     activity_time_range: "selectedDay",
     selected_device: "All Devices",
     collapse_activities_shorter_than_seconds: 0,
   };
-  return <div className="activity-display-menu"><button type="button" className={`quiet-pill activity-display-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />Display</button>{open ? <div className="activity-display-popover" role="dialog" aria-label="Activity display settings"><strong>Display settings</strong><label><input type="checkbox" checked={Boolean(values.include_time_entries)} onChange={(event) => onChange({ include_time_entries: event.target.checked })} />Include time entries</label><label><input type="checkbox" checked={Boolean(values.show_window_titles)} onChange={(event) => onChange({ show_window_titles: event.target.checked })} />Show window titles</label><label><input type="checkbox" checked={Boolean(values.show_resource_paths)} onChange={(event) => onChange({ show_resource_paths: event.target.checked })} />Show website paths</label><label className="activity-display-select">Collapse activities shorter than<select value={Number(values.collapse_activities_shorter_than_seconds || 0)} onChange={(event) => onChange({ collapse_activities_shorter_than_seconds: Number(event.target.value) })}><option value="0">Never</option><option value="5">5 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option></select></label><label><input type="checkbox" checked={Boolean(values.group_websites_independently)} onChange={(event) => onChange({ group_websites_independently: event.target.checked })} />Group websites independently of browser</label><label><input type="checkbox" checked={Boolean(values.group_paths_independently)} onChange={(event) => onChange({ group_paths_independently: event.target.checked })} />Group paths independently of app</label><label className="activity-display-select">Activity range<select value={values.activity_time_range || "selectedDay"} onChange={(event) => onChange({ activity_time_range: event.target.value })}><option value="selectedDay">Selected day</option><option value="lastSevenDays">Last 7 days</option><option value="lastThirtyDays">Last 30 days</option><option value="lastNinetyDays">Last 90 days</option></select></label></div> : null}</div>;
+  return <div className="activity-display-menu"><button type="button" className={`quiet-pill activity-display-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />Display</button>{open ? <div className="activity-display-popover" role="dialog" aria-label="Activity display settings"><strong>Display settings</strong><label><input type="checkbox" checked={Boolean(values.include_time_entries)} onChange={(event) => onChange({ include_time_entries: event.target.checked })} />Include time entries</label><label><input type="checkbox" checked={Boolean(values.show_window_titles)} onChange={(event) => onChange({ show_window_titles: event.target.checked })} />Show window titles</label><label><input type="checkbox" checked={Boolean(values.show_resource_paths)} onChange={(event) => onChange({ show_resource_paths: event.target.checked })} />Show website paths</label><label><input type="checkbox" checked={Boolean(values.show_activity_date_ranges)} onChange={(event) => onChange({ show_activity_date_ranges: event.target.checked })} />Show app-usage date ranges</label><label className="activity-display-select">Collapse activities shorter than<select value={Number(values.collapse_activities_shorter_than_seconds || 0)} onChange={(event) => onChange({ collapse_activities_shorter_than_seconds: Number(event.target.value) })}><option value="0">Never</option><option value="5">5 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option></select></label><label><input type="checkbox" checked={Boolean(values.group_websites_independently)} onChange={(event) => onChange({ group_websites_independently: event.target.checked })} />Group websites independently of browser</label><label><input type="checkbox" checked={Boolean(values.group_paths_independently)} onChange={(event) => onChange({ group_paths_independently: event.target.checked })} />Group paths independently of app</label><label className="activity-display-select">Activity range<select value={values.activity_time_range || "selectedDay"} onChange={(event) => onChange({ activity_time_range: event.target.value })}><option value="selectedDay">Selected day</option><option value="lastSevenDays">Last 7 days</option><option value="lastThirtyDays">Last 30 days</option><option value="lastNinetyDays">Last 90 days</option></select></label></div> : null}</div>;
 }
 
 function WebActivityDevicesMenu({ open, devices, selectedDevice, hideDevicesWithoutTime, onToggle, onSelect, onToggleHide }) {

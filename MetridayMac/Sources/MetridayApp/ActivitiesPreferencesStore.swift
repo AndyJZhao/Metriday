@@ -47,6 +47,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
     @Published var includeTimeEntries: Bool { didSet { persist() } }
     @Published var showWindowTitles: Bool { didSet { persist() } }
     @Published var showResourcePaths: Bool { didSet { persist() } }
+    @Published var showActivityDateRanges: Bool { didSet { persist() } }
     @Published var groupWebsitesIndependently: Bool { didSet { persist() } }
     @Published var groupPathsIndependently: Bool { didSet { persist() } }
     @Published var activityTimeRange: ActivityTimeRange { didSet { persist() } }
@@ -68,6 +69,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTimeEntries = payload.includeTimeEntries
             showWindowTitles = payload.showWindowTitles
             showResourcePaths = payload.showResourcePaths
+            showActivityDateRanges = payload.showActivityDateRanges
             groupWebsitesIndependently = payload.groupWebsitesIndependently
             groupPathsIndependently = payload.groupPathsIndependently
             activityTimeRange = payload.activityTimeRange
@@ -82,6 +84,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTimeEntries = true
             showWindowTitles = true
             showResourcePaths = true
+            showActivityDateRanges = false
             groupWebsitesIndependently = false
             groupPathsIndependently = false
             activityTimeRange = .selectedDay
@@ -106,6 +109,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
                 includeTimeEntries: includeTimeEntries,
                 showWindowTitles: showWindowTitles,
                 showResourcePaths: showResourcePaths,
+                showActivityDateRanges: showActivityDateRanges,
                 groupWebsitesIndependently: groupWebsitesIndependently,
                 groupPathsIndependently: groupPathsIndependently,
                 activityTimeRange: activityTimeRange,
@@ -137,6 +141,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
         let includeTimeEntries: Bool
         let showWindowTitles: Bool
         let showResourcePaths: Bool
+        let showActivityDateRanges: Bool
         let groupWebsitesIndependently: Bool
         let groupPathsIndependently: Bool
         let activityTimeRange: ActivityTimeRange
@@ -152,6 +157,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTimeEntries: Bool,
             showWindowTitles: Bool,
             showResourcePaths: Bool,
+            showActivityDateRanges: Bool,
             groupWebsitesIndependently: Bool,
             groupPathsIndependently: Bool,
             activityTimeRange: ActivityTimeRange,
@@ -166,6 +172,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             self.includeTimeEntries = includeTimeEntries
             self.showWindowTitles = showWindowTitles
             self.showResourcePaths = showResourcePaths
+            self.showActivityDateRanges = showActivityDateRanges
             self.groupWebsitesIndependently = groupWebsitesIndependently
             self.groupPathsIndependently = groupPathsIndependently
             self.activityTimeRange = activityTimeRange
@@ -183,6 +190,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTimeEntries = try container.decodeIfPresent(Bool.self, forKey: .includeTimeEntries) ?? true
             showWindowTitles = try container.decodeIfPresent(Bool.self, forKey: .showWindowTitles) ?? true
             showResourcePaths = try container.decodeIfPresent(Bool.self, forKey: .showResourcePaths) ?? true
+            showActivityDateRanges = try container.decodeIfPresent(Bool.self, forKey: .showActivityDateRanges) ?? false
             groupWebsitesIndependently = try container.decodeIfPresent(Bool.self, forKey: .groupWebsitesIndependently) ?? false
             groupPathsIndependently = try container.decodeIfPresent(Bool.self, forKey: .groupPathsIndependently) ?? false
             activityTimeRange = try container.decodeIfPresent(ActivityTimeRange.self, forKey: .activityTimeRange) ?? .selectedDay

@@ -2179,6 +2179,12 @@ struct ActivitiesView: View {
                             .foregroundStyle(MetridayTheme.secondary)
                             .lineLimit(1)
                     }
+                    if preferences.showActivityDateRanges {
+                        Text(activityDateRangeLabel(for: segment))
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(MetridayTheme.secondary.opacity(0.82))
+                            .lineLimit(1)
+                    }
                 }
             }
             .frame(width: 220, alignment: .leading)
@@ -2347,6 +2353,27 @@ struct ActivitiesView: View {
         return [formatter.string(from: activityDate), context]
             .compactMap { $0 }
             .joined(separator: " · ")
+    }
+
+    private func activityDateRangeLabel(for segment: ActivitySegment) -> String {
+        let calendar = Calendar.current
+        let logicalDay = calendar.startOfDay(for: segment.activityDate ?? selectedDate)
+        let start = TrackingDay.date(
+            forAxisSeconds: segment.startSecond,
+            logicalDayLabel: logicalDay,
+            wrapAtMinute: trackingPreferences.wrapDaysAtMinute,
+            calendar: calendar
+        )
+        let end = TrackingDay.date(
+            forAxisSeconds: segment.endSecond,
+            logicalDayLabel: logicalDay,
+            wrapAtMinute: trackingPreferences.wrapDaysAtMinute,
+            calendar: calendar
+        )
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm:ss"
+        return "\(formatter.string(from: start))–\(formatter.string(from: end))"
     }
 
     private func filterButton(
@@ -3777,6 +3804,12 @@ private struct ActivityDisplaySettingsSheet: View {
                 .toggleStyle(.checkbox)
             Toggle("Show website hosts and file paths", isOn: $preferences.showResourcePaths)
                 .toggleStyle(.checkbox)
+            Toggle("Show app-usage date ranges", isOn: $preferences.showActivityDateRanges)
+                .toggleStyle(.checkbox)
+            Text("Adds the exact start and end time below each activity, matching Timing's detailed activity list.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             Picker("Collapse activities shorter than", selection: $preferences.collapseActivitiesShorterThanSeconds) {
                 Text("Never").tag(0)

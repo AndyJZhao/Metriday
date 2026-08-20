@@ -868,6 +868,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-app-cell { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .activity-app-copy { display: flex; flex-direction: column; min-width: 0; gap: 3px; }
 .activity-app-copy small { color: var(--muted); }
+.activity-app-copy small.activity-date-range { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; letter-spacing: .01em; }
 .activity-table-icon { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 7px; background: #f0f1f4; color: #3f434d; }
 .activity-category { display: inline-flex; align-items: center; gap: 6px; width: fit-content; min-height: 24px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 650; }
 .activity-category i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }

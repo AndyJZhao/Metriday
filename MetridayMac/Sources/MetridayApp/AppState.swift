@@ -352,6 +352,9 @@ final class AppState: ObservableObject {
             if let value = body["show_resource_paths"] as? Bool {
                 activitiesPreferences.showResourcePaths = value
             }
+            if let value = body["show_activity_date_ranges"] as? Bool {
+                activitiesPreferences.showActivityDateRanges = value
+            }
             if let value = body["group_websites_independently"] as? Bool {
                 activitiesPreferences.groupWebsitesIndependently = value
             }
@@ -2429,6 +2432,7 @@ final class AppState: ObservableObject {
             "include_time_entries": activitiesPreferences.includeTimeEntries,
             "show_window_titles": activitiesPreferences.showWindowTitles,
             "show_resource_paths": activitiesPreferences.showResourcePaths,
+            "show_activity_date_ranges": activitiesPreferences.showActivityDateRanges,
             "group_websites_independently": activitiesPreferences.groupWebsitesIndependently,
             "group_paths_independently": activitiesPreferences.groupPathsIndependently,
             "activity_time_range": activitiesPreferences.activityTimeRange.rawValue,
