@@ -557,8 +557,14 @@ private struct TodayTimeEntryDetailSheet: View {
                     .buttonStyle(.borderless)
             }
 
-            TextField("What did you work on?", text: $title)
-                .textFieldStyle(.roundedBorder)
+            TimeEntryTitleField(
+                title: $title,
+                billingStatus: $billingStatus,
+                placeholder: "What did you work on?",
+                entries: timeEntryStore.entries,
+                projects: projects,
+                excludingEntryID: entry.id
+            )
 
             Picker("Project", selection: $projectID) {
                 Text("Unassigned").tag(nil as UUID?)

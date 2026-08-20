@@ -72,6 +72,8 @@ Categories are local and editable from Activities → display settings → Manag
 
 Reports and Teams are now first-class native sections. Reports exposes Timing-style report presets, a configurable builder entry point, weekly project totals, and export-format affordances; Teams keeps local team ownership, member management, project counts, and tracked totals in the same macOS shell.
 
+All Time Entry editors and Timer start now provide local title suggestions from prior entries and projects. Typing a dollar shortcut such as $billable, $billed, or $paid exposes matching Billing Status actions and applies the selected status without leaving the title field.
+
 The running timer controls support Timing-style ±1/±5/±15-minute start corrections, alignment to the previous entry boundary, estimate check-ins, and visible remaining time.
 
 Activities also includes an Entry-O-Matic flow. It previews generated entries from visible app usage, merges segments across a configurable maximum gap, discards sessions shorter than the selected minimum, subtracts existing entries by default, and offers an explicit overwrite mode before writing anything. The latest batch can be undone from the visible action or `⌘Z`; when overwrite mode removed existing entries, undo restores them as part of the same operation.

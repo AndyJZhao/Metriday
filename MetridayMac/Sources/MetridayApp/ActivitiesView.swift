@@ -2531,8 +2531,13 @@ struct ActivitiesView: View {
             Text("New Time Entry")
                 .font(.system(size: 18, weight: .bold))
 
-            TextField("What did you work on?", text: $newEntryTitle)
-                .textFieldStyle(.roundedBorder)
+            TimeEntryTitleField(
+                title: $newEntryTitle,
+                billingStatus: $newEntryBillingStatus,
+                placeholder: "What did you work on?",
+                entries: timeEntryStore.entries,
+                projects: projectStore.activeProjects
+            )
 
             if !reminderStore.reminders.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
@@ -4382,8 +4387,13 @@ private struct TimerStartSheet: View {
                 .font(.system(size: 11))
                 .foregroundStyle(MetridayTheme.secondary)
 
-            TextField("What are you working on?", text: $title)
-                .textFieldStyle(.roundedBorder)
+            TimeEntryTitleField(
+                title: $title,
+                billingStatus: $billingStatus,
+                placeholder: "What are you working on?",
+                entries: recentEntries,
+                projects: projects
+            )
 
             if !recentEntries.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
@@ -5635,8 +5645,14 @@ private struct TimeEntryEditorSheet: View {
             Text("Edit Time Entry")
                 .font(.system(size: 18, weight: .bold))
 
-            TextField("What did you work on?", text: $title)
-                .textFieldStyle(.roundedBorder)
+            TimeEntryTitleField(
+                title: $title,
+                billingStatus: $billingStatus,
+                placeholder: "What did you work on?",
+                entries: existingEntries,
+                projects: projects,
+                excludingEntryID: entry.id
+            )
 
             Picker("Project", selection: $projectID) {
                 Text("Unassigned").tag(nil as UUID?)

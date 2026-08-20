@@ -131,6 +131,7 @@ private struct IdlePromptPresenter: View {
             .sheet(item: $pendingInterval) { interval in
                 IdleTimeEntrySheet(
                     interval: interval,
+                    entries: timeEntryStore.entries,
                     projects: projectStore.activeProjects
                 ) { title, projectID, notes, billingStatus in
                     if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -156,6 +157,7 @@ private struct IdlePromptPresenter: View {
 private struct IdleTimeEntrySheet: View {
     @Environment(\.dismiss) private var dismiss
     let interval: IdleInterval
+    let entries: [TimeEntry]
     let projects: [TrackingProject]
     let onSave: (String, UUID?, String, BillingStatus) -> Void
     let onSkip: () -> Void
@@ -167,11 +169,13 @@ private struct IdleTimeEntrySheet: View {
 
     init(
         interval: IdleInterval,
+        entries: [TimeEntry],
         projects: [TrackingProject],
         onSave: @escaping (String, UUID?, String, BillingStatus) -> Void,
         onSkip: @escaping () -> Void
     ) {
         self.interval = interval
+        self.entries = entries
         self.projects = projects
         self.onSave = onSave
         self.onSkip = onSkip
@@ -186,8 +190,13 @@ private struct IdleTimeEntrySheet: View {
                 .font(.system(size: 11))
                 .foregroundStyle(MetridayTheme.secondary)
 
-            TextField("Time entry title", text: $title)
-                .textFieldStyle(.roundedBorder)
+            TimeEntryTitleField(
+                title: $title,
+                billingStatus: $billingStatus,
+                placeholder: "Time entry title",
+                entries: entries,
+                projects: projects
+            )
 
             Picker("Project", selection: $projectID) {
                 Text("Unassigned").tag(nil as UUID?)
@@ -260,6 +269,7 @@ private struct CallPromptPresenter: View {
             .sheet(item: $pendingInterval) { interval in
                 CallTimeEntrySheet(
                     interval: interval,
+                    entries: timeEntryStore.entries,
                     projects: projectStore.activeProjects
                 ) { title, projectID, notes, billingStatus in
                     if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -285,6 +295,7 @@ private struct CallPromptPresenter: View {
 private struct CallTimeEntrySheet: View {
     @Environment(\.dismiss) private var dismiss
     let interval: CallInterval
+    let entries: [TimeEntry]
     let projects: [TrackingProject]
     let onSave: (String, UUID?, String, BillingStatus) -> Void
     let onSkip: () -> Void
@@ -296,11 +307,13 @@ private struct CallTimeEntrySheet: View {
 
     init(
         interval: CallInterval,
+        entries: [TimeEntry],
         projects: [TrackingProject],
         onSave: @escaping (String, UUID?, String, BillingStatus) -> Void,
         onSkip: @escaping () -> Void
     ) {
         self.interval = interval
+        self.entries = entries
         self.projects = projects
         self.onSave = onSave
         self.onSkip = onSkip
@@ -317,8 +330,13 @@ private struct CallTimeEntrySheet: View {
                 .font(.system(size: 11))
                 .foregroundStyle(MetridayTheme.secondary)
 
-            TextField("Time entry title", text: $title)
-                .textFieldStyle(.roundedBorder)
+            TimeEntryTitleField(
+                title: $title,
+                billingStatus: $billingStatus,
+                placeholder: "Time entry title",
+                entries: entries,
+                projects: projects
+            )
 
             Picker("Project", selection: $projectID) {
                 Text("Unassigned").tag(nil as UUID?)

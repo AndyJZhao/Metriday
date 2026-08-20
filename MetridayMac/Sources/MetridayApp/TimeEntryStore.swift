@@ -26,6 +26,50 @@ enum BillingStatus: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+enum TimeEntrySuggestionProvider {
+    static func titles(
+        from entries: [TimeEntry],
+        projects: [TrackingProject],
+        query: String,
+        excluding entryID: UUID? = nil,
+        limit: Int = 6
+    ) -> [String] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedQuery.hasPrefix("$") else { return [] }
+        let loweredQuery = normalizedQuery.lowercased()
+        var seen: Set<String> = []
+        var result: [String] = []
+        let candidates = entries
+            .filter { $0.id != entryID }
+            .sorted { $0.end > $1.end }
+            .map(\.title) + projects.map(\.name)
+
+        for candidate in candidates {
+            let title = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty,
+                  (loweredQuery.isEmpty || title.lowercased().contains(loweredQuery)) else {
+                continue
+            }
+            let key = title.lowercased()
+            guard seen.insert(key).inserted else { continue }
+            result.append(title)
+            if result.count >= max(0, limit) { break }
+        }
+        return result
+    }
+
+    static func billingStatuses(for shortcut: String) -> [BillingStatus] {
+        let normalized = shortcut.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.first == "$" else { return [] }
+        let query = String(normalized.dropFirst()).lowercased()
+        return BillingStatus.allCases.filter {
+            query.isEmpty
+                || $0.label.lowercased().contains(query)
+                || $0.rawValue.lowercased().contains(query)
+        }
+    }
+}
+
 struct TimeEntry: Identifiable, Hashable, Codable {
     let id: UUID
     var projectID: UUID?

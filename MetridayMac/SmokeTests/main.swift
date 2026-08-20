@@ -110,6 +110,28 @@ expect(timelineSuggestions[0].startMinute == 540 && timelineSuggestions[0].endMi
 expect(timelineSuggestions[0].projectID == suggestionProjectID, "Timeline summary should preserve the dominant project")
 expect(timelineSuggestions[0].title.contains("Focused work"), "Focused timeline summaries should offer a focused title")
 expect(timelineSuggestions[0].notes.contains("captured activities"), "Timeline summaries should explain their local evidence")
+let titleSuggestionEntries = [
+    TimeEntry(
+        title: "Write rebuttal",
+        start: date,
+        end: date.addingTimeInterval(30 * 60)
+    ),
+    TimeEntry(
+        title: "Review experiments",
+        start: date.addingTimeInterval(60 * 60),
+        end: date.addingTimeInterval(90 * 60)
+    )
+]
+let titleSuggestionProjects = [TrackingProject(name: "Research")]
+let titleSuggestions = TimeEntrySuggestionProvider.titles(
+    from: titleSuggestionEntries,
+    projects: titleSuggestionProjects,
+    query: "re"
+)
+expect(titleSuggestions.contains("Review experiments") && titleSuggestions.contains("Research"), "Time entry titles should suggest matching entries and projects")
+expect(TimeEntrySuggestionProvider.titles(from: titleSuggestionEntries, projects: titleSuggestionProjects, query: "$bill").isEmpty, "Billing shortcut text should not become a title suggestion")
+expect(TimeEntrySuggestionProvider.billingStatuses(for: "$bill").contains(.billable), "Dollar shortcuts should suggest Billable")
+expect(TimeEntrySuggestionProvider.billingStatuses(for: "$paid") == [.paid], "Dollar shortcuts should resolve an exact billing status")
 expect(ActivityClassifier.relevance(appName: "Visual Studio Code", bundleIdentifier: "com.microsoft.VSCode", windowTitle: "") == .related, "Known work apps should be related")
 expect(ActivityClassifier.relevance(appName: "Google Chrome", bundleIdentifier: "com.google.Chrome", windowTitle: "YouTube") == .distracted, "Distracting window titles should be classified")
 expect(ActivityClassifier.relevance(appName: "Google Chrome", bundleIdentifier: "com.google.Chrome", windowTitle: "") == .distracted, "Browser activity should have a safe default classification")
