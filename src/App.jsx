@@ -3813,6 +3813,8 @@ function WebActivityCategoriesPanel({ api }) {
   const [message, setMessage] = useState("");
   const fields = { application: "Application", bundleIdentifier: "Bundle identifier", windowTitle: "Window title", resource: "URL or path", domain: "Domain", fullURL: "Full website URL", keyword: "Keyword", device: "Device", startTime: "Start time", dayOfWeek: "Day of week" };
   const comparisons = { contains: "contains", equals: "is", beginsWith: "begins with", endsWith: "ends with", like: "is like", isNot: "is not", matchesRegex: "matches regex" };
+  const comparisonRawValue = (value) => Object.entries(comparisons).find(([raw, label]) => raw === value || label === value)?.[0] || "contains";
+  const comparisonLabel = (value) => comparisons[value] || value || comparisons.contains;
   const emptyRule = () => ({ field: "application", comparison: "contains", pattern: "", case_sensitive: false });
   const resetEditor = () => {
     setName("");
@@ -3826,7 +3828,7 @@ function WebActivityCategoriesPanel({ api }) {
   const submit = async (event) => {
     event.preventDefault();
     const normalizedRules = rules
-      .map((rule) => ({ ...rule, pattern: String(rule.pattern || "").trim(), case_sensitive: Boolean(rule.case_sensitive) }))
+      .map((rule) => ({ ...rule, comparison: comparisonRawValue(rule.comparison), pattern: String(rule.pattern || "").trim(), case_sensitive: Boolean(rule.case_sensitive) }))
       .filter((rule) => rule.pattern);
     if (!name.trim() || !normalizedRules.length || !api.connected) return;
     try {
@@ -3846,7 +3848,7 @@ function WebActivityCategoriesPanel({ api }) {
     setRole(category.role || "other");
     setColor(category.color || "graphite");
     setMatchMode(category.match_mode || "any");
-    setRules((category.rules || []).map((rule) => ({ field: rule.field || "application", comparison: rule.comparison || "contains", pattern: rule.pattern || "", case_sensitive: Boolean(rule.case_sensitive) })));
+    setRules((category.rules || []).map((rule) => ({ field: rule.field || "application", comparison: comparisonLabel(rule.comparison), pattern: rule.pattern || "", case_sensitive: Boolean(rule.case_sensitive) })));
     setMessage("");
   };
   const updateRule = (index, patch) => setRules((current) => current.map((rule, ruleIndex) => ruleIndex === index ? { ...rule, ...patch } : rule));
