@@ -714,10 +714,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-activity-timeline-current-time span { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #384ae0; box-shadow: 0 0 0 2px #fff; }
 .web-activity-timeline-current-time.horizontal span { top: -4px; left: -3px; }
 .web-activity-timeline-current-time.vertical span { top: -3px; left: -4px; }
-.web-activity-timeline-block { position: absolute; top: 22px; height: 52px; min-width: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #6f7480; cursor: pointer; }
+.web-activity-timeline-block { position: absolute; top: 22px; height: 52px; min-width: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #6f7480; cursor: pointer; text-align: left; }
 .web-activity-timeline-block:hover { z-index: 3; filter: saturate(1.15); box-shadow: 0 0 0 2px rgba(78, 95, 242, 0.13); }
 .web-activity-timeline-block:focus-visible { z-index: 4; outline: 2px solid var(--accent); outline-offset: 2px; }
 .web-activity-timeline-block .web-activity-timeline-visual { position: absolute; display: block; min-width: 2px; min-height: 2px; border: 1px solid currentColor; border-radius: inherit; background: currentColor; opacity: 0.2; pointer-events: none; }
+.web-activity-timeline-plus { position: absolute; top: 4px; right: 4px; z-index: 2; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(0, 0, 0, 0.55); color: #fff; opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
+.web-activity-timeline-block:hover .web-activity-timeline-plus, .web-activity-timeline-block:focus-within .web-activity-timeline-plus { opacity: 1; pointer-events: auto; }
+.web-activity-timeline-plus:hover, .web-activity-timeline-plus:focus-visible { background: #20232a; outline: 2px solid #fff; outline-offset: 1px; }
 .web-activity-timeline-track.horizontal { height: 112px; }
 .web-activity-timeline-overlay { position: absolute; min-width: 0; min-height: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; cursor: pointer; z-index: 2; }
 .web-activity-timeline-overlay:hover { z-index: 3; box-shadow: 0 0 0 2px rgba(78, 95, 242, 0.13); }
