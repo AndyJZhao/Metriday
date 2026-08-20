@@ -4353,9 +4353,12 @@ private struct ActivityTimelinePanel: View {
                             3,
                             proxy.size.width * CGFloat(segment.durationSeconds) / 86_400
                         )
+                        let hitWidth = max(12, width)
                         ZStack(alignment: .trailing) {
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
                                 .fill(activityColor(segment).opacity(0.82))
+                                .frame(width: width, height: 18)
+                                .offset(x: -(hitWidth - width) / 2)
                             if hoveredSegmentID == segment.id {
                                 Button {
                                     let start = max(0, segment.startMinute)
@@ -4373,7 +4376,7 @@ private struct ActivityTimelinePanel: View {
                                 .padding(.trailing, 2)
                             }
                         }
-                        .frame(width: width, height: 18)
+                        .frame(width: hitWidth, height: 18)
                         .contentShape(Rectangle())
                         .gesture(
                             TapGesture(count: 2)
@@ -4568,10 +4571,14 @@ private struct ActivityTimelinePanel: View {
                     ForEach(segments) { segment in
                         let left = chartWidth * CGFloat(segment.startSecond) / 86_400
                         let width = max(2, chartWidth * CGFloat(segment.durationSeconds) / 86_400)
-                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .fill(activityColor(segment).opacity(0.72))
-                            .frame(width: width, height: 16)
-                            .offset(x: left)
+                        let hitWidth = max(12, width)
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(activityColor(segment).opacity(0.72))
+                                .frame(width: width, height: 16)
+                        }
+                        .frame(width: hitWidth, height: 16, alignment: .leading)
+                        .offset(x: left)
                             .contentShape(Rectangle())
                             .gesture(
                                 TapGesture(count: 2)
