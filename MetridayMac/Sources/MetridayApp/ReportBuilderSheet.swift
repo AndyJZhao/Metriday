@@ -13,6 +13,7 @@ struct ReportBuilderSheet: View {
 
     @State private var options = ReportOptions()
     @State private var preset: ReportPreset = .custom
+    @State private var advancedMode = true
     @State private var format: ReportFileFormat = .csv
     @State private var rangePreset: ReportDateRangePreset
     @State private var startDate: Date
@@ -58,13 +59,25 @@ struct ReportBuilderSheet: View {
                     .buttonStyle(.borderless)
             }
 
+            Picker("Report builder mode", selection: $advancedMode) {
+                Text("Easy").tag(false)
+                Text("Advanced").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 190)
+            .accessibilityLabel("Report builder mode")
+            .accessibilityIdentifier("reports.builder-mode")
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     presetPanel
                     dateRangePanel
-                    projectPanel
-                    settingsPanel
-                    columnsPanel
+                    if advancedMode {
+                        projectPanel
+                        settingsPanel
+                        columnsPanel
+                    }
                     previewPanel
                 }
             }
