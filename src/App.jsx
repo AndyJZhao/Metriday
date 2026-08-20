@@ -3021,6 +3021,7 @@ function WebActivityCategoryCards({ activities, dateKey, onSelect, onCreateTimeE
 function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = null, onClose }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [overlapEntries, setOverlapEntries] = useState([]);
   const projectLabel = projectTitleFor(api.projects, activity.projectID);
   const category = activityCategory(activity);
   const Icon = activityIcon(activity);
@@ -3031,14 +3032,28 @@ function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = nul
   });
   const startSecond = Math.max(0, Number(activity.startSecond || 0));
   const endSecond = Math.max(startSecond, Number(activity.endSecond || 0));
-  const record = async () => {
+  const record = async (overlapDecision = null) => {
     if (busy || !api.connected || endSecond <= startSecond) return;
+    const activityDateKey = activity.date || dateKey;
+    if (overlapDecision === null && overlapEntries.length === 0) {
+      const overlaps = api.entries.filter((entry) => {
+        const range = entrySecondsForDate(entry, activityDateKey);
+        return range && range.startSecond < endSecond && range.endSecond > startSecond;
+      });
+      if (overlaps.length > 0) {
+        setOverlapEntries(overlaps);
+        setMessage(`This activity overlaps ${overlaps.length} existing time ${overlaps.length === 1 ? "entry" : "entries"}.`);
+        return;
+      }
+    }
     setBusy(true);
     setMessage("");
     try {
-      const activityDateKey = activity.date || dateKey;
       const start = localEntryDateSeconds(activityDateKey, startSecond);
       const end = localEntryDateSeconds(activityDateKey, endSecond);
+      if (overlapDecision === "replace" && overlapEntries.length > 0) {
+        await api.deleteTimeEntries(overlapEntries.map((entry) => entryID(entry)));
+      }
       await api.addTimeEntry({
         title: activity.appName || activity.deviceName || "App activity",
         notes: activity.displayTitle || activityLabel(activity),
@@ -3047,6 +3062,7 @@ function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = nul
         projectID: activity.projectID || undefined,
         billingStatus: "billable",
       });
+      setOverlapEntries([]);
       setMessage("Recorded as a time entry.");
     } catch (error) {
       setMessage(error.message || "Could not record this activity.");
@@ -3066,8 +3082,9 @@ function ActivityDetailDialog({ activity, api, dateKey, displayPreferences = nul
       <header className="activity-detail-heading"><div><span>Activity details</span><h2 id="activity-detail-title">{app}</h2></div><IconButton label="Close activity details" onClick={onClose}><X size={18} /></IconButton></header>
       <div className="activity-detail-app"><span className="activity-detail-icon"><Icon size={22} weight="duotone" /></span><div><strong>{context || app}</strong><small>{activity.deviceName || "This Mac"}</small></div><span className={`activity-category ${category.key}`} style={activityCategoryStyle(category)}><i />{category.label}</span></div>
       <dl className="activity-detail-facts"><div><dt>Date</dt><dd>{activity.date || dateKey}</dd></div><div><dt>Time</dt><dd>{preciseClock(startSecond)}–{preciseClock(endSecond)}</dd></div><div><dt>Duration</dt><dd>{preciseDuration(endSecond - startSecond)}</dd></div><div><dt>Project</dt><dd><i className="hover-project-dot" />{projectLabel} {!activity.projectID ? <small>From the app usage</small> : null}</dd></div>{displayPreferences?.show_window_titles !== false && activity.windowTitle ? <div><dt>Window</dt><dd>{activity.windowTitle}</dd></div> : null}{displayPreferences?.show_resource_paths !== false && activity.resource ? <div><dt>Resource</dt><dd>{activity.resource}</dd></div> : null}</dl>
+      {overlapEntries.length > 0 ? <div className="time-entry-overlap-callout" role="alert"><strong>Overlapping Time Entry</strong><p>This activity overlaps {overlapEntries.length} existing time {overlapEntries.length === 1 ? "entry" : "entries"}. Replace them or keep parallel entries?</p><div><button type="button" className="secondary-button" onClick={() => { setOverlapEntries([]); setMessage(""); }}>Cancel</button><button type="button" className="secondary-button" onClick={() => record("keep")} disabled={busy}>Keep Both</button><button type="button" className="secondary-button danger-pill" onClick={() => record("replace")} disabled={busy}>Replace Existing</button></div></div> : null}
       {message ? <p className="entry-message" role="status">{message}</p> : null}
-      <footer className="activity-detail-actions"><button type="button" className="secondary-button" onClick={onClose}>Close</button><button type="button" className="primary-button" onClick={record} disabled={busy || !api.connected || endSecond <= startSecond}>{busy ? "Recording…" : "Record time"}</button></footer>
+      <footer className="activity-detail-actions"><button type="button" className="secondary-button" onClick={onClose}>Close</button><button type="button" className="primary-button" onClick={() => record()} disabled={busy || !api.connected || endSecond <= startSecond || overlapEntries.length > 0}>{busy ? "Recording…" : "Record time"}</button></footer>
     </section>
   </div>;
 }
