@@ -130,6 +130,8 @@ struct ReviewView: View {
                 initialStartDate: weekDates.first ?? selectedDate,
                 initialEndDate: weekDates.last ?? selectedDate,
                 monitor: monitor,
+                filterStore: filterStore,
+                categoryStore: categoryStore,
                 screenTimeStore: screenTimeStore,
                 timeEntryStore: timeEntryStore,
                 projectStore: projectStore

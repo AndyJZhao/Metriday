@@ -5,6 +5,8 @@ import UniformTypeIdentifiers
 struct ReportBuilderSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var monitor: AppActivityMonitor
+    @ObservedObject var filterStore: ActivityFilterStore
+    @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
     @ObservedObject var timeEntryStore: TimeEntryStore
     @ObservedObject var projectStore: ProjectStore
@@ -22,12 +24,16 @@ struct ReportBuilderSheet: View {
         initialStartDate: Date,
         initialEndDate: Date,
         monitor: AppActivityMonitor,
+        filterStore: ActivityFilterStore,
+        categoryStore: ActivityCategoryStore,
         screenTimeStore: ScreenTimeStore,
         timeEntryStore: TimeEntryStore,
         projectStore: ProjectStore,
         initialPreset: ReportPreset = .custom
     ) {
         self.monitor = monitor
+        self.filterStore = filterStore
+        self.categoryStore = categoryStore
         self.screenTimeStore = screenTimeStore
         self.timeEntryStore = timeEntryStore
         self.projectStore = projectStore
@@ -486,9 +492,14 @@ struct ReportBuilderSheet: View {
 
     private var reportActivityDays: [(date: Date, segments: [ActivitySegment])] {
         reportDates.map { date in
-            (
+            let rawSegments = monitor.segments(for: date) + screenTimeStore.segments(for: date)
+            return (
                 date: date,
-                segments: monitor.segments(for: date) + screenTimeStore.segments(for: date)
+                segments: categoryStore.applyingCategories(
+                    to: rawSegments,
+                    filterStore: filterStore,
+                    date: date
+                )
             )
         }
     }
