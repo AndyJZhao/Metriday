@@ -125,6 +125,7 @@ struct ActivitiesView: View {
     @State private var editingEntry: TimeEntry?
     @State private var editingTitleGroup: TimeEntry?
     @State private var selectedTimeEntryIDs: Set<UUID> = []
+    @State private var selectedActivityIDs: Set<UUID> = []
     @State private var selectedActivity: ActivitySegment?
     @State private var editingFilter: ActivityFilterDefinition?
     @State private var showingFilterEditor = false
@@ -248,7 +249,8 @@ struct ActivitiesView: View {
         .sheet(isPresented: $showingEntryOMatic) {
             EntryOMaticSheet(
                 selectedDate: selectedDate,
-                segments: filteredSegments,
+                segments: entryOMaticSegments,
+                sourceDescription: selectedActivityIDs.isEmpty ? "visible app usage" : "the selected activities",
                 existingEntries: timeEntryStore.entries(overlapping: selectedDate),
                 projects: projectStore.activeProjects,
                 initialProjectID: selectedProjectID
@@ -376,8 +378,15 @@ struct ActivitiesView: View {
             guard displayPreferencesRestored else { return }
             preferences.timelineOrientation = orientation
         }
+        .onChange(of: searchText) { _, _ in
+            selectedActivityIDs.removeAll()
+        }
+        .onChange(of: selectedBuiltinFilter) { _, _ in
+            selectedActivityIDs.removeAll()
+        }
         .onChange(of: selectedDate) { _, _ in
             selectedTimeEntryIDs.removeAll()
+            selectedActivityIDs.removeAll()
         }
     }
 
@@ -410,6 +419,7 @@ struct ActivitiesView: View {
 
     private func selectActivityFilter(_ target: ActivityFilter) {
         filter = target
+        selectedActivityIDs.removeAll()
         switch target {
         case .all:
             appState.activityScope = .all
@@ -1175,8 +1185,8 @@ struct ActivitiesView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .help("Create Time Entries from activity")
-                    .accessibilityLabel("Create Time Entries")
-                    .disabled(filteredSegments.allSatisfy { $0.relevance == .idle })
+                    .accessibilityLabel(selectedActivityIDs.isEmpty ? "Create Time Entries" : "Create Time Entries from selected activities")
+                    .disabled(entryOMaticSegments.allSatisfy { $0.relevance == .idle })
                     .accessibilityIdentifier("activities.entry-o-matic")
 
                     Button {
@@ -1193,20 +1203,46 @@ struct ActivitiesView: View {
             }
             .padding(18)
 
-            if !entryOMaticPreview.isEmpty {
+            if !selectedActivityIDs.isEmpty {
                 HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .foregroundStyle(MetridayTheme.accent)
-                    Text("Metriday can automatically create \(entryOMaticPreview.count) time entries with a total duration of \(formatMinutes(entryOMaticPreviewDuration)) to cover this app usage.")
-                        .font(.system(size: 11))
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 8)
-                    Button("Create Time Entries") {
+                    Label(
+                        "\(selectedActivityIDs.count) activities selected",
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(MetridayTheme.accent)
+                    Spacer()
+                    Button("Create from selected") {
                         showingEntryOMatic = true
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .accessibilityLabel("Create Time Entries")
+                    .accessibilityIdentifier("activities.entry-o-matic-selected")
+                    Button("Clear") {
+                        selectedActivityIDs.removeAll()
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.system(size: 11, weight: .medium))
+                    .help("Clear selected activities")
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 12)
+            }
+
+            if !entryOMaticPreview.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(MetridayTheme.accent)
+                    Text(entryOMaticDescription)
+                        .font(.system(size: 11))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button(selectedActivityIDs.isEmpty ? "Create Time Entries" : "Create Selected") {
+                        showingEntryOMatic = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel(selectedActivityIDs.isEmpty ? "Create Time Entries" : "Create Time Entries from selected activities")
                     .accessibilityIdentifier("activities.entry-o-matic-suggestion")
                 }
                 .padding(.horizontal, 18)
@@ -1829,6 +1865,15 @@ struct ActivitiesView: View {
                     }
                     .contextMenu {
                         if let activity = row.segments.first {
+                            Button("Select \(row.segments.count) activities") {
+                                selectedActivityIDs.formUnion(row.segments.map(\.id))
+                            }
+                            if !selectedActivityIDs.isEmpty {
+                                Button("Create Time Entries from Selected Activities") {
+                                    showingEntryOMatic = true
+                                }
+                            }
+                            Divider()
                             Button("Create Time Entry") {
                                 prepareNewEntry(for: activity)
                                 showingNewEntry = true
@@ -1857,6 +1902,24 @@ struct ActivitiesView: View {
         let category = category(for: segment)
         return HStack(spacing: 12) {
             HStack(spacing: 9) {
+                Button {
+                    toggleActivitySelection(segment.id)
+                } label: {
+                    Image(systemName: selectedActivityIDs.contains(segment.id)
+                        ? "checkmark.circle.fill"
+                        : "circle")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(selectedActivityIDs.contains(segment.id)
+                            ? MetridayTheme.accent
+                            : MetridayTheme.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(selectedActivityIDs.contains(segment.id) ? "Deselect activity" : "Select activity")
+                .accessibilityLabel(selectedActivityIDs.contains(segment.id)
+                    ? "Deselect activity"
+                    : "Select activity")
+                .accessibilityIdentifier("activity.select.\(segment.id.uuidString)")
+
                 AppIdentityIcon(
                     symbol: icon(for: segment),
                     bundleIdentifier: segment.bundleIdentifier,
@@ -1933,6 +1996,9 @@ struct ActivitiesView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 13)
         .contentShape(Rectangle())
+        .background(selectedActivityIDs.contains(segment.id)
+            ? MetridayTheme.accentSoft.opacity(0.52)
+            : Color.clear)
         .onDrag {
             NSItemProvider(object: segment.id.uuidString as NSString)
         }
@@ -1950,6 +2016,15 @@ struct ActivitiesView: View {
                 }
         )
         .contextMenu {
+            Button(selectedActivityIDs.contains(segment.id) ? "Deselect Activity" : "Select Activity") {
+                toggleActivitySelection(segment.id)
+            }
+            if !selectedActivityIDs.isEmpty {
+                Button("Create Time Entries from Selected Activities") {
+                    showingEntryOMatic = true
+                }
+            }
+            Divider()
             Button("Create Time Entry") {
                 prepareNewEntry(startMinute: segment.startMinute, endMinute: segment.endMinute)
                 showingNewEntry = true
@@ -2476,7 +2551,7 @@ struct ActivitiesView: View {
 
     private var entryOMaticPreview: [EntryOMaticInterval] {
         EntryOMaticGenerator.intervals(
-            from: filteredSegments,
+            from: entryOMaticSegments,
             dayStart: Calendar.current.startOfDay(for: selectedDate),
             existingEntries: timeEntriesForSelectedDate,
             minimumDurationSeconds: 5 * 60,
@@ -2486,6 +2561,24 @@ struct ActivitiesView: View {
 
     private var entryOMaticPreviewDuration: Int {
         entryOMaticPreview.reduce(0) { $0 + $1.durationSeconds }
+    }
+
+    private var entryOMaticSegments: [ActivitySegment] {
+        guard !selectedActivityIDs.isEmpty else { return filteredSegments }
+        return filteredSegments.filter { selectedActivityIDs.contains($0.id) }
+    }
+
+    private var entryOMaticDescription: String {
+        let scope = selectedActivityIDs.isEmpty ? "this app usage" : "the selected activities"
+        return "Metriday can automatically create \(entryOMaticPreview.count) time entries with a total duration of \(formatMinutes(entryOMaticPreviewDuration)) to cover \(scope)."
+    }
+
+    private func toggleActivitySelection(_ id: UUID) {
+        if selectedActivityIDs.contains(id) {
+            selectedActivityIDs.remove(id)
+        } else {
+            selectedActivityIDs.insert(id)
+        }
     }
 
     private var activityGroups: [ActivityGroup] {
@@ -4225,6 +4318,7 @@ private struct EntryOMaticSheet: View {
     @Environment(\.dismiss) private var dismiss
     let selectedDate: Date
     let segments: [ActivitySegment]
+    let sourceDescription: String
     let existingEntries: [TimeEntry]
     let projects: [TrackingProject]
     let initialProjectID: UUID?
@@ -4241,6 +4335,7 @@ private struct EntryOMaticSheet: View {
     init(
         selectedDate: Date,
         segments: [ActivitySegment],
+        sourceDescription: String,
         existingEntries: [TimeEntry],
         projects: [TrackingProject],
         initialProjectID: UUID?,
@@ -4248,6 +4343,7 @@ private struct EntryOMaticSheet: View {
     ) {
         self.selectedDate = selectedDate
         self.segments = segments
+        self.sourceDescription = sourceDescription
         self.existingEntries = existingEntries
         self.projects = projects
         self.initialProjectID = initialProjectID
@@ -4265,7 +4361,7 @@ private struct EntryOMaticSheet: View {
         VStack(alignment: .leading, spacing: 15) {
             Text("Create Time Entries")
                 .font(.system(size: 18, weight: .bold))
-            Text("Turn visible app usage into reviewable time entries for \(dateLabel).")
+            Text("Turn \(sourceDescription) into reviewable time entries for \(dateLabel).")
                 .font(.system(size: 11))
                 .foregroundStyle(MetridayTheme.secondary)
 

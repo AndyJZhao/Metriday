@@ -78,7 +78,7 @@ The running timer controls support Timing-style ±1/±5/±15-minute start correc
 
 The native tracker menu and Tracking command menu expose up to five recent non-manual timers for one-click resume. Resuming one preserves its title, project, notes, billing status, and custom fields; the existing Quick Start Timer shortcut still starts the most recent timer automatically.
 
-Activities also includes an Entry-O-Matic flow. It previews generated entries from visible app usage, merges segments across a configurable maximum gap, discards sessions shorter than the selected minimum, subtracts existing entries by default, and offers an explicit overwrite mode before writing anything. The latest batch can be undone from the visible action or `⌘Z`; when overwrite mode removed existing entries, undo restores them as part of the same operation.
+Activities also includes an Entry-O-Matic flow. It previews generated entries from visible app usage, merges segments across a configurable maximum gap, discards sessions shorter than the selected minimum, subtracts existing entries by default, and offers an explicit overwrite mode before writing anything. Individual activity rows can be selected, and the same flow then scopes its preview and writes to only those selected activities; clearing the selection returns to all visible usage. The latest batch can be undone from the visible action or `⌘Z`; when overwrite mode removed existing entries, undo restores them as part of the same operation.
 
 Review's Productivity score uses each assigned project's productivity weight; unassigned related, distracted, and other activity receive sensible local defaults.
 
