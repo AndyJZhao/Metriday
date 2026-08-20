@@ -179,7 +179,7 @@ private struct IdleTimeEntrySheet: View {
         self.projects = projects
         self.onSave = onSave
         self.onSkip = onSkip
-        _billingStatus = State(initialValue: projects.first?.defaultBillingStatus ?? .billable)
+        _billingStatus = State(initialValue: .billable)
     }
 
     var body: some View {
@@ -232,9 +232,7 @@ private struct IdleTimeEntrySheet: View {
         .padding(24)
         .frame(width: 440)
         .onChange(of: projectID) { _, newProjectID in
-            billingStatus = newProjectID
-                .flatMap { id in projects.first(where: { $0.id == id })?.defaultBillingStatus }
-                ?? .billable
+            billingStatus = resolvedProjectBillingStatus(for: newProjectID, in: projects)
         }
     }
 
@@ -319,7 +317,7 @@ private struct CallTimeEntrySheet: View {
         self.onSkip = onSkip
         let inferredTitle = interval.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         _title = State(initialValue: inferredTitle.isEmpty ? "\(interval.appName) call" : inferredTitle)
-        _billingStatus = State(initialValue: projects.first?.defaultBillingStatus ?? .billable)
+        _billingStatus = State(initialValue: .billable)
     }
 
     var body: some View {
@@ -372,9 +370,7 @@ private struct CallTimeEntrySheet: View {
         .padding(24)
         .frame(width: 460)
         .onChange(of: projectID) { _, newProjectID in
-            billingStatus = newProjectID
-                .flatMap { id in projects.first(where: { $0.id == id })?.defaultBillingStatus }
-                ?? .billable
+            billingStatus = resolvedProjectBillingStatus(for: newProjectID, in: projects)
         }
     }
 

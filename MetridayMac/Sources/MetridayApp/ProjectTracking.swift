@@ -10,6 +10,54 @@ enum ProjectColor: String, CaseIterable, Codable {
     case graphite
 }
 
+/// A project's billing preference can either be explicit or inherit from its
+/// parent. Time entries themselves continue to use `BillingStatus`; the
+/// `automatic` value only exists at the project-default layer.
+enum ProjectBillingStatus: String, CaseIterable, Codable, Identifiable {
+    case automatic
+    case billable
+    case notBillable
+    case pending
+    case billed
+    case paid
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .automatic:
+            return "Automatic"
+        case .billable:
+            return BillingStatus.billable.label
+        case .notBillable:
+            return BillingStatus.notBillable.label
+        case .pending:
+            return BillingStatus.pending.label
+        case .billed:
+            return BillingStatus.billed.label
+        case .paid:
+            return BillingStatus.paid.label
+        }
+    }
+
+    var explicitStatus: BillingStatus? {
+        switch self {
+        case .automatic:
+            return nil
+        case .billable:
+            return .billable
+        case .notBillable:
+            return .notBillable
+        case .pending:
+            return .pending
+        case .billed:
+            return .billed
+        case .paid:
+            return .paid
+        }
+    }
+}
+
 struct TrackingProject: Identifiable, Hashable, Codable {
     let id: UUID
     var name: String
@@ -19,7 +67,7 @@ struct TrackingProject: Identifiable, Hashable, Codable {
     var productivity: Int
     var isArchived: Bool
     var notes: String
-    var defaultBillingStatus: BillingStatus
+    var defaultBillingStatus: ProjectBillingStatus
     var customFields: [String: String]
     var billingRate: Double {
         didSet { billingRate = max(0, billingRate) }
@@ -40,7 +88,7 @@ struct TrackingProject: Identifiable, Hashable, Codable {
         productivity: Int = 0,
         isArchived: Bool = false,
         notes: String = "",
-        defaultBillingStatus: BillingStatus = .billable,
+        defaultBillingStatus: ProjectBillingStatus = .automatic,
         billingRate: Double = 0,
         currency: String = "USD",
         customFields: [String: String] = [:]
@@ -75,7 +123,7 @@ struct TrackingProject: Identifiable, Hashable, Codable {
         productivity = min(100, max(-100, try container.decodeIfPresent(Int.self, forKey: .productivity) ?? 0))
         isArchived = try container.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
-        defaultBillingStatus = try container.decodeIfPresent(BillingStatus.self, forKey: .defaultBillingStatus) ?? .billable
+        defaultBillingStatus = try container.decodeIfPresent(ProjectBillingStatus.self, forKey: .defaultBillingStatus) ?? .automatic
         billingRate = max(0, try container.decodeIfPresent(Double.self, forKey: .billingRate) ?? 0)
         customFields = try container.decodeIfPresent([String: String].self, forKey: .customFields) ?? [:]
         currency = (try container.decodeIfPresent(String.self, forKey: .currency) ?? "USD")
@@ -214,6 +262,24 @@ struct ProjectArchive: Codable {
     let rules: [ProjectRule]
 }
 
+func resolvedProjectBillingStatus(
+    for projectID: UUID?,
+    in projects: [TrackingProject],
+    fallback: BillingStatus = .billable
+) -> BillingStatus {
+    var currentID = projectID
+    var visited: Set<UUID> = []
+    while let id = currentID,
+          visited.insert(id).inserted,
+          let project = projects.first(where: { $0.id == id }) {
+        if let explicitStatus = project.defaultBillingStatus.explicitStatus {
+            return explicitStatus
+        }
+        currentID = project.parentID
+    }
+    return fallback
+}
+
 @MainActor
 final class ProjectStore: ObservableObject {
     @Published private(set) var projects: [TrackingProject]
@@ -275,6 +341,13 @@ final class ProjectStore: ObservableObject {
     func project(_ id: UUID?) -> TrackingProject? {
         guard let id else { return nil }
         return projects.first { $0.id == id }
+    }
+
+    /// Resolve a project's billing preference exactly once at entry creation
+    /// time. Automatic defaults inherit through the project hierarchy and
+    /// finally use the local global fallback, Billable.
+    func resolvedBillingStatus(for projectID: UUID?) -> BillingStatus {
+        resolvedProjectBillingStatus(for: projectID, in: projects)
     }
 
     func name(for id: UUID?) -> String {

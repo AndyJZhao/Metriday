@@ -1979,7 +1979,7 @@ function localEntryDateSeconds(dateKey, seconds) {
 }
 
 function billingLabel(value) {
-  const labels = { billable: "Billable", not_billable: "Not billable", pending: "Pending", billed: "Billed", paid: "Paid", undetermined: "Undetermined" };
+  const labels = { automatic: "Automatic", billable: "Billable", not_billable: "Not billable", notBillable: "Not billable", pending: "Pending", billed: "Billed", paid: "Paid", undetermined: "Undetermined" };
   return labels[value] || value || "Billable";
 }
 
@@ -1990,6 +1990,25 @@ function projectTitleFor(projects, value) {
 
 function projectParentID(project) {
   return resourceID(project?.parent || project?.parent_id || project?.parentID);
+}
+
+function normalizedBillingStatus(value) {
+  if (value === "notBillable" || value === "not-billable") return "not_billable";
+  return value || "billable";
+}
+
+function resolvedProjectBillingStatus(projects, projectID) {
+  const visited = new Set();
+  let currentID = resourceID(projectID);
+  while (currentID && !visited.has(currentID)) {
+    visited.add(currentID);
+    const project = projects.find((candidate) => resourceID(candidate.id) === currentID);
+    if (!project) break;
+    const status = normalizedBillingStatus(project.default_billing_status);
+    if (status !== "automatic") return status;
+    currentID = projectParentID(project);
+  }
+  return "billable";
 }
 
 function descendantProjectIDs(projects, projectID) {
@@ -2064,7 +2083,7 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
   const [title, setTitle] = useState("");
   const [rate, setRate] = useState("0");
   const [currency, setCurrency] = useState("USD");
-  const [billingStatus, setBillingStatus] = useState("billable");
+  const [billingStatus, setBillingStatus] = useState("automatic");
   const [parentID, setParentID] = useState("");
   const [teamID, setTeamID] = useState("");
   const [addDefaultNameRules, setAddDefaultNameRules] = useState(true);
@@ -2115,7 +2134,7 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
       setMessage(error.message || "Could not save the project.");
     }
   };
-  const beginEdit = (project) => setEditing({ id: project.id, title: project.title || "", parentID: projectParentID(project), teamID: resourceID(project.team_id) || "", color: projectColorKey(project), productivity: String(Math.round(Number(project.productivity ?? (Number(project.productivity_score || 0) * 100)) || 0)), notes: project.notes || "", rate: String(project.billing_rate || 0), currency: project.currency || "USD", billingStatus: project.default_billing_status || "billable" });
+  const beginEdit = (project) => setEditing({ id: project.id, title: project.title || "", parentID: projectParentID(project), teamID: resourceID(project.team_id) || "", color: projectColorKey(project), productivity: String(Math.round(Number(project.productivity ?? (Number(project.productivity_score || 0) * 100)) || 0)), notes: project.notes || "", rate: String(project.billing_rate || 0), currency: project.currency || "USD", billingStatus: normalizedBillingStatus(project.default_billing_status || "automatic") });
   useEffect(() => {
     if (!editProjectID) return;
     const project = api.projects.find((item) => resourceID(item.id) === resourceID(editProjectID));
@@ -2177,7 +2196,7 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
       <select value={teamID} onChange={(event) => setTeamID(event.target.value)} aria-label="Project team"><option value="">Personal project</option>{teams.map((team) => <option value={resourceID(team.id)} key={team.id}>{team.name}</option>)}</select>
       <input type="number" min="0" step="0.01" value={rate} onChange={(event) => setRate(event.target.value)} placeholder="Rate" aria-label="Project billing rate" />
       <input value={currency} onChange={(event) => setCurrency(event.target.value)} maxLength={3} aria-label="Project currency" />
-      <select value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)} aria-label="Project default billing status"><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option></select>
+      <select value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)} aria-label="Project default billing status"><option value="automatic">Automatic</option><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select>
       <button type="submit" disabled={!api.connected}><Plus size={17} />Add project</button>
     </form>
     <label className="project-auto-rules-toggle"><input type="checkbox" checked={addDefaultNameRules} onChange={(event) => setAddDefaultNameRules(event.target.checked)} /><span>Automatically match this project&apos;s title and path</span><small>Adds title and URL/path rules for future activity.</small></label>
@@ -2189,7 +2208,7 @@ function ProjectPanel({ api, onAssignActivity, editProjectID, onProjectEditHandl
         <label>Team<select value={editing.teamID} onChange={(event) => setEditing((value) => ({ ...value, teamID: event.target.value }))} aria-label={`Edit ${project.title} team`}><option value="">Personal project</option>{teams.map((team) => <option value={resourceID(team.id)} key={team.id}>{team.name}</option>)}</select></label>
         <label>Color<select value={editing.color} onChange={(event) => setEditing((value) => ({ ...value, color: event.target.value }))} aria-label={`Edit ${project.title} color`}>{projectColorOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
         <label>Productivity<input type="number" min="-100" max="100" step="1" value={editing.productivity} onChange={(event) => setEditing((value) => ({ ...value, productivity: event.target.value }))} aria-label={`Edit ${project.title} productivity`} /></label>
-        <label>Billing status<select value={editing.billingStatus} onChange={(event) => setEditing((value) => ({ ...value, billingStatus: event.target.value }))} aria-label={`Edit ${project.title} billing status`}><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option></select></label>
+        <label>Billing status<select value={editing.billingStatus} onChange={(event) => setEditing((value) => ({ ...value, billingStatus: event.target.value }))} aria-label={`Edit ${project.title} billing status`}><option value="automatic">Automatic</option><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select></label>
         <label>Hourly rate<input type="number" min="0" step="0.01" value={editing.rate} onChange={(event) => setEditing((value) => ({ ...value, rate: event.target.value }))} aria-label={`Edit ${project.title} rate`} /></label>
         <label>Currency<input value={editing.currency} onChange={(event) => setEditing((value) => ({ ...value, currency: event.target.value }))} maxLength={3} aria-label={`Edit ${project.title} currency`} /></label>
         <label className="project-edit-notes">Notes<textarea value={editing.notes} onChange={(event) => setEditing((value) => ({ ...value, notes: event.target.value }))} rows={2} aria-label={`Edit ${project.title} notes`} /></label>
@@ -2204,7 +2223,7 @@ function TimeEntryEditRow({ entry, api, dateKey, projects, onCancel, dialog = fa
   const [start, setStart] = useState(entryClock(entry.start_date || entry.start));
   const [end, setEnd] = useState(entryClock(entry.end_date || entry.end));
   const [project, setProject] = useState(resourceID(entry.project) || "");
-  const [billingStatus, setBillingStatus] = useState(entry.billing_status || "billable");
+  const [billingStatus, setBillingStatus] = useState(normalizedBillingStatus(entry.billing_status));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [overlapEntries, setOverlapEntries] = useState([]);
@@ -3651,7 +3670,7 @@ function WebEntryOMaticDialog({ open, activities, entries, projects, dateKey, on
     const project = projects.find((item) => resourceID(item.id) === value);
     if (project) {
       setTitle(project.title || "Work session");
-      setBillingStatus(project.default_billing_status || "billable");
+      setBillingStatus(resolvedProjectBillingStatus(projects, project.id));
     }
   };
   const submit = async () => {
@@ -3706,12 +3725,12 @@ function WebTimeEntryDialog({ mode, open, api, projects, recentEntries, dateKey,
     setTitle(entry.title || "");
     setProjectID(resourceID(entry.project) || "");
     setNotes(entry.notes || "");
-    setBillingStatus(entry.billing_status || "billable");
+    setBillingStatus(normalizedBillingStatus(entry.billing_status));
   };
   const updateProject = (value) => {
     setProjectID(value);
     const project = projects.find((item) => resourceID(item.id) === value);
-    if (project) setBillingStatus(project.default_billing_status || "billable");
+    if (project) setBillingStatus(resolvedProjectBillingStatus(projects, project.id));
   };
   const submit = async (overlapDecision = null) => {
     if (busy || !title.trim() || !api.connected) return;

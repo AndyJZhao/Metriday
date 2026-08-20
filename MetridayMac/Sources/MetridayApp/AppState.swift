@@ -169,8 +169,7 @@ final class AppState: ObservableObject {
             projectID: projectID,
             notes: recent?.notes ?? "",
             billingStatus: recent?.billingStatus
-                ?? projectID.flatMap { projectStore.project($0)?.defaultBillingStatus }
-                ?? .billable,
+                ?? projectStore.resolvedBillingStatus(for: projectID),
             customFields: recent?.customFields ?? [:]
         )
     }
@@ -239,7 +238,7 @@ final class AppState: ObservableObject {
                     "projectID": timer.projectID.map { $0.uuidString } ?? NSNull(),
                     "notes": timer.notes,
                     "startedAt": apiDate(timer.startedAt),
-                    "billingStatus": timer.billingStatus.rawValue,
+                    "billingStatus": entryBillingStatusRaw(timer.billingStatus),
                     "durationSeconds": timeEntryStore.runningDurationSeconds,
                     "estimatedDurationSeconds": timer.estimatedDurationSeconds.map { $0 as Any } ?? NSNull(),
                     "remainingSeconds": timeEntryStore.runningTimerRemainingSeconds.map { $0 as Any } ?? NSNull()
@@ -779,7 +778,7 @@ final class AppState: ObservableObject {
             if let archived = body["is_archived"] as? Bool { project.isArchived = archived }
             if let fields = validatedCustomFields(body["custom_fields"]) { project.customFields = fields }
             if let billing = (body["default_billing_status"] as? String ?? body["billing_status"] as? String),
-               let status = BillingStatus(rawValue: billing) {
+               let status = projectBillingStatus(from: billing) {
                 project.defaultBillingStatus = status
             }
             projectStore.updateProject(project)
@@ -819,7 +818,7 @@ final class AppState: ObservableObject {
                 }
                 applyCustomFieldPatch(&updated.customFields, rawValue: body["custom_fields"])
                 if let billing = body["default_billing_status"] as? String,
-                   let status = BillingStatus(rawValue: billing) {
+                   let status = projectBillingStatus(from: billing) {
                     updated.defaultBillingStatus = status
                 }
                 if body.keys.contains("parent") {
@@ -876,7 +875,7 @@ final class AppState: ObservableObject {
                     return false
                 }
                 if let requestedBilling, !requestedBilling.isEmpty,
-                   entry.billingStatus.rawValue != requestedBilling {
+                   entryBillingStatus(from: requestedBilling) != entry.billingStatus {
                     return false
                 }
                 if let search, !search.isEmpty,
@@ -920,12 +919,14 @@ final class AppState: ObservableObject {
                 var updated = entry
                 if let title = updateData["title"] as? String { updated.title = title }
                 if let notes = updateData["notes"] as? String { updated.notes = notes }
-                if let billing = (updateData["billing_status"] as? String ?? updateData["billingStatus"] as? String),
-                   let status = BillingStatus(rawValue: billing) {
-                    updated.billingStatus = status
-                }
                 if updateData.keys.contains("project") {
                     updated.projectID = apiProjectIDValue(updateData["project"])
+                }
+                if updateData["billing_status"] != nil || updateData["billingStatus"] != nil {
+                    updated.billingStatus = entryBillingStatus(
+                        from: updateData["billing_status"] as? String ?? updateData["billingStatus"] as? String,
+                        projectID: updated.projectID
+                    )
                 }
                 applyCustomFieldPatch(&updated.customFields, rawValue: updateData["custom_fields"])
                 timeEntryStore.update(updated)
@@ -958,10 +959,14 @@ final class AppState: ObservableObject {
                    let start = parseCommandDate(rawStart) { updated.start = start }
                 if let rawEnd = body["end_date"] as? String,
                    let end = parseCommandDate(rawEnd) { updated.end = end }
-                if let billing = body["billing_status"] as? String,
-                   let status = BillingStatus(rawValue: billing) { updated.billingStatus = status }
                 if body.keys.contains("project") {
                     updated.projectID = apiProjectIDValue(body["project"])
+                }
+                if body["billing_status"] != nil || body["billingStatus"] != nil {
+                    updated.billingStatus = entryBillingStatus(
+                        from: body["billing_status"] as? String ?? body["billingStatus"] as? String,
+                        projectID: updated.projectID
+                    )
                 }
                 applyCustomFieldPatch(&updated.customFields, rawValue: body["custom_fields"])
                 guard updated.end > updated.start else {
@@ -1003,8 +1008,10 @@ final class AppState: ObservableObject {
             }
             let notes = body["notes"] as? String ?? ""
             let customFields = validatedCustomFields(body["custom_fields"]) ?? [:]
-            let billing = (body["billing_status"] as? String ?? body["billingStatus"] as? String)
-                .flatMap(BillingStatus.init(rawValue:)) ?? .billable
+            let billing = entryBillingStatus(
+                from: body["billing_status"] as? String ?? body["billingStatus"] as? String,
+                projectID: project
+            )
             let start = (body["start_date"] as? String).flatMap(parseCommandDate)
                 ?? (body["start"] as? String).flatMap(parseCommandDate)
                 ?? .now
@@ -1542,7 +1549,7 @@ final class AppState: ObservableObject {
             let project = projectID(for: body["projectID"] as? String ?? body["project"] as? String)
             let notes = body["notes"] as? String ?? ""
             let customFields = validatedCustomFields(body["customFields"] ?? body["custom_fields"]) ?? [:]
-            let billingStatus = (body["billingStatus"] as? String).flatMap(BillingStatus.init(rawValue:)) ?? .billable
+            let billingStatus = entryBillingStatus(from: body["billingStatus"] as? String, projectID: project)
             let startedAt = (body["startedAt"] as? String).flatMap(parseCommandDate) ?? .now
             let estimatedDurationSeconds = (body["estimatedDurationSeconds"] as? Int)
                 ?? (body["estimated_duration_seconds"] as? Int)
@@ -1564,7 +1571,7 @@ final class AppState: ObservableObject {
                 "title": timer.title,
                 "startedAt": apiDate(timer.startedAt),
                 "estimatedDurationSeconds": timer.estimatedDurationSeconds.map { $0 as Any } ?? NSNull(),
-                "billingStatus": timer.billingStatus.rawValue
+                "billingStatus": entryBillingStatusRaw(timer.billingStatus)
             ], statusCode: 201)
         }
 
@@ -1651,7 +1658,7 @@ final class AppState: ObservableObject {
                 notes: body["notes"] as? String ?? "",
                 start: start,
                 end: end,
-                billingStatus: (body["billingStatus"] as? String).flatMap(BillingStatus.init(rawValue:)) ?? .billable,
+                billingStatus: entryBillingStatus(from: body["billingStatus"] as? String, projectID: projectID),
                 customFields: validatedCustomFields(body["customFields"] ?? body["custom_fields"]) ?? [:]
             ) else {
                 return .error("Time entry has an invalid time range", statusCode: 400)
@@ -2447,7 +2454,7 @@ final class AppState: ObservableObject {
             "start": apiDate(entry.start),
             "end": apiDate(entry.end),
             "durationSeconds": entry.durationSeconds,
-            "billingStatus": entry.billingStatus.rawValue,
+            "billingStatus": entryBillingStatusRaw(entry.billingStatus),
             "isManual": entry.isManual,
             "customFields": entry.customFields
         ]
@@ -2505,7 +2512,7 @@ final class AppState: ObservableObject {
             "parent": project.parentID.map { "/projects/\($0.uuidString)" } ?? NSNull(),
             "children": projectStore.childProjects(of: project.id).map { ["self": "/projects/\($0.id.uuidString)"] },
             "team_id": project.teamID.map { "/teams/\($0.uuidString)" } ?? NSNull(),
-            "default_billing_status": project.defaultBillingStatus.rawValue,
+            "default_billing_status": projectBillingStatusRaw(project.defaultBillingStatus),
             "productivity_score": Double(project.productivity) / 100.0,
             "productivity": project.productivity,
             "is_archived": project.isArchived,
@@ -2582,6 +2589,57 @@ final class AppState: ObservableObject {
         case "#d24b4b": return .red
         case "#555b66": return .graphite
         default: return nil
+        }
+    }
+
+    private func projectBillingStatus(from rawValue: String) -> ProjectBillingStatus? {
+        let normalized = rawValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "")
+        switch normalized {
+        case "automatic", "inherit", "inherited": return .automatic
+        case "billable": return .billable
+        case "notbillable": return .notBillable
+        case "pending": return .pending
+        case "billed": return .billed
+        case "paid": return .paid
+        default: return nil
+        }
+    }
+
+    private func projectBillingStatusRaw(_ status: ProjectBillingStatus) -> String {
+        switch status {
+        case .notBillable: return "not_billable"
+        default: return status.rawValue
+        }
+    }
+
+    private func entryBillingStatus(from rawValue: String?, projectID: UUID? = nil) -> BillingStatus {
+        let normalized = rawValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: "_", with: "")
+        let explicit: BillingStatus?
+        switch normalized {
+        case "billable": explicit = .billable
+        case "notbillable": explicit = .notBillable
+        case "pending": explicit = .pending
+        case "billed": explicit = .billed
+        case "paid": explicit = .paid
+        case "undetermined": explicit = .undetermined
+        case "automatic", "inherit", "inherited", nil, "": explicit = nil
+        default: explicit = nil
+        }
+        return explicit ?? projectStore.resolvedBillingStatus(for: projectID)
+    }
+
+    private func entryBillingStatusRaw(_ status: BillingStatus) -> String {
+        switch status {
+        case .notBillable: return "not_billable"
+        default: return status.rawValue
         }
     }
 
@@ -2716,7 +2774,7 @@ final class AppState: ObservableObject {
             "title": entry.title,
             "notes": entry.notes,
             "is_running": isRunning,
-            "billing_status": entry.billingStatus.rawValue,
+            "billing_status": entryBillingStatusRaw(entry.billingStatus),
             "creator_id": "/users/local",
             "creator_name": NSFullUserName(),
             "custom_fields": entry.customFields
@@ -2853,7 +2911,7 @@ final class AppState: ObservableObject {
                 ?? currentTask?.title
                 ?? "Manual timer"
             let projectID = projectID(for: parameters["project"] ?? parameters["projectID"])
-            let billingStatus = parameters["billingStatus"].flatMap(BillingStatus.init(rawValue:)) ?? .billable
+            let billingStatus = entryBillingStatus(from: parameters["billingStatus"], projectID: projectID)
             let startedAt = parseCommandDate(parameters["start"] ?? parameters["startedAt"]) ?? .now
             timeEntryStore.startTimer(
                 title: title,
@@ -2948,13 +3006,14 @@ final class AppState: ObservableObject {
             let minutes = max(1, Int(parameters["minutes"] ?? "60") ?? 60)
             end = start.addingTimeInterval(TimeInterval(minutes * 60))
         }
+        let projectID = projectID(for: parameters["project"] ?? parameters["projectID"])
         guard timeEntryStore.addEntry(
             title: title,
-            projectID: projectID(for: parameters["project"] ?? parameters["projectID"]),
+            projectID: projectID,
             notes: parameters["notes"] ?? "",
             start: start,
             end: end,
-            billingStatus: parameters["billingStatus"].flatMap(BillingStatus.init(rawValue:)) ?? .billable
+            billingStatus: entryBillingStatus(from: parameters["billingStatus"], projectID: projectID)
         ) != nil else {
             markdownStore.statusMessage = "Time entry URL command has an invalid time range"
             return

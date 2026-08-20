@@ -31,7 +31,7 @@ final class MetridayStartTimerCommand: NSScriptCommand {
                 }
             let billingStatus = billingRawValue
                 .flatMap(scriptBillingStatus)
-                ?? .billable
+                ?? state.projectStore.resolvedBillingStatus(for: projectID)
             state.timeEntryStore.startTimer(
                 title: title,
                 projectID: projectID,
@@ -112,7 +112,7 @@ final class MetridayAddTimeEntryCommand: NSScriptCommand {
                 }
             let billingStatus = billingRawValue
                 .flatMap(scriptBillingStatus)
-                ?? .billable
+                ?? state.projectStore.resolvedBillingStatus(for: projectID)
             guard let id = state.timeEntryStore.addEntry(
                 title: title,
                 projectID: projectID,

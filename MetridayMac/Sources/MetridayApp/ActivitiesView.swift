@@ -268,7 +268,8 @@ struct ActivitiesView: View {
                             end: day.addingTimeInterval(TimeInterval(interval.endSecond))
                         )
                     }
-                    replacedEntries = timeEntryStore.entries(overlapping: selectedDate).filter { existing in
+                    let existingEntries = timeEntryStore.entries(overlapping: selectedDate)
+                    replacedEntries = existingEntries.filter { existing in
                         generatedRanges.contains { range in
                             existing.start < range.end && existing.end > range.start
                         }
@@ -281,14 +282,17 @@ struct ActivitiesView: View {
                 let day = Calendar.current.startOfDay(for: selectedDate)
                 var createdEntries: [TimeEntry] = []
                 for interval in intervals {
+                    let start = day.addingTimeInterval(TimeInterval(interval.startSecond))
+                    let end = day.addingTimeInterval(TimeInterval(interval.endSecond))
                     guard let id = timeEntryStore.addEntry(
                         title: title,
                         projectID: projectID,
                         notes: notes,
-                        start: day.addingTimeInterval(TimeInterval(interval.startSecond)),
-                        end: day.addingTimeInterval(TimeInterval(interval.endSecond)),
+                        start: start,
+                        end: end,
                         billingStatus: billingStatus
-                    ), let entry = timeEntryStore.entries.first(where: { $0.id == id }) else { continue }
+                    ) else { continue }
+                    guard let entry = timeEntryStore.entries.first(where: { $0.id == id }) else { continue }
                     createdEntries.append(entry)
                 }
                 timeEntryStore.recordEntryOMaticCreation(
@@ -347,6 +351,7 @@ struct ActivitiesView: View {
                 activity: activity,
                 category: category(for: activity),
                 projectName: projectStore.name(for: activity.projectID),
+                billingStatus: projectStore.resolvedBillingStatus(for: activity.projectID),
                 timeEntryStore: timeEntryStore,
                 selectedDate: selectedDate
             )
@@ -2746,9 +2751,7 @@ struct ActivitiesView: View {
         .padding(24)
         .frame(width: 420)
         .onChange(of: newEntryProjectID) { _, projectID in
-            newEntryBillingStatus = projectID
-                .flatMap { projectStore.project($0)?.defaultBillingStatus }
-                ?? .billable
+            newEntryBillingStatus = projectStore.resolvedBillingStatus(for: projectID)
         }
     }
 
@@ -2779,9 +2782,7 @@ struct ActivitiesView: View {
         newEntryTitle = ""
         newEntryNotes = ""
         newEntryProjectID = selectedProjectID
-        newEntryBillingStatus = selectedProjectID
-            .flatMap { projectStore.project($0)?.defaultBillingStatus }
-            ?? .billable
+        newEntryBillingStatus = projectStore.resolvedBillingStatus(for: selectedProjectID)
         if let event {
             newEntryTitle = event.title
             newEntryNotes = [event.calendarTitle, event.location, event.notes]
@@ -2789,9 +2790,7 @@ struct ActivitiesView: View {
                 .joined(separator: " · ")
             if selectedProjectID == nil {
                 newEntryProjectID = suggestedProjectID(for: event)
-                newEntryBillingStatus = newEntryProjectID
-                    .flatMap { projectStore.project($0)?.defaultBillingStatus }
-                    ?? .billable
+                newEntryBillingStatus = projectStore.resolvedBillingStatus(for: newEntryProjectID)
             }
             newEntryStart = event.start
             newEntryEnd = event.end
@@ -2831,9 +2830,7 @@ struct ActivitiesView: View {
         newEntryTitle = activity.appName.isEmpty ? "App activity" : activity.appName
         newEntryNotes = activity.displayTitle
         newEntryProjectID = activity.projectID ?? selectedProjectID
-        newEntryBillingStatus = newEntryProjectID
-            .flatMap { projectStore.project($0)?.defaultBillingStatus }
-            ?? .billable
+        newEntryBillingStatus = projectStore.resolvedBillingStatus(for: newEntryProjectID)
     }
 
     private func prepareNewEntry(for suggestion: ActivityTimelineSuggestion) {
@@ -2844,9 +2841,7 @@ struct ActivitiesView: View {
         newEntryTitle = suggestion.title
         newEntryNotes = suggestion.notes
         newEntryProjectID = suggestion.projectID ?? selectedProjectID
-        newEntryBillingStatus = newEntryProjectID
-            .flatMap { projectStore.project($0)?.defaultBillingStatus }
-            ?? .billable
+        newEntryBillingStatus = projectStore.resolvedBillingStatus(for: newEntryProjectID)
     }
 
     private func prepareNewEntry(for reminder: ReminderItem) {
@@ -2855,9 +2850,7 @@ struct ActivitiesView: View {
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: " · ")
         newEntryProjectID = selectedProjectID
-        newEntryBillingStatus = selectedProjectID
-            .flatMap { projectStore.project($0)?.defaultBillingStatus }
-            ?? .billable
+        newEntryBillingStatus = projectStore.resolvedBillingStatus(for: selectedProjectID)
         newEntryEnd = reminder.completedAt
         newEntryStart = reminder.completedAt.addingTimeInterval(-30 * 60)
     }
@@ -2868,9 +2861,7 @@ struct ActivitiesView: View {
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: " · ")
         newEntryProjectID = selectedProjectID
-        newEntryBillingStatus = selectedProjectID
-            .flatMap { projectStore.project($0)?.defaultBillingStatus }
-            ?? .billable
+        newEntryBillingStatus = projectStore.resolvedBillingStatus(for: selectedProjectID)
         newEntryStart = call.start
         newEntryEnd = call.end
     }
@@ -4367,9 +4358,7 @@ private struct EntryOMaticSheet: View {
         _title = State(initialValue: initialProjectID
             .flatMap { id in projects.first(where: { $0.id == id })?.name }
             ?? "Work session")
-        _billingStatus = State(initialValue: initialProjectID
-            .flatMap { id in projects.first(where: { $0.id == id })?.defaultBillingStatus }
-            ?? .billable)
+        _billingStatus = State(initialValue: resolvedProjectBillingStatus(for: initialProjectID, in: projects))
     }
 
     var body: some View {
@@ -4460,9 +4449,7 @@ private struct EntryOMaticSheet: View {
         .padding(24)
         .frame(width: 500)
         .onChange(of: projectID) { _, newProjectID in
-            billingStatus = newProjectID
-                .flatMap { id in projects.first(where: { $0.id == id })?.defaultBillingStatus }
-                ?? .billable
+            billingStatus = resolvedProjectBillingStatus(for: newProjectID, in: projects)
         }
     }
 
@@ -4526,9 +4513,7 @@ private struct TimerStartSheet: View {
             .flatMap { id in projects.first(where: { $0.id == id })?.name }
             ?? "Focused work")
         _estimatedDurationMinutes = State(initialValue: nil)
-        _billingStatus = State(initialValue: resolvedProjectID
-            .flatMap { id in projects.first(where: { $0.id == id })?.defaultBillingStatus }
-            ?? .billable)
+        _billingStatus = State(initialValue: resolvedProjectBillingStatus(for: resolvedProjectID, in: projects))
     }
 
     var body: some View {
@@ -4660,9 +4645,7 @@ private struct TimerStartSheet: View {
         .padding(24)
         .frame(width: 430)
         .onChange(of: projectID) { _, newProjectID in
-            billingStatus = newProjectID
-                .flatMap { id in projects.first(where: { $0.id == id })?.defaultBillingStatus }
-                ?? .billable
+            billingStatus = resolvedProjectBillingStatus(for: newProjectID, in: projects)
         }
     }
 
@@ -5656,6 +5639,7 @@ private struct ProjectEditorSheet: View {
     @State private var productivity: Double
     @State private var notes: String
     @State private var defaultBillingStatus: BillingStatus
+    @State private var inheritsBillingStatus: Bool
     @State private var billingRate: Double
     @State private var currency: String
 
@@ -5675,7 +5659,8 @@ private struct ProjectEditorSheet: View {
         _color = State(initialValue: project.color)
         _productivity = State(initialValue: Double(project.productivity))
         _notes = State(initialValue: project.notes)
-        _defaultBillingStatus = State(initialValue: project.defaultBillingStatus)
+        _defaultBillingStatus = State(initialValue: project.defaultBillingStatus.explicitStatus ?? .billable)
+        _inheritsBillingStatus = State(initialValue: project.defaultBillingStatus == .automatic)
         _billingRate = State(initialValue: project.billingRate)
         _currency = State(initialValue: project.currency)
     }
@@ -5720,11 +5705,15 @@ private struct ProjectEditorSheet: View {
                 Slider(value: $productivity, in: -100...100, step: 1)
             }
 
+            Toggle("Automatic (inherit from parent)", isOn: $inheritsBillingStatus)
+                .toggleStyle(.checkbox)
+
             Picker("Default billing status", selection: $defaultBillingStatus) {
                 ForEach(BillingStatus.allCases.filter { $0 != .undetermined }) { status in
                     Text(status.label).tag(status)
                 }
             }
+            .disabled(inheritsBillingStatus)
 
             HStack(spacing: 10) {
                 TextField("Hourly billing rate", value: $billingRate, format: .number)
@@ -5752,7 +5741,9 @@ private struct ProjectEditorSheet: View {
                     updated.color = color
                     updated.productivity = Int(productivity.rounded())
                     updated.notes = notes
-                    updated.defaultBillingStatus = defaultBillingStatus
+                    updated.defaultBillingStatus = inheritsBillingStatus
+                        ? .automatic
+                        : ProjectBillingStatus(rawValue: defaultBillingStatus.rawValue) ?? .billable
                     updated.billingRate = max(0, billingRate)
                     updated.currency = currency.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         ? "USD"

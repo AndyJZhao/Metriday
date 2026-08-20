@@ -721,6 +721,31 @@ Task { @MainActor in
         "Project hierarchy paths should include parent projects"
     )
     expect(
+        projectStore.project(researchProjectID)?.defaultBillingStatus == .automatic
+            && projectStore.project(childProjectID)?.defaultBillingStatus == .automatic,
+        "New project defaults should inherit billing status automatically"
+    )
+    expect(
+        projectStore.resolvedBillingStatus(for: childProjectID) == .billable,
+        "Automatic billing should use the local Billable fallback when no ancestor is explicit"
+    )
+    if var parentProject = projectStore.project(researchProjectID) {
+        parentProject.defaultBillingStatus = .notBillable
+        projectStore.updateProject(parentProject)
+    }
+    expect(
+        projectStore.resolvedBillingStatus(for: childProjectID) == .notBillable,
+        "Automatic child billing should inherit an explicit parent status"
+    )
+    if var childProject = projectStore.project(childProjectID) {
+        childProject.defaultBillingStatus = .paid
+        projectStore.updateProject(childProject)
+    }
+    expect(
+        projectStore.resolvedBillingStatus(for: childProjectID) == .paid,
+        "Explicit child billing should override an inherited parent status"
+    )
+    expect(
         !projectStore.validParentProjects(for: researchProjectID).contains { $0.id == childProjectID },
         "Project hierarchies should not allow a descendant to become its parent's parent"
     )

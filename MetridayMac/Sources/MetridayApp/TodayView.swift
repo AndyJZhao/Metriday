@@ -39,6 +39,7 @@ struct TodayView: View {
                 activity: activity,
                 category: category(for: activity),
                 projectName: appState.projectStore.name(for: activity.projectID),
+                billingStatus: appState.projectStore.resolvedBillingStatus(for: activity.projectID),
                 timeEntryStore: timeEntryStore,
                 selectedDate: appState.selectedDate
             )
@@ -417,6 +418,7 @@ struct ActivityDetailSheet: View {
     let activity: ActivitySegment
     let category: ActivityCategoryDefinition
     let projectName: String
+    let billingStatus: BillingStatus
     @ObservedObject var timeEntryStore: TimeEntryStore
     let selectedDate: Date
 
@@ -516,7 +518,7 @@ struct ActivityDetailSheet: View {
             notes: activity.displayTitle,
             start: day.addingTimeInterval(TimeInterval(activity.startSecond)),
             end: day.addingTimeInterval(TimeInterval(activity.endSecond)),
-            billingStatus: .billable
+            billingStatus: billingStatus
         )
         dismiss()
     }
@@ -610,6 +612,9 @@ private struct TodayTimeEntryDetailSheet: View {
         }
         .padding(24)
         .frame(width: 430)
+        .onChange(of: projectID) { _, newProjectID in
+            billingStatus = resolvedProjectBillingStatus(for: newProjectID, in: projects)
+        }
     }
 }
 
