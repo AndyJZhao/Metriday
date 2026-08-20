@@ -277,7 +277,8 @@ final class SyncStore: ObservableObject {
                         var mapped = segment
                         mapped.projectID = segment.projectID.flatMap { projectMap[$0] }
                         return mapped
-                    }
+                    },
+                    deletedIDs: day.deletedIDs
                 )
             }
             let activityData = try encode(ActivityHistoryArchive(version: 1, days: mappedDays))

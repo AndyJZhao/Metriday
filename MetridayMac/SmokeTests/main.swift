@@ -75,6 +75,28 @@ expect(activitySummary.distractedMinutes == 12, "Activity summary should count d
 expect(activitySummary.idleMinutes == 18, "Activity summary should count idle minutes")
 expect(activitySummary.activeMinutes == 72, "Activity summary should exclude idle time from active minutes")
 expect(activitySummary.taskRelatedPercentage == 83, "Activity summary should calculate task relevance from active time")
+
+let deletionHistoryRoot = FileManager.default.temporaryDirectory
+    .appendingPathComponent("MetridaySmoke-\(UUID().uuidString)", isDirectory: true)
+let deletionHistory = ActivityHistoryStore(rootDirectory: deletionHistoryRoot)
+try! deletionHistory.save(trackedActivities, date: date)
+let deletedActivityID = trackedActivities[1].id
+deletionHistory.markDeleted([deletedActivityID], date: date)
+expect(deletionHistory.isDeleted(deletedActivityID, date: date), "Activity deletion should persist a date-scoped tombstone")
+expect(deletionHistory.load(date: date).count == 2, "Deleted activities should stay hidden from history loads")
+deletionHistory.restore([deletedActivityID], date: date)
+expect(!deletionHistory.isDeleted(deletedActivityID, date: date), "Undo should clear the activity deletion tombstone")
+expect(deletionHistory.load(date: date).count == 3, "Restoring an activity should make it visible again")
+deletionHistory.markDeleted([deletedActivityID], date: date)
+let deletionArchive = try! deletionHistory.exportArchiveData()
+let importedDeletionHistory = ActivityHistoryStore(
+    rootDirectory: FileManager.default.temporaryDirectory
+        .appendingPathComponent("MetridaySmokeImport-\(UUID().uuidString)", isDirectory: true)
+)
+_ = try! importedDeletionHistory.importArchiveData(deletionArchive)
+expect(importedDeletionHistory.isDeleted(deletedActivityID, date: date), "Activity tombstones should survive archive sync")
+expect(importedDeletionHistory.load(date: date).count == 2, "Synced activity tombstones should remain hidden")
+
 let suggestionProjectID = UUID()
 let timelineSuggestionSegments = [
     ActivitySegment(

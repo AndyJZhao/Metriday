@@ -192,6 +192,58 @@ final class AppActivityMonitor: ObservableObject {
     }
 
     @discardableResult
+    func deleteActivities(_ ids: Set<UUID>, date: Date? = nil) -> [ActivitySegment] {
+        guard !ids.isEmpty else { return [] }
+        let targetDate = calendar.startOfDay(for: date ?? visibleDate)
+
+        if targetDate == trackedDate {
+            var deleted = dailySegments.filter { ids.contains($0.id) }
+            if ids.contains(currentSegmentID),
+               let liveSegment = currentSegment(at: .now) {
+                deleted.append(liveSegment)
+                currentStart = .now
+                currentSegmentID = UUID()
+            }
+            guard !deleted.isEmpty else { return [] }
+            let deletedIDs = Set(deleted.map(\.id))
+            history.markDeleted(deletedIDs, date: targetDate)
+            dailySegments.removeAll { deletedIDs.contains($0.id) }
+            persistDailySegments()
+            refreshObservedSegments()
+            return deleted
+        }
+
+        let historicalSegments = history.load(date: targetDate)
+        let deleted = historicalSegments.filter { ids.contains($0.id) }
+        guard !deleted.isEmpty else { return [] }
+        let deletedIDs = Set(deleted.map(\.id))
+        history.markDeleted(deletedIDs, date: targetDate)
+        try? history.save(historicalSegments.filter { !deletedIDs.contains($0.id) }, date: targetDate)
+        if targetDate == visibleDate { refreshObservedSegments() }
+        return deleted
+    }
+
+    func restoreActivities(_ segments: [ActivitySegment], date: Date? = nil) {
+        guard !segments.isEmpty else { return }
+        let targetDate = calendar.startOfDay(for: date ?? visibleDate)
+        let ids = Set(segments.map(\.id))
+        history.restore(ids, date: targetDate)
+
+        var restored: [UUID: ActivitySegment]
+        if targetDate == trackedDate {
+            restored = Dictionary(uniqueKeysWithValues: dailySegments.map { ($0.id, $0) })
+        } else {
+            restored = Dictionary(uniqueKeysWithValues: history.load(date: targetDate).map { ($0.id, $0) })
+        }
+        for segment in segments { restored[segment.id] = segment }
+        try? history.save(Array(restored.values), date: targetDate)
+        if targetDate == trackedDate {
+            dailySegments = history.load(date: targetDate)
+        }
+        if targetDate == visibleDate { refreshObservedSegments() }
+    }
+
+    @discardableResult
     func createRule(for activity: ActivitySegment, projectID: UUID) -> UUID? {
         let field: ProjectRuleField
         let pattern: String

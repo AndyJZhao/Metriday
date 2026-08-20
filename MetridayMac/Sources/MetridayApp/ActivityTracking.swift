@@ -265,6 +265,10 @@ enum EntryOMaticGenerator {
 struct ActivityHistoryStore {
     let rootDirectory: URL
 
+    private var deletionURL: URL {
+        rootDirectory.appendingPathComponent("DeletedActivities.json")
+    }
+
     init(rootDirectory: URL? = nil) {
         if let rootDirectory {
             self.rootDirectory = rootDirectory
@@ -281,7 +285,8 @@ struct ActivityHistoryStore {
               let payload = try? JSONDecoder().decode(ActivityHistoryPayload.self, from: data) else {
             return []
         }
-        return Self.normalized(payload.segments)
+        let deleted = deletedIDs(for: date)
+        return Self.normalized(payload.segments).filter { !deleted.contains($0.id) }
     }
 
     func save(_ segments: [ActivitySegment], date: Date) throws {
@@ -299,6 +304,33 @@ struct ActivityHistoryStore {
 
     func fileURL(for date: Date) -> URL {
         rootDirectory.appendingPathComponent("\(Self.dateKey(for: date)).json")
+    }
+
+    /// Marks captured activities as deleted without mutating an upstream
+    /// source such as Apple's read-only Screen Time database. The tombstones
+    /// are kept beside the daily history so a later import cannot resurrect a
+    /// record the user intentionally removed.
+    func markDeleted(_ ids: Set<UUID>, date: Date) {
+        guard !ids.isEmpty else { return }
+        var allDeleted = loadDeletionIndex()
+        let key = Self.dateKey(for: date)
+        allDeleted[key, default: []].formUnion(ids)
+        saveDeletionIndex(allDeleted)
+    }
+
+    func restore(_ ids: Set<UUID>, date: Date) {
+        guard !ids.isEmpty else { return }
+        var allDeleted = loadDeletionIndex()
+        let key = Self.dateKey(for: date)
+        allDeleted[key]?.subtract(ids)
+        if allDeleted[key]?.isEmpty == true {
+            allDeleted.removeValue(forKey: key)
+        }
+        saveDeletionIndex(allDeleted)
+    }
+
+    func isDeleted(_ id: UUID, date: Date) -> Bool {
+        deletedIDs(for: date).contains(id)
     }
 
     func storedDates() -> [Date] {
@@ -325,6 +357,34 @@ struct ActivityHistoryStore {
         formatter.timeZone = .current
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
+    }
+
+    private func deletedIDs(for date: Date) -> Set<UUID> {
+        loadDeletionIndex()[Self.dateKey(for: date)] ?? []
+    }
+
+    private func loadDeletionIndex() -> [String: Set<UUID>] {
+        guard let data = try? Data(contentsOf: deletionURL),
+              let archive = try? JSONDecoder().decode(ActivityDeletionArchive.self, from: data) else {
+            return [:]
+        }
+        return archive.idsByDate.mapValues(Set.init)
+    }
+
+    private func saveDeletionIndex(_ idsByDate: [String: Set<UUID>]) {
+        do {
+            try FileManager.default.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
+            let archive = ActivityDeletionArchive(
+                version: 1,
+                idsByDate: idsByDate.mapValues { $0.sorted { $0.uuidString < $1.uuidString } }
+            )
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try encoder.encode(archive).write(to: deletionURL, options: .atomic)
+        } catch {
+            // History writes are intentionally best-effort, matching the
+            // existing local activity persistence behavior.
+        }
     }
 
     private static func normalized(_ segments: [ActivitySegment]) -> [ActivitySegment] {
@@ -365,6 +425,24 @@ struct ActivityHistoryStore {
 struct ActivityHistoryDayArchive: Codable {
     let date: String
     let segments: [ActivitySegment]
+    let deletedIDs: [UUID]
+
+    init(date: String, segments: [ActivitySegment], deletedIDs: [UUID] = []) {
+        self.date = date
+        self.segments = segments
+        self.deletedIDs = deletedIDs
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case date, segments, deletedIDs
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        date = try container.decode(String.self, forKey: .date)
+        segments = try container.decode([ActivitySegment].self, forKey: .segments)
+        deletedIDs = try container.decodeIfPresent([UUID].self, forKey: .deletedIDs) ?? []
+    }
 }
 
 struct ActivityHistoryArchive: Codable {
@@ -377,7 +455,11 @@ extension ActivityHistoryStore {
         let archive = ActivityHistoryArchive(
             version: 1,
             days: storedDates().map { date in
-                ActivityHistoryDayArchive(date: Self.dateKey(for: date), segments: load(date: date))
+                ActivityHistoryDayArchive(
+                    date: Self.dateKey(for: date),
+                    segments: load(date: date),
+                    deletedIDs: Array(deletedIDs(for: date)).sorted { $0.uuidString < $1.uuidString }
+                )
             }
         )
         let encoder = JSONEncoder()
@@ -397,6 +479,7 @@ extension ActivityHistoryStore {
 
         for day in archive.days {
             guard let date = formatter.date(from: day.date) else { continue }
+            markDeleted(Set(day.deletedIDs), date: date)
             var merged = Dictionary(uniqueKeysWithValues: load(date: date).map { ($0.id, $0) })
             for segment in day.segments {
                 if merged[segment.id] == nil { importedSegments += 1 }
@@ -412,4 +495,9 @@ private struct ActivityHistoryPayload: Codable {
     let version: Int
     let date: String
     let segments: [ActivitySegment]
+}
+
+private struct ActivityDeletionArchive: Codable {
+    let version: Int
+    let idsByDate: [String: [UUID]]
 }

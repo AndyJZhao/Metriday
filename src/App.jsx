@@ -646,6 +646,11 @@ function useMetridayAPI(dateKey, apiBase) {
       await request(`/v1/activities/${resourceID(id)}?date=${date}`, { method: "PATCH", body: JSON.stringify({ projectID: projectID || null }) });
       await refresh();
     },
+    deleteActivity: async (id, date = dateKey || localDateKey()) => {
+      const result = await request(`/v1/activities/${resourceID(id)}?date=${date}`, { method: "DELETE" });
+      await refresh();
+      return result;
+    },
     createTeam: async (team) => {
       await request("/v1/teams", { method: "POST", body: JSON.stringify(team) });
       await refresh();
@@ -2768,7 +2773,7 @@ function ActivityContextMenu({ activity, x, y, onClose, onSelect, onCreateTimeEn
   const app = activity.appName || activity.deviceName || "Unknown App";
   const category = activityCategory(activity);
   const menuWidth = 226;
-  const menuHeight = 142;
+  const menuHeight = activity.__deleteActivity ? 180 : 142;
   const left = Math.max(8, Math.min(x, (window.innerWidth || x + menuWidth) - menuWidth - 8));
   const top = Math.max(8, Math.min(y, (window.innerHeight || y + menuHeight) - menuHeight - 8));
   const select = () => {
@@ -2779,11 +2784,21 @@ function ActivityContextMenu({ activity, x, y, onClose, onSelect, onCreateTimeEn
     onClose();
     onCreateTimeEntry?.(activity);
   };
+  const deleteActivity = async () => {
+    onClose();
+    if (!activity.__deleteActivity || !window.confirm(`Delete captured app usage for ${app}?`)) return;
+    try {
+      await activity.__deleteActivity();
+    } catch (error) {
+      window.alert(error.message || "Could not delete app usage.");
+    }
+  };
   return <div className="activity-context-menu" role="menu" aria-label={`Actions for ${app}`} style={{ left, top }} onPointerDown={(event) => event.stopPropagation()} onContextMenu={(event) => event.preventDefault()}>
     <div className="activity-context-heading"><span className="activity-context-icon"><Browsers size={16} /></span><div><strong>{app}</strong><small><span className={`activity-context-category ${category.key}`} style={{ color: activityCategoryStyle(category).color }}>{category.label}</span>{activity.deviceName ? ` · ${activity.deviceName}` : ""}</small></div></div>
     <div className="activity-context-divider" />
     <button type="button" role="menuitem" onClick={select}><NotePencil size={15} />Open details</button>
     <button type="button" role="menuitem" onClick={createTimeEntry}><Clock size={15} />Create time entry</button>
+    {activity.__deleteActivity ? <button type="button" role="menuitem" className="timeline-context-danger" onClick={deleteActivity}><Trash size={15} />Delete app usage</button> : null}
   </div>;
 }
 
@@ -3055,7 +3070,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
       event.stopPropagation();
       if (rowClickTimer.current) window.clearTimeout(rowClickTimer.current);
       rowClickTimer.current = null;
-      setContextMenu({ activity, x: event.clientX, y: event.clientY });
+      setContextMenu({ activity: { ...activity, __deleteActivity: api?.connected && api?.deleteActivity ? () => api.deleteActivity(activity.id, activity.date || dateKey) : null }, x: event.clientX, y: event.clientY });
     };
     return <div className="activity-table-row" key={activity.id} role="button" tabIndex={0} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-metriday-activity", activity.id); event.dataTransfer.setData("text/plain", activity.id); event.dataTransfer.setData("application/x-metriday-activity-date", activity.date || dateKey); }} onClick={openDetails} onDoubleClick={openTimeEntry} onContextMenu={openContextMenu} onKeyDown={handleKeyDown} aria-label={`Open details for ${app} ${formatRange(start, end)}`} title="Drag this activity to a project to assign it">
       <div className="activity-app-cell">

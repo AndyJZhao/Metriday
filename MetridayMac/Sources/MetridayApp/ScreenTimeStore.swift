@@ -141,6 +141,7 @@ final class ScreenTimeStore: ObservableObject {
 
         databaseAvailable = true
         segments = merged(archived: archived, imported: imported)
+            .filter { !history.isDeleted($0.id, date: selectedDate) }
         try? history.save(segments, date: selectedDate)
         statusMessage = imported.isEmpty
             ? (segments.isEmpty ? "No Screen Time activities for this day" : "Showing \(segments.count) archived Screen Time activities")
@@ -179,6 +180,35 @@ final class ScreenTimeStore: ObservableObject {
         guard let index = historicalSegments.firstIndex(where: { $0.id == id }) else { return }
         historicalSegments[index].projectID = projectID
         try? history.save(historicalSegments, date: targetDate)
+    }
+
+    @discardableResult
+    func deleteActivities(_ ids: Set<UUID>, date: Date? = nil) -> [ActivitySegment] {
+        guard !ids.isEmpty else { return [] }
+        let targetDate = Calendar.current.startOfDay(for: date ?? selectedDate)
+        let historicalSegments = history.load(date: targetDate)
+        let deleted = historicalSegments.filter { ids.contains($0.id) }
+        guard !deleted.isEmpty else { return [] }
+        let deletedIDs = Set(deleted.map(\.id))
+        history.markDeleted(deletedIDs, date: targetDate)
+        try? history.save(historicalSegments.filter { !deletedIDs.contains($0.id) }, date: targetDate)
+        if targetDate == selectedDate {
+            segments.removeAll { deletedIDs.contains($0.id) }
+        }
+        return deleted
+    }
+
+    func restoreActivities(_ restored: [ActivitySegment], date: Date? = nil) {
+        guard !restored.isEmpty else { return }
+        let targetDate = Calendar.current.startOfDay(for: date ?? selectedDate)
+        let ids = Set(restored.map(\.id))
+        history.restore(ids, date: targetDate)
+        var merged = Dictionary(uniqueKeysWithValues: history.load(date: targetDate).map { ($0.id, $0) })
+        for segment in restored { merged[segment.id] = segment }
+        try? history.save(Array(merged.values), date: targetDate)
+        if targetDate == selectedDate {
+            segments = history.load(date: targetDate)
+        }
     }
 
     func openAccessSettings() {

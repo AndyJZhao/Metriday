@@ -1221,6 +1221,29 @@ final class AppState: ObservableObject {
             return .jsonObject(apiActivity(updated, date: date))
         }
 
+        if request.method == "DELETE", path.hasPrefix("/v1/activities/") {
+            let rawID = String(path.dropFirst("/v1/activities/".count))
+            guard let activityID = UUID(uuidString: rawID) else {
+                return .error("Activity ID is invalid", statusCode: 400)
+            }
+            let date = apiDate(from: request.query["date"]) ?? selectedDate
+            let deleted: [ActivitySegment]
+            if activityMonitor.segments(for: date).contains(where: { $0.id == activityID }) {
+                deleted = activityMonitor.deleteActivities([activityID], date: date)
+            } else if screenTimeStore.segments(for: date).contains(where: { $0.id == activityID }) {
+                deleted = screenTimeStore.deleteActivities([activityID], date: date)
+            } else {
+                return .error("Activity not found", statusCode: 404)
+            }
+            guard !deleted.isEmpty else {
+                return .error("Activity could not be deleted", statusCode: 500)
+            }
+            return .jsonObject([
+                "deleted": deleted.map { $0.id.uuidString },
+                "date": apiDayKey(date)
+            ])
+        }
+
         if request.method == "GET", path == "/v1/activities" {
             let date = apiDate(from: request.query["date"]) ?? selectedDate
             do {

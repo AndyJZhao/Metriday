@@ -74,6 +74,16 @@ private final class LockedArray<Element>: @unchecked Sendable {
 }
 
 struct ActivitiesView: View {
+    private struct DeletedActivityRecord: Identifiable {
+        let segment: ActivitySegment
+        let date: Date
+        let isScreenTime: Bool
+
+        var id: String {
+            "\(segment.id.uuidString)-\(date.timeIntervalSince1970)"
+        }
+    }
+
     @EnvironmentObject private var appState: AppState
     @ObservedObject var monitor: AppActivityMonitor
     @ObservedObject var projectStore: ProjectStore
@@ -127,6 +137,9 @@ struct ActivitiesView: View {
     @State private var selectedTimeEntryIDs: Set<UUID> = []
     @State private var selectedActivityIDs: Set<UUID> = []
     @State private var selectedActivity: ActivitySegment?
+    @State private var pendingActivityDeletion: [DeletedActivityRecord] = []
+    @State private var lastDeletedActivities: [DeletedActivityRecord] = []
+    @State private var showingActivityDeletionConfirmation = false
     @State private var editingFilter: ActivityFilterDefinition?
     @State private var showingFilterEditor = false
     @State private var showingActivitySettings = false
@@ -368,6 +381,16 @@ struct ActivitiesView: View {
             }
         } message: {
             Text(overlapMessage)
+        }
+        .alert("Delete App Usage?", isPresented: $showingActivityDeletionConfirmation) {
+            Button("Cancel", role: .cancel) {
+                pendingActivityDeletion = []
+            }
+            Button("Delete", role: .destructive) {
+                deletePendingActivities()
+            }
+        } message: {
+            Text("Delete \(pendingActivityDeletion.count) captured activit\(pendingActivityDeletion.count == 1 ? "y" : "ies")? This only removes the local activity record and can be undone.")
         }
         .onAppear {
             restoreDisplayPreferences()
@@ -1238,12 +1261,41 @@ struct ActivitiesView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .accessibilityIdentifier("activities.entry-o-matic-selected")
+                    Button("Delete selected", role: .destructive) {
+                        requestDeleteSelectedActivities()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("activities.delete-selected")
                     Button("Clear") {
                         selectedActivityIDs.removeAll()
                     }
                     .buttonStyle(.borderless)
                     .font(.system(size: 11, weight: .medium))
                     .help("Clear selected activities")
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 12)
+            }
+
+            if !lastDeletedActivities.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "trash")
+                        .foregroundStyle(MetridayTheme.danger)
+                    Text("Deleted \(lastDeletedActivities.count) app usage record\(lastDeletedActivities.count == 1 ? "" : "s")")
+                        .font(.system(size: 11))
+                    Spacer()
+                    Button("Undo") {
+                        undoLastActivityDeletion()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .keyboardShortcut("z", modifiers: [.command])
+                    Button("Dismiss") {
+                        lastDeletedActivities = []
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.system(size: 11, weight: .medium))
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 12)
@@ -1898,6 +1950,9 @@ struct ActivitiesView: View {
                                 prepareNewEntry(for: activity)
                                 showingNewEntry = true
                             }
+                            Button("Delete \(row.segments.count) Activities", role: .destructive) {
+                                requestDeleteActivities(row.segments)
+                            }
                         }
                     }
                     .help("Click for details · double-click to create a time entry")
@@ -2048,6 +2103,9 @@ struct ActivitiesView: View {
             Button("Create Time Entry") {
                 prepareNewEntry(startMinute: segment.startMinute, endMinute: segment.endMinute)
                 showingNewEntry = true
+            }
+            Button("Delete Activity", role: .destructive) {
+                requestDeleteActivities([segment])
             }
         }
         .help("Double-click or right-click to create a time entry")
@@ -2551,6 +2609,64 @@ struct ActivitiesView: View {
         } else {
             monitor.assignActivity(id, to: projectID, date: date)
         }
+    }
+
+    private func requestDeleteSelectedActivities() {
+        let selected = allActivitySegments.filter { selectedActivityIDs.contains($0.id) }
+        requestDeleteActivities(selected)
+    }
+
+    private func requestDeleteActivities(_ segments: [ActivitySegment]) {
+        let records = segments.compactMap { segment -> DeletedActivityRecord? in
+            let date = Calendar.current.startOfDay(for: segment.activityDate ?? selectedDate)
+            let isScreenTime = screenTimeStore.segments(for: date).contains { $0.id == segment.id }
+            return DeletedActivityRecord(
+                segment: segment,
+                date: date,
+                isScreenTime: isScreenTime
+            )
+        }
+        guard !records.isEmpty else { return }
+        pendingActivityDeletion = records
+        showingActivityDeletionConfirmation = true
+    }
+
+    private func deletePendingActivities() {
+        let records = pendingActivityDeletion
+        guard !records.isEmpty else { return }
+        var deleted: [DeletedActivityRecord] = []
+        for record in records {
+            let result: [ActivitySegment]
+            if record.isScreenTime {
+                result = screenTimeStore.deleteActivities([record.segment.id], date: record.date)
+            } else {
+                result = monitor.deleteActivities([record.segment.id], date: record.date)
+            }
+            if !result.isEmpty {
+                deleted.append(record)
+            }
+        }
+        pendingActivityDeletion = []
+        selectedActivityIDs.subtract(deleted.map { $0.segment.id })
+        lastDeletedActivities = deleted
+    }
+
+    private func undoLastActivityDeletion() {
+        let records = lastDeletedActivities
+        guard !records.isEmpty else { return }
+        let groups = Dictionary(grouping: records) {
+            "\($0.isScreenTime)|\(Calendar.current.startOfDay(for: $0.date).timeIntervalSince1970)"
+        }
+        for records in groups.values {
+            guard let first = records.first else { continue }
+            let segments = records.map(\.segment)
+            if first.isScreenTime {
+                screenTimeStore.restoreActivities(segments, date: first.date)
+            } else {
+                monitor.restoreActivities(segments, date: first.date)
+            }
+        }
+        lastDeletedActivities = []
     }
 
     @discardableResult
