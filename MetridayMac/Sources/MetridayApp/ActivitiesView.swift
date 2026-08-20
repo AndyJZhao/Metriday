@@ -1112,7 +1112,8 @@ struct ActivitiesView: View {
                             Text(mode.label).tag(mode)
                         }
                     }
-                    .pickerStyle(.menu)
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                     .controlSize(.small)
                     .accessibilityIdentifier("activities.view-mode")
 
@@ -1141,6 +1142,26 @@ struct ActivitiesView: View {
                 }
             }
             .padding(18)
+
+            if !entryOMaticPreview.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(MetridayTheme.accent)
+                    Text("Metriday can automatically create \(entryOMaticPreview.count) time entries with a total duration of \(formatMinutes(entryOMaticPreviewDuration)) to cover this app usage.")
+                        .font(.system(size: 11))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button("Create Time Entries") {
+                        showingEntryOMatic = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("Create Time Entries")
+                    .accessibilityIdentifier("activities.entry-o-matic-suggestion")
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 12)
+            }
 
             Divider()
 
@@ -2208,6 +2229,20 @@ struct ActivitiesView: View {
 
     private var totalSeconds: Int {
         filteredSegments.reduce(0) { $0 + $1.durationSeconds }
+    }
+
+    private var entryOMaticPreview: [EntryOMaticInterval] {
+        EntryOMaticGenerator.intervals(
+            from: filteredSegments,
+            dayStart: Calendar.current.startOfDay(for: selectedDate),
+            existingEntries: timeEntriesForSelectedDate,
+            minimumDurationSeconds: 5 * 60,
+            maximumGapSeconds: 60
+        )
+    }
+
+    private var entryOMaticPreviewDuration: Int {
+        entryOMaticPreview.reduce(0) { $0 + $1.durationSeconds }
     }
 
     private var activityGroups: [ActivityGroup] {
@@ -3330,8 +3365,8 @@ private struct ActivityCategoryEditorSheet: View {
 
 private enum ActivityDisplayMode: String, CaseIterable, Identifiable {
     case unified
-    case chronological
     case byCategory
+    case chronological
 
     var id: Self { self }
 
