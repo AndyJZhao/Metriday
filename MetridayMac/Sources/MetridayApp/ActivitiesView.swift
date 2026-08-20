@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 
 private enum ActivityDeviceFilter {
     static let all = "All Devices"
-    static let local = "This Mac"
 }
 
 /// RescueTime-style activity categories. The palette is intentionally owned by
@@ -790,7 +789,7 @@ struct ActivitiesView: View {
             ForEach(availableDevices.dropFirst(), id: \.self) { device in
                 devicePopoverRow(
                     title: device,
-                    icon: device == ActivityDeviceFilter.local ? "macbook" : "desktopcomputer",
+                    icon: device == appState.syncStore.deviceName ? "macbook" : "desktopcomputer",
                     isSelected: selectedDevice == device
                 ) {
                     selectedDevice = device
@@ -2513,7 +2512,7 @@ struct ActivitiesView: View {
             context = usefulTitle
         } else if let path {
             context = path
-        } else if segment.deviceName != ActivityDeviceFilter.local {
+        } else if segment.deviceName != appState.syncStore.deviceName {
             context = segment.deviceName
         } else {
             context = nil
