@@ -235,14 +235,14 @@ private struct IdlePromptPresenter: View {
                     interval: interval,
                     entries: timeEntryStore.entries,
                     projects: projectStore.activeProjects
-                ) { title, projectID, notes, billingStatus in
+                ) { title, projectID, notes, billingStatus, start, end in
                     if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         _ = timeEntryStore.addEntry(
                             title: title,
                             projectID: projectID,
                             notes: notes,
-                            start: interval.start,
-                            end: interval.end,
+                            start: start,
+                            end: end,
                             billingStatus: billingStatus
                         )
                     }
@@ -261,19 +261,21 @@ private struct IdleTimeEntrySheet: View {
     let interval: IdleInterval
     let entries: [TimeEntry]
     let projects: [TrackingProject]
-    let onSave: (String, UUID?, String, BillingStatus) -> Void
+    let onSave: (String, UUID?, String, BillingStatus, Date, Date) -> Void
     let onSkip: () -> Void
 
     @State private var title = ""
     @State private var projectID: UUID?
     @State private var notes = ""
     @State private var billingStatus: BillingStatus
+    @State private var start: Date
+    @State private var end: Date
 
     init(
         interval: IdleInterval,
         entries: [TimeEntry],
         projects: [TrackingProject],
-        onSave: @escaping (String, UUID?, String, BillingStatus) -> Void,
+        onSave: @escaping (String, UUID?, String, BillingStatus, Date, Date) -> Void,
         onSkip: @escaping () -> Void
     ) {
         self.interval = interval
@@ -282,14 +284,45 @@ private struct IdleTimeEntrySheet: View {
         self.onSave = onSave
         self.onSkip = onSkip
         _billingStatus = State(initialValue: .billable)
+        _start = State(initialValue: interval.start)
+        _end = State(initialValue: interval.end)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             Label("What did you do while away?", systemImage: "moon.zzz")
                 .font(.system(size: 18, weight: .bold))
-            Text("Idle interval: \(formatTime(interval.start))–\(formatTime(interval.end)) · \(formatDuration(interval.durationSeconds))")
+            Text("Idle interval: \(formatTime(start))–\(formatTime(end)) · \(formatDuration(durationSeconds))")
                 .font(.system(size: 11))
+                .foregroundStyle(MetridayTheme.secondary)
+
+            HStack(spacing: 7) {
+                Label("Adjust time", systemImage: "arrow.left.and.right")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(MetridayTheme.secondary)
+                Spacer()
+                Button("prev") { alignToPreviousEntry() }
+                    .buttonStyle(.bordered)
+                    .disabled(previousEntryEnd == nil)
+                    .help("Align the start to the previous time entry")
+                    .accessibilityIdentifier("idle-prompt.previous")
+                Button("−5m") { shift(by: -adjustmentMinutes) }
+                    .buttonStyle(.bordered)
+                    .help("Shift both times by 5 minutes (⌥ 1 minute, ⌘ 15 minutes)")
+                    .accessibilityIdentifier("idle-prompt.minus-five")
+                Button("+5m") { shift(by: adjustmentMinutes) }
+                    .buttonStyle(.bordered)
+                    .help("Shift both times by 5 minutes (⌥ 1 minute, ⌘ 15 minutes)")
+                    .accessibilityIdentifier("idle-prompt.plus-five")
+                Button("next") { alignToNextEntry() }
+                    .buttonStyle(.bordered)
+                    .disabled(nextEntryStart == nil)
+                    .help("Align the end to the next time entry")
+                    .accessibilityIdentifier("idle-prompt.next")
+            }
+
+            Text("⌥ 1m · ⌘ 15m")
+                .font(.system(size: 10))
                 .foregroundStyle(MetridayTheme.secondary)
 
             TimeEntryTitleField(
@@ -324,11 +357,14 @@ private struct IdleTimeEntrySheet: View {
                 }
                 Spacer()
                 Button("Save Time Entry") {
-                    onSave(title, projectID, notes, billingStatus)
+                    onSave(title, projectID, notes, billingStatus, start, end)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || end <= start
+                    )
             }
         }
         .padding(24)
@@ -336,6 +372,60 @@ private struct IdleTimeEntrySheet: View {
         .onChange(of: projectID) { _, newProjectID in
             billingStatus = resolvedProjectBillingStatus(for: newProjectID, in: projects)
         }
+    }
+
+    private var durationSeconds: Int {
+        max(1, Int(end.timeIntervalSince(start).rounded()))
+    }
+
+    private var adjustmentMinutes: Int {
+        let modifiers = NSEvent.modifierFlags
+        if modifiers.contains(.command) { return 15 }
+        if modifiers.contains(.option) { return 1 }
+        return 5
+    }
+
+    private var previousEntryEnd: Date? {
+        entries
+            .filter { $0.end <= start }
+            .max { $0.end < $1.end }?
+            .end
+    }
+
+    private var nextEntryStart: Date? {
+        entries
+            .filter { $0.start >= end }
+            .min { $0.start < $1.start }?
+            .start
+    }
+
+    private func shift(by minutes: Int) {
+        let delta = TimeInterval(minutes * 60)
+        start = start.addingTimeInterval(delta)
+        end = end.addingTimeInterval(delta)
+    }
+
+    private func alignToPreviousEntry() {
+        guard let boundary = previousEntryEnd else { return }
+        shiftInterval(toStart: boundary)
+    }
+
+    private func alignToNextEntry() {
+        guard let boundary = nextEntryStart else { return }
+        shiftInterval(toEnd: boundary)
+    }
+
+    private func shiftInterval(toStart target: Date? = nil, toEnd endTarget: Date? = nil) {
+        let delta: TimeInterval
+        if let target {
+            delta = target.timeIntervalSince(start)
+        } else if let endTarget {
+            delta = endTarget.timeIntervalSince(end)
+        } else {
+            return
+        }
+        start = start.addingTimeInterval(delta)
+        end = end.addingTimeInterval(delta)
     }
 
     private func formatTime(_ date: Date) -> String {
