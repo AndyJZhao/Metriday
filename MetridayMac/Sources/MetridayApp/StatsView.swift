@@ -78,6 +78,15 @@ struct StatsView: View {
                             .pickerStyle(.segmented)
                             .frame(width: 250)
                             .accessibilityIdentifier("stats.period-picker")
+                            ShareLink(
+                                item: statsShareText,
+                                subject: Text("Metriday Stats"),
+                                message: Text("Time overview for \(periodRangeLabel)")
+                            ) {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("stats.share")
                             Button("Open Activities") {
                                 appState.section = .activities
                             }
@@ -752,6 +761,11 @@ struct StatsView: View {
         return statsPeriod == .year
             ? formatter.string(from: first)
             : "\(formatter.string(from: first))–\(formatter.string(from: last))"
+    }
+
+    private var statsShareText: String {
+        let categories = categoryPoints.prefix(5).map { "\($0.name): \(formatSeconds($0.seconds))" }.joined(separator: "\n")
+        return "Metriday Stats\n\(statsPeriod.label) · \(periodRangeLabel)\nTotal time: \(formatSeconds(totalActiveSeconds))\nProductivity score: \(productivityScore)%\nRelated time: \(formatSeconds(periodSummary.relatedDurationSeconds))\nDistraction: \(formatSeconds(periodSummary.distractedDurationSeconds))\n\nTop categories\n\(categories)"
     }
 
     private func dates(in interval: DateInterval) -> [Date] {
