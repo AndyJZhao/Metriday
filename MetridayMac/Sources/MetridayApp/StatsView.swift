@@ -499,7 +499,7 @@ struct StatsView: View {
             }
 
             if categoryPoints.isEmpty {
-                Text("No categorized activity in this week yet.")
+                Text("No categorized activity in this period yet.")
                     .font(.system(size: 12))
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
@@ -528,22 +528,9 @@ struct StatsView: View {
                     }
                     .frame(width: 170, height: 170)
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 11) {
                         ForEach(categoryPoints) { point in
-                            HStack(spacing: 7) {
-                                Circle()
-                                    .fill(point.color)
-                                    .frame(width: 8, height: 8)
-                                Text(point.name)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .lineLimit(1)
-                                Spacer(minLength: 6)
-                                Text("\(point.percentage)%")
-                                    .font(.system(size: 10, weight: .semibold))
-                                Text(formatSeconds(point.seconds))
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(MetridayTheme.secondary)
-                            }
+                            categoryProgressRow(point)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -554,6 +541,40 @@ struct StatsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .metridayPanel()
         .accessibilityIdentifier("stats.categories")
+    }
+
+    private func categoryProgressRow(_ point: StatsCategoryPoint) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 7) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(point.color)
+                        .frame(width: 8, height: 8)
+                    Text(point.name)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Text("\(point.percentage)%")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(formatSeconds(point.seconds))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(MetridayTheme.secondary)
+            }
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.gray.opacity(0.12))
+                    Capsule()
+                        .fill(point.color)
+                        .frame(width: max(4, proxy.size.width * CGFloat(point.seconds) / CGFloat(maxCategorySeconds)))
+                }
+            }
+            .frame(height: 8)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(point.name), \(point.percentage) percent, \(formatSeconds(point.seconds))")
     }
 
     private var projectChart: some View {
@@ -958,6 +979,10 @@ struct StatsView: View {
             )
         }
         .sorted { $0.seconds > $1.seconds }
+    }
+
+    private var maxCategorySeconds: Int {
+        max(1, categoryPoints.map(\.seconds).max() ?? 1)
     }
 
     private var applicationPoints: [StatsApplicationPoint] {

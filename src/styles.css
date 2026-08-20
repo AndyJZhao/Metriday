@@ -455,6 +455,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-project-scope-hint { margin: 12px 7px 2px; color: var(--muted); font-size: 9px; line-height: 1.45; }
 .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; max-width: 1120px; margin: 0 auto; }
 .stats-panel { min-width: 0; padding: 22px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.stats-category-panel { grid-column: 1 / -1; }
 .stats-unit-picker { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
 .stats-unit-picker select { min-height: 26px; padding: 3px 22px 3px 7px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--ink); font: inherit; }
 .stats-period-picker { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
@@ -494,10 +495,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .stats-ranking-row > i b { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
 .stats-ranking-row > strong { color: #353a44; font-size: 11px; white-space: nowrap; }
 .stats-category-list { display: grid; gap: 15px; margin-top: 18px; }
+.stats-category-donut-layout { align-items: flex-start; }
+.stats-category-donut-layout .stats-category-list { flex: 1; min-width: 0; margin-top: 0; }
 .stats-category-row { display: grid; gap: 7px; }
 .stats-category-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 9px; color: #353a44; font-size: 12px; }
 .stats-category-name { display: flex; align-items: center; min-width: 0; gap: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stats-category-name i { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; }
+.stats-category-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stats-category-heading strong { font-size: 12px; }
 .stats-category-heading small { min-width: 48px; color: var(--muted); font-size: 10px; text-align: right; }
 .stats-category-track { height: 8px; overflow: hidden; border-radius: 99px; background: #eff0f3; }
