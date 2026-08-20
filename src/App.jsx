@@ -2088,22 +2088,40 @@ function TimeEntriesPanel({ api, dateKey }) {
   const [billingStatus, setBillingStatus] = useState("billable");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [overlapEntries, setOverlapEntries] = useState([]);
   const [editingEntryID, setEditingEntryID] = useState(null);
   const entries = [...api.entries].sort((left, right) => new Date(left.start_date || left.start) - new Date(right.start_date || right.start));
   const projects = [...api.projects].sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
-  const submit = async (event) => {
-    event.preventDefault();
+  const submit = async (event, overlapDecision = null) => {
+    event?.preventDefault();
     const startDate = localEntryDate(dateKey, start);
     const endDate = localEntryDate(dateKey, end);
     if (!title.trim() || !startDate || !endDate || new Date(endDate) <= new Date(startDate)) {
       setMessage("Enter a title and a valid time range.");
       return;
     }
+    if (overlapDecision === null && overlapEntries.length === 0) {
+      const startSecond = Number(start.slice(0, 2)) * 3_600 + Number(start.slice(3, 5)) * 60;
+      const endSecond = Number(end.slice(0, 2)) * 3_600 + Number(end.slice(3, 5)) * 60;
+      const overlaps = entries.filter((entry) => {
+        const range = entrySecondsForDate(entry, dateKey);
+        return range && range.startSecond < endSecond && range.endSecond > startSecond;
+      });
+      if (overlaps.length > 0) {
+        setOverlapEntries(overlaps);
+        setMessage(`This range overlaps ${overlaps.length} existing time ${overlaps.length === 1 ? "entry" : "entries"}.`);
+        return;
+      }
+    }
     setBusy(true);
     setMessage("");
     try {
+      if (overlapDecision === "replace" && overlapEntries.length > 0) {
+        await api.deleteTimeEntries(overlapEntries.map((entry) => entryID(entry)));
+      }
       await api.addTimeEntry({ title: title.trim(), start: startDate, end: endDate, projectID: project ? resourceID(project) : undefined, billingStatus });
       setTitle("");
+      setOverlapEntries([]);
       setMessage("Time entry saved locally.");
     } catch (error) {
       setMessage(error.message || "Could not save the time entry.");
@@ -3450,6 +3468,7 @@ function WebTimeEntryDialog({ mode, open, api, projects, recentEntries, dateKey,
   const [estimatedMinutes, setEstimatedMinutes] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [overlapEntries, setOverlapEntries] = useState([]);
   useEffect(() => {
     if (!open) return;
     setTitle(timerMode ? "Focused work" : initialEntry?.title || "");
@@ -3461,6 +3480,7 @@ function WebTimeEntryDialog({ mode, open, api, projects, recentEntries, dateKey,
     setEstimatedMinutes("");
     setBusy(false);
     setMessage("");
+    setOverlapEntries([]);
   }, [dateKey, initialEntry, open, timerMode]);
   useEffect(() => {
     if (!open) return undefined;
@@ -3479,7 +3499,7 @@ function WebTimeEntryDialog({ mode, open, api, projects, recentEntries, dateKey,
     const project = projects.find((item) => resourceID(item.id) === value);
     if (project) setBillingStatus(project.default_billing_status || "billable");
   };
-  const submit = async () => {
+  const submit = async (overlapDecision = null) => {
     if (busy || !title.trim() || !api.connected) return;
     const startDate = localEntryDate(dateKey, start);
     const endDate = localEntryDate(dateKey, end);
@@ -3487,14 +3507,31 @@ function WebTimeEntryDialog({ mode, open, api, projects, recentEntries, dateKey,
       setMessage("Enter a valid time range.");
       return;
     }
+    if (!timerMode && overlapDecision === null && overlapEntries.length === 0) {
+      const startSecond = Number(start.slice(0, 2)) * 3_600 + Number(start.slice(3, 5)) * 60;
+      const endSecond = Number(end.slice(0, 2)) * 3_600 + Number(end.slice(3, 5)) * 60;
+      const overlaps = api.entries.filter((entry) => {
+        const range = entrySecondsForDate(entry, dateKey);
+        return range && range.startSecond < endSecond && range.endSecond > startSecond;
+      });
+      if (overlaps.length > 0) {
+        setOverlapEntries(overlaps);
+        setMessage(`This range overlaps ${overlaps.length} existing time ${overlaps.length === 1 ? "entry" : "entries"}.`);
+        return;
+      }
+    }
     setBusy(true);
     setMessage("");
     try {
       if (timerMode) {
         await api.startTimer(title.trim(), projectID ? resourceID(projectID) : undefined, { notes, billingStatus, estimatedMinutes: estimatedMinutes ? Number(estimatedMinutes) : undefined });
       } else {
+        if (overlapDecision === "replace" && overlapEntries.length > 0) {
+          await api.deleteTimeEntries(overlapEntries.map((entry) => entryID(entry)));
+        }
         await api.addTimeEntry({ title: title.trim(), projectID: projectID ? resourceID(projectID) : undefined, notes, billingStatus, start: startDate, end: endDate });
       }
+      setOverlapEntries([]);
       onClose();
     } catch (error) {
       setMessage(error.message || `Could not ${timerMode ? "start the timer" : "save the time entry"}.`);
@@ -3504,7 +3541,7 @@ function WebTimeEntryDialog({ mode, open, api, projects, recentEntries, dateKey,
   };
   if (!open) return null;
   const recent = recentEntries.filter((entry) => !entry.is_running).slice(-5).reverse();
-  return <div className="entry-omatic-backdrop" role="presentation" onClick={onClose}><section className="entry-omatic-dialog time-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="time-entry-dialog-title" onClick={(event) => event.stopPropagation()}><header><div><span>{timerMode ? "Focus session" : "Manual time"}</span><h2 id="time-entry-dialog-title">{timerMode ? "Start Timer" : "New Time Entry"}</h2><p>{timerMode ? "The timer will capture activity until you stop it." : `Record a time entry for ${dateKey}.`}</p></div><IconButton label="Close time entry dialog" onClick={onClose}><X size={17} /></IconButton></header><div className="entry-omatic-form">{timerMode && recent.length > 0 ? <div className="time-entry-recent"><strong>Recent timers</strong>{recent.map((entry) => <button type="button" key={entry.id} onClick={() => selectRecent(entry)}><Clock size={14} /><span><b>{entry.title || "Untitled"}</b><small>{projectTitleFor(projects, entry.project)}</small></span></button>)}</div> : null}<label>{timerMode ? "What are you working on?" : "Time entry title"}<input aria-label={timerMode ? "Time entry title" : "Time entry title"} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={timerMode ? "Focused work" : "What did you work on?"} /></label>{!timerMode ? <div className="entry-omatic-options"><label>From<input aria-label="From" type="time" value={start} onChange={(event) => setStart(event.target.value)} /></label><label>To<input aria-label="To" type="time" value={end} onChange={(event) => setEnd(event.target.value)} /></label></div> : null}<label>Project<select aria-label="Project" value={projectID} onChange={(event) => updateProject(event.target.value)}><option value="">Unassigned</option>{projects.map((project) => <option value={resourceID(project.id)} key={project.id}>{project.title}</option>)}</select></label><label>Billing status<select aria-label="Billing status" value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)}><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select></label>{timerMode ? <label>Estimated duration<select aria-label="Estimated duration" value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(event.target.value)}><option value="">No estimate</option>{[15, 30, 45, 60, 90, 120, 180, 240].map((minutes) => <option value={minutes} key={minutes}>{minutes >= 60 ? `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ""}` : `${minutes}m`}</option>)}</select></label> : null}<label>Notes (optional)<textarea aria-label="Notes (optional)" value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} /></label></div>{message ? <p className="entry-message" role="status">{message}</p> : null}<footer><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" onClick={submit} disabled={busy || !api.connected || !title.trim()}>{busy ? "Saving…" : timerMode ? "Start Timer" : "Save Time Entry"}</button></footer></section></div>;
+  return <div className="entry-omatic-backdrop" role="presentation" onClick={onClose}><section className="entry-omatic-dialog time-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="time-entry-dialog-title" onClick={(event) => event.stopPropagation()}><header><div><span>{timerMode ? "Focus session" : "Manual time"}</span><h2 id="time-entry-dialog-title">{timerMode ? "Start Timer" : "New Time Entry"}</h2><p>{timerMode ? "The timer will capture activity until you stop it." : `Record a time entry for ${dateKey}.`}</p></div><IconButton label="Close time entry dialog" onClick={onClose}><X size={17} /></IconButton></header><div className="entry-omatic-form">{timerMode && recent.length > 0 ? <div className="time-entry-recent"><strong>Recent timers</strong>{recent.map((entry) => <button type="button" key={entry.id} onClick={() => selectRecent(entry)}><Clock size={14} /><span><b>{entry.title || "Untitled"}</b><small>{projectTitleFor(projects, entry.project)}</small></span></button>)}</div> : null}<label>{timerMode ? "What are you working on?" : "Time entry title"}<input aria-label={timerMode ? "Time entry title" : "Time entry title"} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={timerMode ? "Focused work" : "What did you work on?"} /></label>{!timerMode ? <div className="entry-omatic-options"><label>From<input aria-label="From" type="time" value={start} onChange={(event) => { setStart(event.target.value); setOverlapEntries([]); }} /></label><label>To<input aria-label="To" type="time" value={end} onChange={(event) => { setEnd(event.target.value); setOverlapEntries([]); }} /></label></div> : null}<label>Project<select aria-label="Project" value={projectID} onChange={(event) => updateProject(event.target.value)}><option value="">Unassigned</option>{projects.map((project) => <option value={resourceID(project.id)} key={project.id}>{project.title}</option>)}</select></label><label>Billing status<select aria-label="Billing status" value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)}><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select></label>{timerMode ? <label>Estimated duration<select aria-label="Estimated duration" value={estimatedMinutes} onChange={(event) => setEstimatedMinutes(event.target.value)}><option value="">No estimate</option>{[15, 30, 45, 60, 90, 120, 180, 240].map((minutes) => <option value={minutes} key={minutes}>{minutes >= 60 ? `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ""}` : `${minutes}m`}</option>)}</select></label> : null}<label>Notes (optional)<textarea aria-label="Notes (optional)" value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} /></label></div>{overlapEntries.length > 0 ? <div className="time-entry-overlap-callout" role="alert"><strong>Overlapping Time Entry</strong><p>This range overlaps {overlapEntries.length} existing time {overlapEntries.length === 1 ? "entry" : "entries"}. Replace them or keep parallel entries?</p><div><button type="button" className="secondary-button" onClick={() => { setOverlapEntries([]); setMessage(""); }}>Cancel</button><button type="button" className="secondary-button" onClick={() => submit("keep")} disabled={busy}>Keep Both</button><button type="button" className="secondary-button danger-pill" onClick={() => submit("replace")} disabled={busy}>Replace Existing</button></div></div> : null}{message ? <p className="entry-message" role="status">{message}</p> : null}<footer><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" onClick={submit} disabled={busy || !api.connected || !title.trim() || overlapEntries.length > 0}>{busy ? "Saving…" : timerMode ? "Start Timer" : "Save Time Entry"}</button></footer></section></div>;
 }
 
 function WebTimeEntryEditDialog({ entry, api, projects, dateKey, onClose }) {
