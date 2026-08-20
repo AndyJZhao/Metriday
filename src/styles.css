@@ -1011,7 +1011,11 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .project-auto-rules-toggle input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
 .project-auto-rules-toggle small { flex-basis: 100%; margin-left: 20px; color: var(--muted); font-size: 10px; }
 .project-table { margin-top: 18px; border-top: 1px solid var(--border); }
+.project-root-drop-zone { display: flex; align-items: center; gap: 7px; min-height: 32px; margin-top: 16px; padding: 0 10px; border: 1px dashed var(--border); border-radius: 7px; color: var(--muted); font-size: 10px; }
+.project-root-drop-zone.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .project-row { display: grid; grid-template-columns: 10px minmax(150px, 1fr) minmax(120px, 1fr) 110px 70px 130px; align-items: center; gap: 10px; min-height: 48px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
+.project-row[draggable="true"] { cursor: grab; }
+.project-row[draggable="true"]:active { cursor: grabbing; }
 .project-edit-card { padding: 16px 0; border-bottom: 1px solid #eceef1; }
 .project-edit-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .project-edit-fields > label { display: grid; gap: 5px; color: #555b66; font-size: 10px; font-weight: 650; }
