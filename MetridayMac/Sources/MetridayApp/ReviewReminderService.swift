@@ -99,7 +99,7 @@ final class ReviewReminderService: ObservableObject {
 
         let content = UNMutableNotificationContent()
         content.title = "Review your activities"
-        content.body = "(durationLabel(summary.activeDurationSeconds)) active today · (summary.relatedMinutes)m focused · (summary.distractedMinutes)m distracting."
+        content.body = "\(durationLabel(summary.activeMinutes * 60)) active today · \(summary.relatedMinutes)m focused · \(summary.distractedMinutes)m distracting."
         content.sound = .default
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
