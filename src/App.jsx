@@ -3696,7 +3696,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
           </div> : null}
         </section>;
       })}
-      {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} /> : null}
+      {contextMenu ? <ActivityContextMenu activity={contextMenu.activity} x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)} onSelect={onSelect} onCreateTimeEntry={onCreateTimeEntry} selectedCount={selectedActivityIDs.size} onCreateSelectedTimeEntries={onCreateSelectedTimeEntries} onDeleteSelectedActivities={onDeleteSelectedActivities} /> : null}
     </div>;
   }
   const grouped = groupedFor(rows, grouping);
