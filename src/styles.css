@@ -679,7 +679,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .report-metrics strong { color: #282b32; font-size: 18px; }
 .report-table { margin-top: 20px; border-top: 1px solid var(--border); }
 .report-table-head, .report-table-row { display: grid; grid-template-columns: minmax(180px, 1fr) 120px 180px 80px 100px; align-items: center; gap: 10px; min-height: 42px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 11px; }
-.report-table-head { color: var(--muted); font-weight: 650; }
+.report-table-head { position: sticky; top: 0; z-index: 1; color: var(--muted); font-weight: 650; background: var(--canvas); }
+.report-table-body { max-height: 560px; overflow: auto; }
 .report-table-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
 .report-table-row small { color: var(--muted); }
 .status-pill { display: inline-flex; align-items: center; gap: 7px; }
