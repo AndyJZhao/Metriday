@@ -2,6 +2,7 @@ import Charts
 import SwiftUI
 
 private enum StatsPeriod: String, CaseIterable, Identifiable {
+    case day
     case week
     case month
     case year
@@ -10,6 +11,7 @@ private enum StatsPeriod: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
+        case .day: return "Today"
         case .week: return "This Week"
         case .month: return "This Month"
         case .year: return "This Year"
@@ -18,7 +20,7 @@ private enum StatsPeriod: String, CaseIterable, Identifiable {
 
     var chartTitle: String {
         switch self {
-        case .week: return "Time by Day"
+        case .day, .week: return "Time by Day"
         case .month, .year: return "Time by Week"
         }
     }
@@ -735,6 +737,8 @@ struct StatsView: View {
 
     private var periodDates: [Date] {
         switch statsPeriod {
+        case .day:
+            return [calendar.startOfDay(for: selectedDate)]
         case .week:
             guard let interval = calendar.dateInterval(of: .weekOfYear, for: selectedDate) else {
                 return [selectedDate]
@@ -758,6 +762,9 @@ struct StatsView: View {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = statsPeriod == .year ? "MMM yyyy" : "MMM d"
+        if statsPeriod == .day {
+            return formatter.string(from: first)
+        }
         return statsPeriod == .year
             ? formatter.string(from: first)
             : "\(formatter.string(from: first))–\(formatter.string(from: last))"
@@ -832,7 +839,7 @@ struct StatsView: View {
     private var periodPoints: [StatsDayPoint] {
         let buckets: [StatsPeriodBucket]
         switch statsPeriod {
-        case .week:
+        case .day, .week:
             buckets = periodDates.map { StatsPeriodBucket(label: dayLabel($0), dates: [$0]) }
         case .month, .year:
             buckets = stride(from: 0, to: periodDates.count, by: 7).map { start in
