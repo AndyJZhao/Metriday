@@ -435,9 +435,9 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Time by Category")
+                    Text("Productivity pulse")
                         .font(.system(size: 14, weight: .bold))
-                    Text("Active App, website, and item time")
+                    Text("Category-weighted activity quality")
                         .font(.system(size: 10))
                         .foregroundStyle(MetridayTheme.secondary)
                 }
@@ -452,17 +452,28 @@ struct StatsView: View {
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
                 HStack(alignment: .center, spacing: 14) {
-                    Chart {
-                        ForEach(categoryPoints) { point in
-                            SectorMark(
-                                angle: .value("Time", point.seconds),
-                                innerRadius: .ratio(0.62),
-                                angularInset: 1.5
-                            )
-                            .foregroundStyle(point.color)
+                    ZStack {
+                        Chart {
+                            ForEach(categoryPoints) { point in
+                                SectorMark(
+                                    angle: .value("Time", point.seconds),
+                                    innerRadius: .ratio(0.62),
+                                    angularInset: 1.5
+                                )
+                                .foregroundStyle(point.color)
+                            }
+                        }
+                        .chartLegend(.hidden)
+
+                        VStack(spacing: 1) {
+                            Text(totalActiveSeconds > 0 ? "\(productivityScore)" : "—")
+                                .font(.system(size: 27, weight: .bold))
+                                .foregroundStyle(MetridayTheme.graphite)
+                            Text("score")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(MetridayTheme.secondary)
                         }
                     }
-                    .chartLegend(.hidden)
                     .frame(width: 170, height: 170)
 
                     VStack(alignment: .leading, spacing: 8) {
