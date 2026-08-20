@@ -3207,6 +3207,17 @@ private struct ActivityCategoryEditorSheet: View {
                         Text(color.rawValue.capitalized).tag(color)
                     }
                 }
+                .disabled(draft.role == .focused || draft.role == .distracting)
+            }
+            .onChange(of: draft.role) { _, role in
+                switch role {
+                case .focused:
+                    draft.color = .blue
+                case .distracting:
+                    draft.color = .red
+                case .other, .idle:
+                    break
+                }
             }
 
             Picker("Match", selection: $draft.matchMode) {

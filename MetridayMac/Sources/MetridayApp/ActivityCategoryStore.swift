@@ -59,7 +59,14 @@ struct ActivityCategoryDefinition: Identifiable, Hashable, Codable {
         self.id = id
         self.name = name
         self.role = role
-        self.color = color ?? role.defaultColor
+        switch role {
+        case .focused:
+            self.color = .blue
+        case .distracting:
+            self.color = .red
+        case .other, .idle:
+            self.color = color ?? role.defaultColor
+        }
         self.matchMode = matchMode
         self.rules = rules
         self.isSystem = isSystem
