@@ -651,6 +651,26 @@ function activityIcon(activity) {
   return Browsers;
 }
 
+function activityApplicationGroupName(activity, displayPreferences = null) {
+  const resource = String(activity?.resource || "").trim();
+  if (displayPreferences?.group_websites_independently && resource) {
+    try {
+      const host = new URL(resource).host;
+      if (host) return host;
+    } catch {
+      // Continue with the normal application grouping.
+    }
+  }
+  if (displayPreferences?.group_paths_independently && resource) {
+    try {
+      if (!new URL(resource).host) return resource.replace(/^file:\/\//, "");
+    } catch {
+      return resource.replace(/^file:\/\//, "");
+    }
+  }
+  return activity?.appName || activity?.deviceName || "Unknown App";
+}
+
 function activityCategory(activity) {
   const categoryRole = String(activity?.categoryRole || "").toLowerCase();
   if (["focused", "distracting", "other", "idle"].includes(categoryRole)) {
@@ -2836,9 +2856,9 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
   }
   const groupedFor = (items, groupingMode, keyPrefix = "") => [...items.reduce((groups, activity) => {
     const category = activityCategory(activity);
-    const rawKey = groupingMode === "category" ? `${category.key}:${category.label}` : groupingMode === "project" ? resourceID(activity.projectID) || "unassigned" : groupingMode === "device" ? activity.deviceName || "This Mac" : activity.appName || activity.deviceName || "Unknown App";
+    const rawKey = groupingMode === "category" ? `${category.key}:${category.label}` : groupingMode === "project" ? resourceID(activity.projectID) || "unassigned" : groupingMode === "device" ? activity.deviceName || "This Mac" : activityApplicationGroupName(activity, displayPreferences);
     const key = `${keyPrefix}${rawKey}`;
-    const label = groupingMode === "category" ? category.label : groupingMode === "project" ? projectTitleFor(projects, activity.projectID) : groupingMode === "device" ? activity.deviceName || "This Mac" : activity.appName || activity.deviceName || "Unknown App";
+    const label = groupingMode === "category" ? category.label : groupingMode === "project" ? projectTitleFor(projects, activity.projectID) : groupingMode === "device" ? activity.deviceName || "This Mac" : activityApplicationGroupName(activity, displayPreferences);
     const existing = groups.get(key) || { key, label, category, categories: new Map(), activities: [], seconds: 0 };
     existing.categories.set(`${category.key}:${category.label}:${category.color}`, category);
     existing.activities.push(activity);
@@ -3269,10 +3289,12 @@ function WebActivityDisplayMenu({ open, onToggle, preferences, devices, onChange
     include_time_entries: true,
     show_window_titles: true,
     show_resource_paths: true,
+    group_websites_independently: false,
+    group_paths_independently: false,
     activity_time_range: "selectedDay",
     selected_device: "All Devices",
   };
-  return <div className="activity-display-menu"><button type="button" className={`quiet-pill activity-display-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />Display</button>{open ? <div className="activity-display-popover" role="dialog" aria-label="Activity display settings"><strong>Display settings</strong><label><input type="checkbox" checked={Boolean(values.include_time_entries)} onChange={(event) => onChange({ include_time_entries: event.target.checked })} />Include time entries</label><label><input type="checkbox" checked={Boolean(values.show_window_titles)} onChange={(event) => onChange({ show_window_titles: event.target.checked })} />Show window titles</label><label><input type="checkbox" checked={Boolean(values.show_resource_paths)} onChange={(event) => onChange({ show_resource_paths: event.target.checked })} />Show website paths</label><label className="activity-display-select">Activity range<select value={values.activity_time_range || "selectedDay"} onChange={(event) => onChange({ activity_time_range: event.target.value })}><option value="selectedDay">Selected day</option><option value="lastSevenDays">Last 7 days</option></select></label></div> : null}</div>;
+  return <div className="activity-display-menu"><button type="button" className={`quiet-pill activity-display-button ${open ? "active" : ""}`} onClick={onToggle} aria-expanded={open} aria-haspopup="dialog"><SlidersHorizontal size={15} />Display</button>{open ? <div className="activity-display-popover" role="dialog" aria-label="Activity display settings"><strong>Display settings</strong><label><input type="checkbox" checked={Boolean(values.include_time_entries)} onChange={(event) => onChange({ include_time_entries: event.target.checked })} />Include time entries</label><label><input type="checkbox" checked={Boolean(values.show_window_titles)} onChange={(event) => onChange({ show_window_titles: event.target.checked })} />Show window titles</label><label><input type="checkbox" checked={Boolean(values.show_resource_paths)} onChange={(event) => onChange({ show_resource_paths: event.target.checked })} />Show website paths</label><label><input type="checkbox" checked={Boolean(values.group_websites_independently)} onChange={(event) => onChange({ group_websites_independently: event.target.checked })} />Group websites independently of browser</label><label><input type="checkbox" checked={Boolean(values.group_paths_independently)} onChange={(event) => onChange({ group_paths_independently: event.target.checked })} />Group paths independently of app</label><label className="activity-display-select">Activity range<select value={values.activity_time_range || "selectedDay"} onChange={(event) => onChange({ activity_time_range: event.target.value })}><option value="selectedDay">Selected day</option><option value="lastSevenDays">Last 7 days</option></select></label></div> : null}</div>;
 }
 
 function WebActivityDevicesMenu({ open, devices, selectedDevice, hideDevicesWithoutTime, onToggle, onSelect, onToggleHide }) {

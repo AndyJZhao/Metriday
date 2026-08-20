@@ -43,6 +43,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
     @Published var includeTimeEntries: Bool { didSet { persist() } }
     @Published var showWindowTitles: Bool { didSet { persist() } }
     @Published var showResourcePaths: Bool { didSet { persist() } }
+    @Published var groupWebsitesIndependently: Bool { didSet { persist() } }
+    @Published var groupPathsIndependently: Bool { didSet { persist() } }
     @Published var activityTimeRange: ActivityTimeRange { didSet { persist() } }
     @Published var activityDisplayMode: String { didSet { persist() } }
     @Published var groupByProject: Bool { didSet { persist() } }
@@ -61,6 +63,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTimeEntries = payload.includeTimeEntries
             showWindowTitles = payload.showWindowTitles
             showResourcePaths = payload.showResourcePaths
+            groupWebsitesIndependently = payload.groupWebsitesIndependently
+            groupPathsIndependently = payload.groupPathsIndependently
             activityTimeRange = payload.activityTimeRange
             activityDisplayMode = payload.activityDisplayMode
             groupByProject = payload.groupByProject
@@ -72,6 +76,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTimeEntries = true
             showWindowTitles = true
             showResourcePaths = true
+            groupWebsitesIndependently = false
+            groupPathsIndependently = false
             activityTimeRange = .selectedDay
             activityDisplayMode = "chronological"
             groupByProject = true
@@ -93,6 +99,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
                 includeTimeEntries: includeTimeEntries,
                 showWindowTitles: showWindowTitles,
                 showResourcePaths: showResourcePaths,
+                groupWebsitesIndependently: groupWebsitesIndependently,
+                groupPathsIndependently: groupPathsIndependently,
                 activityTimeRange: activityTimeRange,
                 activityDisplayMode: activityDisplayMode,
                 groupByProject: groupByProject,
@@ -121,6 +129,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
         let includeTimeEntries: Bool
         let showWindowTitles: Bool
         let showResourcePaths: Bool
+        let groupWebsitesIndependently: Bool
+        let groupPathsIndependently: Bool
         let activityTimeRange: ActivityTimeRange
         let activityDisplayMode: String
         let groupByProject: Bool
@@ -133,6 +143,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTimeEntries: Bool,
             showWindowTitles: Bool,
             showResourcePaths: Bool,
+            groupWebsitesIndependently: Bool,
+            groupPathsIndependently: Bool,
             activityTimeRange: ActivityTimeRange,
             activityDisplayMode: String,
             groupByProject: Bool,
@@ -144,6 +156,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
             self.includeTimeEntries = includeTimeEntries
             self.showWindowTitles = showWindowTitles
             self.showResourcePaths = showResourcePaths
+            self.groupWebsitesIndependently = groupWebsitesIndependently
+            self.groupPathsIndependently = groupPathsIndependently
             self.activityTimeRange = activityTimeRange
             self.activityDisplayMode = activityDisplayMode
             self.groupByProject = groupByProject
@@ -158,6 +172,8 @@ final class ActivitiesPreferencesStore: ObservableObject {
             includeTimeEntries = try container.decodeIfPresent(Bool.self, forKey: .includeTimeEntries) ?? true
             showWindowTitles = try container.decodeIfPresent(Bool.self, forKey: .showWindowTitles) ?? true
             showResourcePaths = try container.decodeIfPresent(Bool.self, forKey: .showResourcePaths) ?? true
+            groupWebsitesIndependently = try container.decodeIfPresent(Bool.self, forKey: .groupWebsitesIndependently) ?? false
+            groupPathsIndependently = try container.decodeIfPresent(Bool.self, forKey: .groupPathsIndependently) ?? false
             activityTimeRange = try container.decodeIfPresent(ActivityTimeRange.self, forKey: .activityTimeRange) ?? .selectedDay
             activityDisplayMode = try container.decodeIfPresent(String.self, forKey: .activityDisplayMode) ?? "chronological"
             groupByProject = try container.decodeIfPresent(Bool.self, forKey: .groupByProject) ?? true

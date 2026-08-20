@@ -1474,9 +1474,7 @@ struct ActivitiesView: View {
 
     private func unifiedAppGroups(for projectGroup: ActivityGroup) -> [ActivityGroup] {
         Dictionary(grouping: projectGroup.segments) { segment in
-            segment.appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "Unknown application"
-                : segment.appName
+            unifiedGroupName(for: segment)
         }
         .map { name, segments in
             ActivityGroup(
@@ -1489,6 +1487,22 @@ struct ActivitiesView: View {
             if first.seconds == second.seconds { return first.name < second.name }
             return first.seconds > second.seconds
         }
+    }
+
+    private func unifiedGroupName(for segment: ActivitySegment) -> String {
+        if preferences.groupWebsitesIndependently,
+           let host = URL(string: segment.resource)?.host,
+           !host.isEmpty {
+            return host
+        }
+        if preferences.groupPathsIndependently,
+           !segment.resource.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           URL(string: segment.resource)?.host == nil {
+            return resourceLabel(segment.resource)
+        }
+        return segment.appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Unknown application"
+            : segment.appName
     }
 
     private var groupedActivityListByDevice: some View {
@@ -2916,6 +2930,11 @@ private struct ActivityDisplaySettingsSheet: View {
             Toggle("Show window titles", isOn: $preferences.showWindowTitles)
                 .toggleStyle(.checkbox)
             Toggle("Show website hosts and file paths", isOn: $preferences.showResourcePaths)
+                .toggleStyle(.checkbox)
+
+            Toggle("Group websites independently of their browser", isOn: $preferences.groupWebsitesIndependently)
+                .toggleStyle(.checkbox)
+            Toggle("Group file paths independently of their app", isOn: $preferences.groupPathsIndependently)
                 .toggleStyle(.checkbox)
 
             Picker("Activity usage range", selection: $preferences.activityTimeRange) {

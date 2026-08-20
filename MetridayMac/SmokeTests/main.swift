@@ -717,6 +717,8 @@ Task { @MainActor in
     activityPreferences.includeTimeEntries = false
     activityPreferences.showWindowTitles = false
     activityPreferences.activityTimeRange = .lastSevenDays
+    activityPreferences.groupWebsitesIndependently = true
+    activityPreferences.groupPathsIndependently = true
     activityPreferences.activityDisplayMode = "unified"
     activityPreferences.groupByProject = false
     activityPreferences.groupByDevice = true
@@ -726,6 +728,8 @@ Task { @MainActor in
     let reloadedActivityPreferences = ActivitiesPreferencesStore(rootDirectory: activityPreferencesRoot)
     expect(!reloadedActivityPreferences.includeTimeEntries, "Activity display preferences should persist timeline visibility")
     expect(!reloadedActivityPreferences.showWindowTitles, "Activity display preferences should persist title visibility")
+    expect(reloadedActivityPreferences.groupWebsitesIndependently, "Activity display preferences should persist independent website grouping")
+    expect(reloadedActivityPreferences.groupPathsIndependently, "Activity display preferences should persist independent path grouping")
     expect(reloadedActivityPreferences.activityTimeRange == .lastSevenDays, "Activity display preferences should persist the selected usage range")
     expect(reloadedActivityPreferences.activityDisplayMode == "unified", "Activity display mode should persist")
     expect(!reloadedActivityPreferences.groupByProject && reloadedActivityPreferences.groupByDevice, "Activity grouping preferences should persist")
