@@ -1507,10 +1507,12 @@ function TimerControls({ api }) {
       setMessage(error.message || "Could not set timer estimate.");
     }
   };
-  const adjust = async (minutes) => {
+  const adjust = async (minutes, event = null) => {
+    const magnitude = event?.altKey ? 1 : event?.metaKey ? 15 : Math.abs(minutes);
+    const effectiveMinutes = Math.sign(minutes) * magnitude;
     try {
-      await api.adjustTimer(minutes);
-      setMessage(`${minutes > 0 ? "+" : ""}${minutes} min adjustment saved`);
+      await api.adjustTimer(effectiveMinutes);
+      setMessage(`${effectiveMinutes > 0 ? "+" : ""}${effectiveMinutes} min adjustment saved`);
     } catch (error) {
       setMessage(error.message || "Could not adjust timer.");
     }
@@ -1552,7 +1554,7 @@ function TimerControls({ api }) {
   const remainingLabel = Number.isFinite(remaining)
     ? remaining >= 0 ? `${formatDurationSeconds(remaining)} remaining` : `Over by ${formatDurationSeconds(-remaining)}`
     : "Timer running";
-  return <div className="timer-controls" aria-label="Running timer controls"><span>{remainingLabel}</span><select aria-label="Timer estimate" value={timer.estimatedDurationSeconds ? Math.round(Number(timer.estimatedDurationSeconds) / 60) : ""} onChange={setEstimate}><option value="">Set estimate</option><option value={15}>15 min</option><option value={25}>25 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 hour</option><option value={90}>90 min</option><option value={120}>2 hours</option></select><details className="timer-adjust-menu" onClick={(event) => { if (event.target.closest("button")) event.currentTarget.open = false; }}><summary>Adjust</summary><div className="timer-adjust-popover"><strong>Adjust start</strong><div className="timer-adjust-grid">{[-15, -5, -1, 1, 5, 15].map((minutes) => <button type="button" key={minutes} onClick={() => adjust(minutes)}>{minutes > 0 ? `+${minutes}` : minutes}m</button>)}</div><button type="button" onClick={align}>Align to previous entry</button><strong>Estimate</strong><div className="timer-adjust-estimate-list">{[15, 30, 60].map((minutes) => <button type="button" key={minutes} onClick={() => adjustEstimate(minutes)}>Add {minutes === 60 ? "1 hour" : `${minutes} min`}</button>)}</div></div></details>{expired && dismissedTimerID !== timerID ? <div className="timer-check-in" role="alert"><strong>Timer estimate reached</strong><span>Still working on “{timer.title}”?</span><button type="button" onClick={keepWorking}>Keep working · +15m</button><button type="button" className="danger" onClick={stopTimer}>Stop timer</button><button type="button" className="quiet" onClick={() => setDismissedTimerID(timerID)}>Dismiss</button></div> : null}{message ? <small role="status">{message}</small> : null}</div>;
+  return <div className="timer-controls" aria-label="Running timer controls"><span>{remainingLabel}</span><select aria-label="Timer estimate" value={timer.estimatedDurationSeconds ? Math.round(Number(timer.estimatedDurationSeconds) / 60) : ""} onChange={setEstimate}><option value="">Set estimate</option><option value={15}>15 min</option><option value={25}>25 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 hour</option><option value={90}>90 min</option><option value={120}>2 hours</option></select><details className="timer-adjust-menu" onClick={(event) => { if (event.target.closest("button")) event.currentTarget.open = false; }}><summary>Adjust</summary><div className="timer-adjust-popover"><strong>Adjust start</strong><small className="timer-adjust-hint">⌥ 1m · ⌘ 15m</small><div className="timer-adjust-grid">{[-5, 5].map((minutes) => <button type="button" key={minutes} onClick={(event) => adjust(minutes, event)} title={`Hold ⌥ for 1m or ⌘ for 15m`}>{minutes > 0 ? `+${minutes}` : minutes}m</button>)}</div><button type="button" onClick={align}>Align to previous entry</button><strong>Estimate</strong><div className="timer-adjust-estimate-list">{[15, 30, 60].map((minutes) => <button type="button" key={minutes} onClick={() => adjustEstimate(minutes)}>Add {minutes === 60 ? "1 hour" : `${minutes} min`}</button>)}</div></div></details>{expired && dismissedTimerID !== timerID ? <div className="timer-check-in" role="alert"><strong>Timer estimate reached</strong><span>Still working on “{timer.title}”?</span><button type="button" onClick={keepWorking}>Keep working · +15m</button><button type="button" className="danger" onClick={stopTimer}>Stop timer</button><button type="button" className="quiet" onClick={() => setDismissedTimerID(timerID)}>Dismiss</button></div> : null}{message ? <small role="status">{message}</small> : null}</div>;
 }
 
 function TodayHeader({ focusRunning, setFocusRunning, setPage, api, dateKey, setDateKey }) {
@@ -5094,6 +5096,19 @@ export function App() {
   const [apiBase, setApiBase] = useState(apiBaseURL);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const api = useMetridayAPI(dateKey, apiBase);
+  useEffect(() => {
+    const handleQuickTimerShortcut = (event) => {
+      if (event.key.toLowerCase() !== "t" || !event.ctrlKey || !event.altKey || !event.metaKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (!api.connected) return;
+      event.preventDefault();
+      if (api.status?.timer) void api.stopTimer();
+      else void api.startTimer(api.status?.currentTask?.title || "Focused work");
+    };
+    window.addEventListener("keydown", handleQuickTimerShortcut);
+    return () => window.removeEventListener("keydown", handleQuickTimerShortcut);
+  }, [api.connected, api.startTimer, api.status?.currentTask?.title, api.status?.timer, api.stopTimer]);
   const content = useMemo(() => page === "plan" ? <PlanPage tasks={tasks} setTasks={setTasks} api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "activities" ? <ActivitiesPage api={api} dateKey={dateKey} setDateKey={setDateKey} projectScopeID={activityScopeID} setProjectScopeID={setActivityScopeID} /> : page === "stats" ? <StatsPage api={api} dateKey={dateKey} setDateKey={setDateKey} setPage={setPage} projectScopeID={activityScopeID} setProjectScopeID={setActivityScopeID} /> : page === "reports" ? <ReportsPage api={api} dateKey={dateKey} setDateKey={setDateKey} /> : page === "teams" ? <TeamsPage api={api} /> : page === "review" ? <ReviewPage api={api} dateKey={dateKey} setDateKey={setDateKey} setPage={setPage} /> : page === "rules" ? <RulesPageLive api={api} /> : <TodayPage setPage={setPage} api={api} dateKey={dateKey} setDateKey={setDateKey} />, [api, page, tasks, dateKey, setPage, activityScopeID]);
   return <div className="app-shell"><Sidebar page={page} setPage={setPage} api={api} onOpenSettings={() => setSettingsOpen(true)} /><div className="app-main"><WebGlobalHeader api={api} setPage={setPage} dateKey={dateKey} setDateKey={setDateKey} />{content}</div><ConnectionSettings open={settingsOpen} api={api} apiBase={apiBase} connected={api.connected} onSave={setApiBase} onClose={() => setSettingsOpen(false)} /></div>;
 }
