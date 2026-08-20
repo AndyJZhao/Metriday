@@ -5603,9 +5603,9 @@ private struct ActivityTimelinePanel: View {
                                         let start = max(0, segment.startMinute)
                                         let end = min(1_440, max(start + 15, segment.endMinute))
                                         onCreateTimeEntry(start, end)
-                                    case .second:
-                                        onSelectActivity(segment)
-                                    }
+                                        case .second:
+                                            onSelectActivity(segment)
+                                        }
                                 }
                         )
                         .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))\(segment.resource.isEmpty ? "" : " · \(segment.resource)")")
@@ -5824,10 +5824,26 @@ private struct ActivityTimelinePanel: View {
                         let left = timelineWindow.x(for: range.start, width: chartWidth)
                         let width = max(2, timelineWindow.x(for: range.end, width: chartWidth) - left)
                         let hitWidth = max(12, width)
-                        ZStack(alignment: .leading) {
+                        ZStack(alignment: .topTrailing) {
                             RoundedRectangle(cornerRadius: 2, style: .continuous)
                                 .fill(activityColor(segment).opacity(0.72))
                                 .frame(width: width, height: 16)
+                            if hoveredSegmentID == segment.id {
+                                Button {
+                                    let start = max(0, segment.startMinute)
+                                    let end = min(1_440, max(start + 15, segment.endMinute))
+                                    onCreateTimeEntry(start, end)
+                                } label: {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 16, height: 16)
+                                        .background(.black.opacity(0.55))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.trailing, 1)
+                            }
                         }
                         .frame(width: hitWidth, height: 16, alignment: .leading)
                         .offset(x: left)
@@ -5845,10 +5861,25 @@ private struct ActivityTimelinePanel: View {
                                             let end = min(1_440, max(start + 15, segment.endMinute))
                                             onCreateTimeEntry(start, end)
                                         case .second:
-                                            onSelectActivity(segment)
+                                        onSelectActivity(segment)
                                         }
                                     }
                             )
+                            .onHover { isHovered in
+                                if isHovered, hoveredSegmentID != segment.id {
+                                    hoveredSegmentID = segment.id
+                                    hoveredTimeEntryID = nil
+                                    hoveredCalendarEventID = nil
+                                    hoveredSuggestionID = nil
+                                }
+                            }
+                            .contextMenu {
+                                Button("Create Time Entry") {
+                                    let start = max(0, segment.startMinute)
+                                    let end = min(1_440, max(start + 15, segment.endMinute))
+                                    onCreateTimeEntry(start, end)
+                                }
+                            }
                             .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
                     }
                         }
