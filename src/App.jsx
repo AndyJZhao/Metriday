@@ -2825,7 +2825,8 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
     const category = activityCategory(activity);
     const key = grouping === "category" ? `${category.key}:${category.label}` : grouping === "project" ? resourceID(activity.projectID) || "unassigned" : grouping === "device" ? activity.deviceName || "This Mac" : activity.appName || activity.deviceName || "Unknown App";
     const label = grouping === "category" ? category.label : grouping === "project" ? projectTitleFor(projects, activity.projectID) : grouping === "device" ? activity.deviceName || "This Mac" : activity.appName || activity.deviceName || "Unknown App";
-    const existing = groups.get(key) || { key, label, category, activities: [], seconds: 0 };
+    const existing = groups.get(key) || { key, label, category, categories: new Map(), activities: [], seconds: 0 };
+    existing.categories.set(`${category.key}:${category.label}:${category.color}`, category);
     existing.activities.push(activity);
     existing.seconds += Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
     groups.set(key, existing);
@@ -2834,9 +2835,10 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
   return <div className="activity-table">
     {grouped.map((group) => {
       const collapsed = collapsedGroups.has(group.key);
+      const categories = [...(group.categories?.values?.() || [])];
       return <section className="activity-group" key={group.key}>
         <button type="button" className="activity-group-heading" onClick={() => setCollapsedGroups((current) => { const next = new Set(current); if (next.has(group.key)) next.delete(group.key); else next.add(group.key); return next; })} aria-expanded={!collapsed}>
-          <span className="activity-group-title">{grouping === "category" ? <span className={`activity-category ${group.category.key}`} style={activityCategoryStyle(group.category)}><i />{group.label}</span> : <strong>{group.label}</strong>}</span>
+          <span className="activity-group-title">{grouping === "category" ? <span className={`activity-category ${group.category.key}`} style={activityCategoryStyle(group.category)}><i />{group.label}</span> : <><strong>{group.label}</strong>{grouping === "application" && categories.length ? <span className="activity-group-category-summary">{categories.map((item) => <span key={`${item.key}:${item.label}:${item.color}`} className={`activity-category-dot ${item.key}`} style={{ background: activityCategoryStyle(item).color }} title={item.label} aria-label={item.label} />)}<small>{categories.length === 1 ? categories[0].label : "Multiple categories"}</small></span> : null}</>}</span>
           <span className="activity-group-meta">{formatDurationSeconds(group.seconds)} · {group.activities.length} segment{group.activities.length === 1 ? "" : "s"}<CaretDown size={15} className={collapsed ? "collapsed" : ""} /></span>
         </button>
         {!collapsed ? <div className="activity-group-rows">{group.activities.map(activityRow)}</div> : null}

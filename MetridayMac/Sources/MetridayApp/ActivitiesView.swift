@@ -1412,6 +1412,7 @@ struct ActivitiesView: View {
                                 collapsedUnifiedAppGroups.insert(groupKey)
                             }
                         } label: {
+                            let appCategories = categories(for: appGroup.segments)
                             HStack(spacing: 8) {
                                 Image(systemName: appCollapsed ? "chevron.right" : "chevron.down")
                                     .font(.system(size: 8, weight: .bold))
@@ -1423,9 +1424,21 @@ struct ActivitiesView: View {
                                 Text(appGroup.name)
                                     .font(.system(size: 11, weight: .semibold))
                                     .lineLimit(1)
-                                Text(category(for: appGroup.segments[0]).name)
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(categoryColor(for: category(for: appGroup.segments[0])))
+                                HStack(spacing: 4) {
+                                    ForEach(appCategories) { definition in
+                                        Circle()
+                                            .fill(categoryColor(for: definition))
+                                            .frame(width: 6, height: 6)
+                                    }
+                                    Text(appCategories.count == 1 ? appCategories[0].name : "Multiple categories")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(
+                                            appCategories.count == 1
+                                                ? categoryColor(for: appCategories[0])
+                                                : MetridayTheme.secondary
+                                        )
+                                        .lineLimit(1)
+                                }
                                 Spacer()
                                 Text(formatMinutes(appGroup.seconds))
                                     .font(.system(size: 10, weight: .semibold))
@@ -1693,6 +1706,22 @@ struct ActivitiesView: View {
             filterStore: filterStore,
             date: selectedDate
         )
+    }
+
+    private func categories(for segments: [ActivitySegment]) -> [ActivityCategoryDefinition] {
+        var definitions: [UUID: ActivityCategoryDefinition] = [:]
+        var seconds: [UUID: Int] = [:]
+        for segment in segments {
+            let definition = category(for: segment)
+            definitions[definition.id] = definition
+            seconds[definition.id, default: 0] += segment.durationSeconds
+        }
+        return definitions.values.sorted {
+            let firstSeconds = seconds[$0.id, default: 0]
+            let secondSeconds = seconds[$1.id, default: 0]
+            if firstSeconds == secondSeconds { return $0.name < $1.name }
+            return firstSeconds > secondSeconds
+        }
     }
 
     private func categoryColor(for category: ActivityCategoryDefinition) -> Color {

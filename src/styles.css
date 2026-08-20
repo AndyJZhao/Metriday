@@ -781,6 +781,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-table-head { min-height: 34px; color: var(--muted); font-size: 11px; font-weight: 650; }
 .activity-group { border-bottom: 1px solid #eceef1; }
 .activity-group-heading { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 46px; padding: 0 12px; border: 0; background: #fafbfc; color: #282b32; cursor: pointer; text-align: left; }
+.activity-group-category-summary { display: inline-flex; align-items: center; gap: 4px; margin-left: 9px; color: var(--muted); font-size: 10px; font-weight: 600; vertical-align: middle; }
+.activity-group-category-summary small { margin-left: 2px; color: currentColor; font-size: inherit; }
+.activity-category-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
 .activity-group-heading:hover { background: #f5f6fa; }
 .activity-group-title { display: inline-flex; align-items: center; min-width: 0; }
 .activity-group-meta { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }

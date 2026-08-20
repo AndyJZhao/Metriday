@@ -237,6 +237,13 @@ Task { @MainActor in
         matchMode: .any,
         rules: [ActivityFilterRule(field: .domain, pattern: "youtube.com")]
     )
+    _ = categoryStore.createCategory(
+        name: "Focused research",
+        role: .focused,
+        color: .blue,
+        matchMode: .any,
+        rules: [ActivityFilterRule(field: .domain, pattern: "github.com")]
+    )
     let focusedCategory = categoryStore.category(for: trackedActivities[0], filterStore: categoryFilterStore, date: date)
     let youtubeActivity = ActivitySegment(
         appName: "Google Chrome",
@@ -250,6 +257,22 @@ Task { @MainActor in
     let distractingCategory = categoryStore.category(for: youtubeActivity, filterStore: categoryFilterStore, date: date)
     expect(focusedCategory.role == .focused && focusedCategory.color == .blue, "Focused application rules should resolve to the deep-blue category")
     expect(distractingCategory.role == .distracting && distractingCategory.color == .red, "Distracting domain rules should resolve to the red category")
+    let focusedChromeActivity = ActivitySegment(
+        appName: "Google Chrome",
+        bundleIdentifier: "com.google.Chrome",
+        windowTitle: "GitHub",
+        resource: "https://github.com/openai",
+        startMinute: 612,
+        endMinute: 624,
+        relevance: .other
+    )
+    let focusedChromeCategory = categoryStore.category(for: focusedChromeActivity, filterStore: categoryFilterStore, date: date)
+    expect(
+        focusedChromeActivity.appName == youtubeActivity.appName
+            && focusedChromeCategory.role == .focused
+            && distractingCategory.role == .distracting,
+        "One App source should be able to resolve to different Categories by website rule"
+    )
     let categorizedSummary = ActivitySummary(
         segments: categoryStore.applyingCategories(
             to: [youtubeActivity],
