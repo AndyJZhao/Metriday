@@ -133,7 +133,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
             timelineOrientation = payload.timelineOrientation
             collapseActivitiesShorterThanSeconds = max(0, payload.collapseActivitiesShorterThanSeconds)
         } else {
-            includeTimeEntries = true
+            includeTimeEntries = false
             showWindowTitles = true
             showResourcePaths = true
             showActivityDateRanges = false
@@ -249,7 +249,7 @@ final class ActivitiesPreferencesStore: ObservableObject {
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            includeTimeEntries = try container.decodeIfPresent(Bool.self, forKey: .includeTimeEntries) ?? true
+            includeTimeEntries = try container.decodeIfPresent(Bool.self, forKey: .includeTimeEntries) ?? false
             showWindowTitles = try container.decodeIfPresent(Bool.self, forKey: .showWindowTitles) ?? true
             showResourcePaths = try container.decodeIfPresent(Bool.self, forKey: .showResourcePaths) ?? true
             showActivityDateRanges = try container.decodeIfPresent(Bool.self, forKey: .showActivityDateRanges) ?? false

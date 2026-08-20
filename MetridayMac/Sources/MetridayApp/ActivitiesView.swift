@@ -258,7 +258,7 @@ struct ActivitiesView: View {
                         ActivityTimelinePanel(
                             segments: timelineScopedSegments,
                             calendarEvents: calendarStore.events,
-                            timeEntries: preferences.includeTimeEntries ? timelineTimeEntries : [],
+                            timeEntries: preferences.includeTimeEntries ? [] : timelineTimeEntries,
                             suggestions: timelineSuggestions,
                             selectedDate: selectedDate,
                             wrapAtMinute: appState.preferences.wrapDaysAtMinute,
@@ -327,7 +327,9 @@ struct ActivitiesView: View {
                         )
                         ScreenTimePanel(store: screenTimeStore, selectedDate: selectedDate)
                         activityList
-                        timeEntryList
+                        if !preferences.includeTimeEntries {
+                            timeEntryList
+                        }
                     }
                         .frame(maxWidth: .infinity)
                 }
@@ -3982,6 +3984,10 @@ private struct ActivityDisplaySettingsSheet: View {
 
             Toggle("Include time entries in the timeline", isOn: $preferences.includeTimeEntries)
                 .toggleStyle(.checkbox)
+            Text("When enabled, show only App Usage. Leave this off to include manual and timer entries.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Toggle("Show window titles", isOn: $preferences.showWindowTitles)
                 .toggleStyle(.checkbox)
             Toggle("Show website hosts and file paths", isOn: $preferences.showResourcePaths)
