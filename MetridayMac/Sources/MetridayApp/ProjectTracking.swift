@@ -758,7 +758,8 @@ final class ProjectStore: ObservableObject {
                     expression: rule.pattern,
                     comparison: rule.comparison,
                     options: options,
-                    supportsDayGroups: rule.field == .dayOfWeek
+                    supportsDayGroups: rule.field == .dayOfWeek,
+                    supportsKeywordTokens: rule.field == .keyword
                 )
             }
             return matchesAtom(
@@ -767,7 +768,8 @@ final class ProjectStore: ObservableObject {
                 comparison: rule.comparison,
                 options: options,
                 isCaseSensitive: rule.isCaseSensitive,
-                supportsDayGroups: rule.field == .dayOfWeek
+                supportsDayGroups: rule.field == .dayOfWeek,
+                supportsKeywordTokens: rule.field == .keyword
             )
         }
     }
@@ -777,7 +779,8 @@ final class ProjectStore: ObservableObject {
         expression: String,
         comparison: ProjectRuleComparison,
         options: String.CompareOptions,
-        supportsDayGroups: Bool
+        supportsDayGroups: Bool,
+        supportsKeywordTokens: Bool
     ) -> Bool {
         expression
             .components(separatedBy: "||")
@@ -793,7 +796,8 @@ final class ProjectStore: ObservableObject {
                             comparison: comparison,
                             options: options,
                             isCaseSensitive: options.isEmpty,
-                            supportsDayGroups: supportsDayGroups
+                            supportsDayGroups: supportsDayGroups,
+                            supportsKeywordTokens: supportsKeywordTokens
                         )
                     }
             }
@@ -805,12 +809,23 @@ final class ProjectStore: ObservableObject {
         comparison: ProjectRuleComparison,
         options: String.CompareOptions,
         isCaseSensitive: Bool,
-        supportsDayGroups: Bool
+        supportsDayGroups: Bool,
+        supportsKeywordTokens: Bool
     ) -> Bool {
         switch comparison {
         case .contains:
+            if supportsKeywordTokens {
+                return keywordTokens(from: candidate).contains {
+                    $0.compare(pattern, options: options) == .orderedSame
+                }
+            }
             return candidate.range(of: pattern, options: options) != nil
         case .equals:
+            if supportsKeywordTokens {
+                return keywordTokens(from: candidate).contains {
+                    $0.compare(pattern, options: options) == .orderedSame
+                }
+            }
             if supportsDayGroups, let dayMatch = dayGroupMatch(candidate: candidate, pattern: pattern) {
                 return dayMatch
             }
@@ -827,6 +842,11 @@ final class ProjectStore: ObservableObject {
             }
             return expression.firstMatch(in: candidate, range: NSRange(candidate.startIndex..., in: candidate)) != nil
         case .isNot:
+            if supportsKeywordTokens {
+                return keywordTokens(from: candidate).allSatisfy {
+                    $0.compare(pattern, options: options) != .orderedSame
+                }
+            }
             if supportsDayGroups, let dayMatch = dayGroupMatch(candidate: candidate, pattern: pattern) {
                 return !dayMatch
             }
@@ -892,6 +912,12 @@ final class ProjectStore: ObservableObject {
             return ["saturday", "sunday"].contains(day)
         }
         return nil
+    }
+
+    private func keywordTokens(from value: String) -> [String] {
+        value
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
     }
 
     private func persist() {

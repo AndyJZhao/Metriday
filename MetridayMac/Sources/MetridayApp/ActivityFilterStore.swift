@@ -299,7 +299,8 @@ final class ActivityFilterStore: ObservableObject {
                                 comparison: rule.comparison,
                                 options: options,
                                 isCaseSensitive: rule.isCaseSensitive,
-                                supportsDayGroups: rule.field == .dayOfWeek
+                                supportsDayGroups: rule.field == .dayOfWeek,
+                                supportsKeywordTokens: rule.field == .keyword
                             )
                         }
                 }
@@ -310,7 +311,8 @@ final class ActivityFilterStore: ObservableObject {
             comparison: rule.comparison,
             options: options,
             isCaseSensitive: rule.isCaseSensitive,
-            supportsDayGroups: rule.field == .dayOfWeek
+            supportsDayGroups: rule.field == .dayOfWeek,
+            supportsKeywordTokens: rule.field == .keyword
         )
     }
 
@@ -320,12 +322,23 @@ final class ActivityFilterStore: ObservableObject {
         comparison: ProjectRuleComparison,
         options: String.CompareOptions,
         isCaseSensitive: Bool,
-        supportsDayGroups: Bool
+        supportsDayGroups: Bool,
+        supportsKeywordTokens: Bool
     ) -> Bool {
         switch comparison {
         case .contains:
+            if supportsKeywordTokens {
+                return keywordTokens(from: candidate).contains {
+                    $0.compare(pattern, options: options) == .orderedSame
+                }
+            }
             return candidate.range(of: pattern, options: options) != nil
         case .equals:
+            if supportsKeywordTokens {
+                return keywordTokens(from: candidate).contains {
+                    $0.compare(pattern, options: options) == .orderedSame
+                }
+            }
             if supportsDayGroups, let dayMatch = dayGroupMatch(candidate: candidate, pattern: pattern) {
                 return dayMatch
             }
@@ -340,6 +353,11 @@ final class ActivityFilterStore: ObservableObject {
             guard let expression = try? NSRegularExpression(pattern: regex, options: regexOptions) else { return false }
             return expression.firstMatch(in: candidate, range: NSRange(candidate.startIndex..., in: candidate)) != nil
         case .isNot:
+            if supportsKeywordTokens {
+                return keywordTokens(from: candidate).allSatisfy {
+                    $0.compare(pattern, options: options) != .orderedSame
+                }
+            }
             if supportsDayGroups, let dayMatch = dayGroupMatch(candidate: candidate, pattern: pattern) {
                 return !dayMatch
             }
@@ -403,6 +421,12 @@ final class ActivityFilterStore: ObservableObject {
             return ["saturday", "sunday"].contains(day)
         }
         return nil
+    }
+
+    private func keywordTokens(from value: String) -> [String] {
+        value
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
     }
 
     private func persist() {

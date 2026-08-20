@@ -2089,6 +2089,58 @@ Task { @MainActor in
         "Activity filters should share time-range and weekday matching"
     )
 
+    let keywordRuleStore = ProjectStore(
+        rootDirectory: tempRoot.appendingPathComponent("KeywordProjectRules", isDirectory: true)
+    )
+    guard let keywordProjectID = keywordRuleStore.createProject(name: "Keyword Rules") else {
+        expect(false, "Keyword rule store should create a project")
+        return
+    }
+    _ = keywordRuleStore.addRule(
+        projectID: keywordProjectID,
+        field: .keyword,
+        pattern: "art"
+    )
+    let articleActivity = ActivitySegment(
+        appName: "Safari",
+        windowTitle: "Article review",
+        resource: "https://news.example/article",
+        startMinute: 600,
+        endMinute: 610,
+        relevance: .other
+    )
+    let artActivity = ActivitySegment(
+        appName: "Safari",
+        windowTitle: "Art review",
+        resource: "https://news.example/gallery",
+        startMinute: 600,
+        endMinute: 610,
+        relevance: .other
+    )
+    expect(
+        keywordRuleStore.matchingProjectID(for: articleActivity) == nil,
+        "Keyword rules should not match a substring inside a larger word"
+    )
+    expect(
+        keywordRuleStore.matchingProjectID(for: artActivity) == keywordProjectID,
+        "Keyword rules should match extracted whole words"
+    )
+    let keywordFilterStore = ActivityFilterStore(
+        rootDirectory: tempRoot.appendingPathComponent("KeywordFilters", isDirectory: true)
+    )
+    let keywordFilter = ActivityFilterDefinition(
+        name: "Keyword filter",
+        rules: [ActivityFilterRule(field: .keyword, pattern: "art")]
+    )
+    expect(
+        !keywordFilterStore.matches(keywordFilter, activity: articleActivity),
+        "Activity filters should use whole-word keyword matching"
+    )
+    expect(
+        keywordFilterStore.matches(keywordFilter, activity: artActivity),
+        "Activity filters should match extracted whole-word keywords"
+    )
+
     try? FileManager.default.removeItem(at: tempRoot)
     print("Metriday smoke tests passed")
     exit(0)

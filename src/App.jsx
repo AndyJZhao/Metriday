@@ -922,7 +922,7 @@ function activityFilterValues(activity, field) {
     case "domain":
       try { return [new URL(activity.resource || "").host]; } catch { return [""]; }
     case "fullURL": return [activity.resource || ""];
-    case "keyword": return [`${activity.windowTitle || ""} ${activity.resource || ""}`.trim()];
+    case "keyword": return `${activity.windowTitle || ""} ${activity.resource || ""}`.trim().match(/[\p{L}\p{N}]+/gu) || [];
     case "device": return [activity.deviceName || "This Mac"];
     case "startTime": return [String(Math.floor(startMinute / 60)).padStart(2, "0") + ":" + String(startMinute % 60).padStart(2, "0")];
     case "dayOfWeek": return Number.isNaN(startDate.getTime()) ? [] : [startDate.toLocaleDateString("en-US", { weekday: "long" })];
@@ -930,7 +930,7 @@ function activityFilterValues(activity, field) {
   }
 }
 
-function activityFilterAtomMatches(source, pattern, comparison, caseSensitive) {
+function activityFilterAtomMatches(source, pattern, comparison, caseSensitive, keywordMode = false) {
   const left = String(source);
   const right = String(pattern).trim();
   if (!right) return false;
@@ -965,7 +965,7 @@ function activityFilterAtomMatches(source, pattern, comparison, caseSensitive) {
       const escaped = right.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/[*%]/g, ".*").replace(/[?]/g, ".");
       try { return new RegExp(`^${escaped}$`, caseSensitive ? "" : "i").test(left); } catch { return false; }
     }
-    default: return normalizedLeft.includes(normalizedRight);
+    default: return keywordMode ? normalizedLeft === normalizedRight : normalizedLeft.includes(normalizedRight);
   }
 }
 
@@ -982,7 +982,7 @@ function activityFilterRuleMatches(activity, rule) {
     .split("||")
     .some((orBranch) => orBranch
       .split("&&")
-      .every((atom) => activityFilterAtomMatches(value, atom, rule.comparison, caseSensitive)));
+      .every((atom) => activityFilterAtomMatches(value, atom, rule.comparison, caseSensitive, rule.field === "keyword")));
   return values.some((value) => matchesExpression(value));
 }
 
