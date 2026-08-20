@@ -2245,6 +2245,7 @@ struct ActivitiesView: View {
                             .accessibilityLabel("Open \(row.name) in \(title)")
                             .accessibilityHint("Double-click to create a time entry")
                             .accessibilityAddTraits(.isButton)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.vertical, 2)
                         }
                     }
@@ -2431,6 +2432,7 @@ struct ActivitiesView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .background(selectedActivityIDs.contains(segment.id)
             ? MetridayTheme.accentSoft.opacity(0.52)
