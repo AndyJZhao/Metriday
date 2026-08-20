@@ -2082,56 +2082,12 @@ function TimeEntryEditRow({ entry, api, dateKey, projects, onCancel, dialog = fa
   return <form className={dialog ? "time-entry-edit-form" : "entry-edit-row"} onSubmit={save} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); onCancel(); } }}>{fields}<span className={dialog ? "time-entry-edit-actions" : "project-actions"}><button type="submit" disabled={busy} aria-label="Save time entry">{dialog ? "Save changes" : <Check size={16} />}</button><IconButton label="Cancel time entry edit" onClick={onCancel}>{dialog ? "Cancel" : <X size={15} />}</IconButton></span>{message ? <small className="entry-edit-message">{message}</small> : null}</form>;
 }
 
-function TimeEntriesPanel({ api, dateKey }) {
-  const [title, setTitle] = useState("");
-  const [start, setStart] = useState("09:00");
-  const [end, setEnd] = useState("10:00");
-  const [project, setProject] = useState("");
-  const [billingStatus, setBillingStatus] = useState("billable");
-  const [busy, setBusy] = useState(false);
+function TimeEntriesPanel({ api, dateKey, onNewEntry = () => window.dispatchEvent(new CustomEvent("metriday:open-new-time-entry")) }) {
   const [message, setMessage] = useState("");
-  const [overlapEntries, setOverlapEntries] = useState([]);
   const [editingEntryID, setEditingEntryID] = useState(null);
   const entries = [...api.entries].sort((left, right) => new Date(left.start_date || left.start) - new Date(right.start_date || right.start));
   const projects = [...api.projects].sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
-  const submit = async (event, overlapDecision = null) => {
-    event?.preventDefault();
-    const startDate = localEntryDate(dateKey, start);
-    const endDate = localEntryDate(dateKey, end);
-    if (!title.trim() || !startDate || !endDate || new Date(endDate) <= new Date(startDate)) {
-      setMessage("Enter a title and a valid time range.");
-      return;
-    }
-    if (overlapDecision === null && overlapEntries.length === 0) {
-      const startSecond = Number(start.slice(0, 2)) * 3_600 + Number(start.slice(3, 5)) * 60;
-      const endSecond = Number(end.slice(0, 2)) * 3_600 + Number(end.slice(3, 5)) * 60;
-      const overlaps = entries.filter((entry) => {
-        const range = entrySecondsForDate(entry, dateKey);
-        return range && range.startSecond < endSecond && range.endSecond > startSecond;
-      });
-      if (overlaps.length > 0) {
-        setOverlapEntries(overlaps);
-        setMessage(`This range overlaps ${overlaps.length} existing time ${overlaps.length === 1 ? "entry" : "entries"}.`);
-        return;
-      }
-    }
-    setBusy(true);
-    setMessage("");
-    try {
-      if (overlapDecision === "replace" && overlapEntries.length > 0) {
-        await api.deleteTimeEntries(overlapEntries.map((entry) => entryID(entry)));
-      }
-      await api.addTimeEntry({ title: title.trim(), start: startDate, end: endDate, projectID: project ? resourceID(project) : undefined, billingStatus });
-      setTitle("");
-      setOverlapEntries([]);
-      setMessage("Time entry saved locally.");
-    } catch (error) {
-      setMessage(error.message || "Could not save the time entry.");
-    } finally {
-      setBusy(false);
-    }
-  };
-  return <section className="time-entries-panel"><div className="activities-list-heading"><div><h2>Time entries</h2><p>Manual entries and focus sessions for {planDateLabel(dateKey)}.</p></div><span className="api-badge online">{entries.length} saved</span></div><form className="manual-entry-form" onSubmit={submit}><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="What did you work on?" aria-label="Time entry title" /><label>From<input type="time" value={start} onChange={(event) => setStart(event.target.value)} aria-label="Time entry start" /></label><label>To<input type="time" value={end} onChange={(event) => setEnd(event.target.value)} aria-label="Time entry end" /></label><select value={project} onChange={(event) => setProject(event.target.value)} aria-label="Time entry project"><option value="">Unassigned</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><select value={billingStatus} onChange={(event) => setBillingStatus(event.target.value)} aria-label="Time entry billing status"><option value="billable">Billable</option><option value="not_billable">Not billable</option><option value="pending">Pending</option><option value="billed">Billed</option><option value="paid">Paid</option></select><button type="submit" disabled={busy || !api.connected}><Plus size={17} />{busy ? "Saving…" : "Add entry"}</button></form>{message ? <p className="entry-message" role="status">{message}</p> : null}{entries.length > 0 ? <div className="entry-table">{entries.map((entry) => editingEntryID === entry.id ? <TimeEntryEditRow key={entry.id} entry={entry} api={api} dateKey={dateKey} projects={projects} onCancel={() => setEditingEntryID(null)} /> : <WebTimeEntryRow key={entry.id} entry={entry} projects={projects} onEdit={() => setEditingEntryID(entry.id)} onDelete={() => api.deleteTimeEntry(entryID(entry)).catch((error) => setMessage(error.message || "Could not delete the time entry."))} />)}</div> : <div className="entries-empty"><Clock size={24} /><span>{api.connected ? "No manual entries for this date." : "Connect the native app to edit time entries."}</span></div>}</section>;
+  return <section className="time-entries-panel"><div className="activities-list-heading"><div><h2>Time entries</h2><p>Manual entries and focus sessions for {planDateLabel(dateKey)}.</p></div><div className="activities-list-heading-actions"><button type="button" className="quiet-pill" onClick={onNewEntry} disabled={!api.connected}><Plus size={16} />New time entry</button><span className="api-badge online">{entries.length} saved</span></div></div>{message ? <p className="entry-message" role="status">{message}</p> : null}{entries.length > 0 ? <div className="entry-table">{entries.map((entry) => editingEntryID === entry.id ? <TimeEntryEditRow key={entry.id} entry={entry} api={api} dateKey={dateKey} projects={projects} onCancel={() => setEditingEntryID(null)} /> : <WebTimeEntryRow key={entry.id} entry={entry} projects={projects} onEdit={() => setEditingEntryID(entry.id)} onDelete={() => api.deleteTimeEntry(entryID(entry)).catch((error) => setMessage(error.message || "Could not delete the time entry."))} />)}</div> : <div className="entries-empty"><Clock size={24} /><span>{api.connected ? "No manual entries for this date." : "Connect the native app to edit time entries."}</span></div>}</section>;
 }
 
 function WebTimeEntryRow({ entry, projects, onEdit, onDelete }) {
@@ -3761,6 +3717,11 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     setTimeEntryPrefill(prefill);
     setTimeEntryDialogMode("new");
   };
+  useEffect(() => {
+    const handleOpenNewTimeEntry = () => openNewTimeEntry();
+    window.addEventListener("metriday:open-new-time-entry", handleOpenNewTimeEntry);
+    return () => window.removeEventListener("metriday:open-new-time-entry", handleOpenNewTimeEntry);
+  }, []);
   const openSourceTimeEntry = (source) => {
     if (source?.completed_at) {
       const completed = new Date(source.completed_at);
