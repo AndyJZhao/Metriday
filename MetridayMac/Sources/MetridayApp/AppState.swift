@@ -857,6 +857,7 @@ final class AppState: ObservableObject {
             }
             if let notes = body["notes"] as? String { project.notes = notes }
             if let color = body["color"] as? String, let value = projectColor(from: color) { project.color = value }
+            if let sortOrder = body["sort_order"] as? Int { project.sortOrder = sortOrder }
             if let productivity = body["productivity"] as? Int { project.productivity = productivity }
             if let productivityScore = body["productivity_score"] as? Double {
                 project.productivity = Int((productivityScore * 100).rounded())
@@ -894,6 +895,7 @@ final class AppState: ObservableObject {
                 if let title = body["title"] as? String { updated.name = title }
                 if let notes = body["notes"] as? String { updated.notes = notes }
                 if let color = body["color"] as? String, let value = projectColor(from: color) { updated.color = value }
+                if let sortOrder = body["sort_order"] as? Int { updated.sortOrder = sortOrder }
                 if let productivity = body["productivity"] as? Int { updated.productivity = productivity }
                 if let productivityScore = body["productivity_score"] as? Double {
                     updated.productivity = Int((productivityScore * 100).rounded())
@@ -2694,6 +2696,7 @@ final class AppState: ObservableObject {
             "title_chain": projectStore.hierarchyPath(for: project.id).components(separatedBy: " > "),
             "color": projectColorHex(project.color),
             "parent": project.parentID.map { "/projects/\($0.uuidString)" } ?? NSNull(),
+            "sort_order": project.sortOrder,
             "children": projectStore.childProjects(of: project.id).map { ["self": "/projects/\($0.id.uuidString)"] },
             "team_id": project.teamID.map { "/teams/\($0.uuidString)" } ?? NSNull(),
             "default_billing_status": projectBillingStatusRaw(project.defaultBillingStatus),

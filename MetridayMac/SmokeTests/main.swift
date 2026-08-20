@@ -185,6 +185,12 @@ let titleSuggestionEntries = [
     )
 ]
 let titleSuggestionProjects = [TrackingProject(name: "Research")]
+let orderedProject = TrackingProject(name: "Ordered child", sortOrder: 7)
+let orderedProjectRoundTrip = try! JSONDecoder().decode(
+    TrackingProject.self,
+    from: JSONEncoder().encode(orderedProject)
+)
+expect(orderedProjectRoundTrip.sortOrder == 7, "Project sibling order should survive local JSON round trips")
 let titleSuggestions = TimeEntrySuggestionProvider.titles(
     from: titleSuggestionEntries,
     projects: titleSuggestionProjects,

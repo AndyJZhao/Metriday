@@ -63,6 +63,7 @@ struct TrackingProject: Identifiable, Hashable, Codable {
     var name: String
     var color: ProjectColor
     var parentID: UUID?
+    var sortOrder: Int
     var teamID: UUID?
     var productivity: Int
     var isArchived: Bool
@@ -84,6 +85,7 @@ struct TrackingProject: Identifiable, Hashable, Codable {
         name: String,
         color: ProjectColor = .blue,
         parentID: UUID? = nil,
+        sortOrder: Int = 0,
         teamID: UUID? = nil,
         productivity: Int = 0,
         isArchived: Bool = false,
@@ -97,6 +99,7 @@ struct TrackingProject: Identifiable, Hashable, Codable {
         self.name = name
         self.color = color
         self.parentID = parentID
+        self.sortOrder = sortOrder
         self.teamID = teamID
         self.productivity = min(100, max(-100, productivity))
         self.isArchived = isArchived
@@ -110,7 +113,7 @@ struct TrackingProject: Identifiable, Hashable, Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, color, parentID, teamID, productivity, isArchived, notes, defaultBillingStatus, billingRate, currency, customFields
+        case id, name, color, parentID, sortOrder, teamID, productivity, isArchived, notes, defaultBillingStatus, billingRate, currency, customFields
     }
 
     init(from decoder: Decoder) throws {
@@ -119,6 +122,7 @@ struct TrackingProject: Identifiable, Hashable, Codable {
         name = try container.decode(String.self, forKey: .name)
         color = try container.decode(ProjectColor.self, forKey: .color)
         parentID = try container.decodeIfPresent(UUID.self, forKey: .parentID)
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
         teamID = try container.decodeIfPresent(UUID.self, forKey: .teamID)
         productivity = min(100, max(-100, try container.decodeIfPresent(Int.self, forKey: .productivity) ?? 0))
         isArchived = try container.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
@@ -138,6 +142,7 @@ struct TrackingProject: Identifiable, Hashable, Codable {
         try container.encode(name, forKey: .name)
         try container.encode(color, forKey: .color)
         try container.encodeIfPresent(parentID, forKey: .parentID)
+        try container.encode(sortOrder, forKey: .sortOrder)
         try container.encodeIfPresent(teamID, forKey: .teamID)
         try container.encode(productivity, forKey: .productivity)
         try container.encode(isArchived, forKey: .isArchived)
@@ -412,7 +417,14 @@ final class ProjectStore: ObservableObject {
     }
 
     func childProjects(of parentID: UUID?) -> [TrackingProject] {
-        activeProjects.filter { $0.parentID == parentID }
+        activeProjects
+            .filter { $0.parentID == parentID }
+            .sorted {
+                if $0.sortOrder == $1.sortOrder {
+                    return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                }
+                return $0.sortOrder < $1.sortOrder
+            }
     }
 
     /// Returns the selected project plus every active descendant. Selecting a
@@ -481,7 +493,11 @@ final class ProjectStore: ObservableObject {
         let validParentID = parentID.flatMap { candidateID in
             activeProjects.contains(where: { $0.id == candidateID }) ? candidateID : nil
         }
-        let project = TrackingProject(name: name, color: color, parentID: validParentID, teamID: teamID)
+        let nextSortOrder = (activeProjects
+            .filter { $0.parentID == validParentID }
+            .map(\.sortOrder)
+            .max() ?? -1) + 1
+        let project = TrackingProject(name: name, color: color, parentID: validParentID, sortOrder: nextSortOrder, teamID: teamID)
         projects.append(project)
         persist()
         statusMessage = "Project created · \(name)"
@@ -538,8 +554,9 @@ final class ProjectStore: ObservableObject {
         let sortedProjects = siblingIndices
             .map { projects[$0] }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        for (index, projectIndex) in siblingIndices.enumerated() {
-            projects[projectIndex] = sortedProjects[index]
+        for (index, sortedProject) in sortedProjects.enumerated() {
+            guard let projectIndex = projects.firstIndex(where: { $0.id == sortedProject.id }) else { continue }
+            projects[projectIndex].sortOrder = index
         }
         persist()
         statusMessage = "Subprojects ordered alphabetically · \(project.name)"
@@ -686,6 +703,7 @@ final class ProjectStore: ObservableObject {
                 name: candidate.name,
                 color: candidate.color,
                 parentID: targetParentID,
+                sortOrder: candidate.sortOrder,
                 teamID: candidate.teamID,
                 productivity: candidate.productivity,
                 isArchived: candidate.isArchived,

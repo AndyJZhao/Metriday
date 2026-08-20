@@ -2297,6 +2297,32 @@ function projectColorKey(project) {
   }[raw] || "blue";
 }
 
+function projectSortOrder(project) {
+  const raw = Number(project?.sort_order ?? project?.sortOrder);
+  return Number.isFinite(raw) ? raw : 0;
+}
+
+function compareProjects(left, right) {
+  const orderDifference = projectSortOrder(left) - projectSortOrder(right);
+  if (orderDifference !== 0) return orderDifference;
+  return String(left.title || left.name || "").localeCompare(String(right.title || right.name || ""));
+}
+
+function projectRowsInHierarchy(projects) {
+  const rows = [];
+  const visit = (parentID = "") => {
+    projects
+      .filter((project) => !project.is_archived && projectParentID(project) === parentID)
+      .sort(compareProjects)
+      .forEach((project) => {
+        rows.push(project);
+        visit(resourceID(project.id));
+      });
+  };
+  visit();
+  return [...rows, ...projects.filter((project) => project.is_archived).sort(compareProjects)];
+}
+
 function projectOptionRows(projects, excludedID = "") {
   const excluded = new Set();
   const markDescendants = (parentID) => {
@@ -2315,7 +2341,7 @@ function projectOptionRows(projects, excludedID = "") {
   const visit = (parentID, depth) => {
     projects
       .filter((project) => !excluded.has(resourceID(project.id)) && projectParentID(project) === parentID)
-      .sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")))
+      .sort(compareProjects)
       .forEach((project) => {
         const id = resourceID(project.id);
         rows.push({ project, depth });
@@ -2340,10 +2366,12 @@ function ProjectPanel({ api, activities = [], onAssignActivity, onDropActivity, 
   const [rootDropTarget, setRootDropTarget] = useState(false);
   const [showArchivedProjects, setShowArchivedProjects] = useState(false);
   const [archivedProjects, setArchivedProjects] = useState([]);
-  const projects = [...api.projects].sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
+  const projects = [...api.projects].sort(compareProjects);
   const teams = [...(api.teams || [])].sort((left, right) => String(left.name || "").localeCompare(String(right.name || "")));
   const parentOptions = projectOptionRows(api.projects);
-  const displayedProjects = [...(showArchivedProjects ? [...projects, ...archivedProjects.filter((archived) => !projects.some((project) => resourceID(project.id) === resourceID(archived.id)))] : projects)].sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
+  const displayedProjects = projectRowsInHierarchy(showArchivedProjects
+    ? [...projects, ...archivedProjects.filter((archived) => !projects.some((project) => resourceID(project.id) === resourceID(archived.id)))]
+    : projects);
   const reloadProjectInventory = async () => {
     if (!showArchivedProjects) return;
     try {
@@ -2428,11 +2456,22 @@ function ProjectPanel({ api, activities = [], onAssignActivity, onDropActivity, 
     ids.delete(resourceID(project.id));
     return projects.filter((candidate) => ids.has(resourceID(candidate.id)) && !candidate.is_archived);
   };
-  const orderSubprojectsAlphabetically = (project) => {
-    const children = projects.filter((candidate) => projectParentID(candidate) === resourceID(project.id));
-    setMessage(children.length > 1
-      ? `Subprojects of ${project.title} are displayed alphabetically.`
-      : `No sibling order to change for ${project.title}.`);
+  const orderSubprojectsAlphabetically = async (project) => {
+    const children = projects
+      .filter((candidate) => projectParentID(candidate) === resourceID(project.id))
+      .sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
+    if (children.length <= 1) {
+      setMessage(`No sibling order to change for ${project.title}.`);
+      return;
+    }
+    try {
+      for (const [index, child] of children.entries()) {
+        await api.updateProject(child.id, { sort_order: index });
+      }
+      setMessage(`Subprojects of ${project.title} ordered alphabetically.`);
+    } catch (error) {
+      setMessage(error.message || "Could not order subprojects alphabetically.");
+    }
   };
   const reassignSubprojectColors = async (project) => {
     const children = activeSubprojects(project);
