@@ -202,6 +202,7 @@ enum ProjectRuleComparison: String, CaseIterable, Codable, Identifiable {
     case endsWith
     case like
     case isNot
+    case isBetween
     case matchesRegex
 
     var id: Self { self }
@@ -220,6 +221,8 @@ enum ProjectRuleComparison: String, CaseIterable, Codable, Identifiable {
             return "is like"
         case .isNot:
             return "is not"
+        case .isBetween:
+            return "is between"
         case .matchesRegex:
             return "matches regex"
         }
@@ -754,7 +757,8 @@ final class ProjectStore: ObservableObject {
                     candidate: candidate,
                     expression: rule.pattern,
                     comparison: rule.comparison,
-                    options: options
+                    options: options,
+                    supportsDayGroups: rule.field == .dayOfWeek
                 )
             }
             return matchesAtom(
@@ -762,7 +766,8 @@ final class ProjectStore: ObservableObject {
                 pattern: rule.pattern,
                 comparison: rule.comparison,
                 options: options,
-                isCaseSensitive: rule.isCaseSensitive
+                isCaseSensitive: rule.isCaseSensitive,
+                supportsDayGroups: rule.field == .dayOfWeek
             )
         }
     }
@@ -771,7 +776,8 @@ final class ProjectStore: ObservableObject {
         candidate: String,
         expression: String,
         comparison: ProjectRuleComparison,
-        options: String.CompareOptions
+        options: String.CompareOptions,
+        supportsDayGroups: Bool
     ) -> Bool {
         expression
             .components(separatedBy: "||")
@@ -786,7 +792,8 @@ final class ProjectStore: ObservableObject {
                             pattern: pattern,
                             comparison: comparison,
                             options: options,
-                            isCaseSensitive: options.isEmpty
+                            isCaseSensitive: options.isEmpty,
+                            supportsDayGroups: supportsDayGroups
                         )
                     }
             }
@@ -797,12 +804,16 @@ final class ProjectStore: ObservableObject {
         pattern: String,
         comparison: ProjectRuleComparison,
         options: String.CompareOptions,
-        isCaseSensitive: Bool
+        isCaseSensitive: Bool,
+        supportsDayGroups: Bool
     ) -> Bool {
         switch comparison {
         case .contains:
             return candidate.range(of: pattern, options: options) != nil
         case .equals:
+            if supportsDayGroups, let dayMatch = dayGroupMatch(candidate: candidate, pattern: pattern) {
+                return dayMatch
+            }
             return candidate.compare(pattern, options: options) == .orderedSame
         case .beginsWith:
             return candidate.range(of: pattern, options: options.union(.anchored)) != nil
@@ -816,7 +827,17 @@ final class ProjectStore: ObservableObject {
             }
             return expression.firstMatch(in: candidate, range: NSRange(candidate.startIndex..., in: candidate)) != nil
         case .isNot:
+            if supportsDayGroups, let dayMatch = dayGroupMatch(candidate: candidate, pattern: pattern) {
+                return !dayMatch
+            }
             return candidate.compare(pattern, options: options) != .orderedSame
+        case .isBetween:
+            guard let candidateMinute = clockMinute(candidate),
+                  let range = clockRange(pattern) else { return false }
+            if range.start <= range.end {
+                return (range.start...range.end).contains(candidateMinute)
+            }
+            return candidateMinute >= range.start || candidateMinute <= range.end
         case .matchesRegex:
             let regexOptions: NSRegularExpression.Options = isCaseSensitive ? [] : [.caseInsensitive]
             guard let expression = try? NSRegularExpression(pattern: pattern, options: regexOptions) else {
@@ -836,6 +857,41 @@ final class ProjectStore: ObservableObject {
             }
         }
         return result + "$"
+    }
+
+    private func clockMinute(_ value: String) -> Int? {
+        let pieces = value.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
+        guard pieces.count == 2,
+              let hour = Int(pieces[0]),
+              let minute = Int(pieces[1]),
+              (0..<24).contains(hour),
+              (0..<60).contains(minute) else { return nil }
+        return hour * 60 + minute
+    }
+
+    private func clockRange(_ value: String) -> (start: Int, end: Int)? {
+        let normalized = value
+            .replacingOccurrences(of: "–", with: "-")
+            .replacingOccurrences(of: "—", with: "-")
+        let pieces = normalized.split(separator: "-")
+        guard pieces.count == 2,
+              let start = clockMinute(String(pieces[0])),
+              let end = clockMinute(String(pieces[1])) else { return nil }
+        return (start, end)
+    }
+
+    private func dayGroupMatch(candidate: String, pattern: String) -> Bool? {
+        let day = candidate.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let value = pattern.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let days = Set(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"])
+        guard days.contains(day) else { return nil }
+        if value == "weekday" || value == "weekdays" {
+            return !["saturday", "sunday"].contains(day)
+        }
+        if value == "weekend" || value == "weekends" {
+            return ["saturday", "sunday"].contains(day)
+        }
+        return nil
     }
 
     private func persist() {

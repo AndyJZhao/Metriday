@@ -1180,7 +1180,7 @@ private struct ExclusionRuleEditorSheet: View {
             }
 
             Picker("Relation", selection: $comparison) {
-                ForEach(ProjectRuleComparison.allCases) { value in
+                ForEach(ProjectRuleComparison.allCases.filter { $0 != .isBetween }) { value in
                     Text(value.label).tag(value)
                 }
             }

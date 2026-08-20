@@ -936,11 +936,31 @@ function activityFilterAtomMatches(source, pattern, comparison, caseSensitive) {
   if (!right) return false;
   const normalizedLeft = caseSensitive ? left : left.toLowerCase();
   const normalizedRight = caseSensitive ? right : right.toLowerCase();
+  const dayNames = new Set(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
+  if ((comparison === "equals" || comparison === "isNot") && dayNames.has(normalizedLeft)) {
+    const isWeekend = normalizedLeft === "saturday" || normalizedLeft === "sunday";
+    if (normalizedRight === "weekday" || normalizedRight === "weekdays") return comparison === "equals" ? !isWeekend : isWeekend;
+    if (normalizedRight === "weekend" || normalizedRight === "weekends") return comparison === "equals" ? isWeekend : !isWeekend;
+  }
   switch (comparison) {
     case "equals": return normalizedLeft === normalizedRight;
     case "beginsWith": return normalizedLeft.startsWith(normalizedRight);
     case "endsWith": return normalizedLeft.endsWith(normalizedRight);
     case "isNot": return normalizedLeft !== normalizedRight;
+    case "isBetween": {
+      const parseClock = (value) => {
+        const match = String(value).trim().match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return null;
+        const hour = Number(match[1]);
+        const minute = Number(match[2]);
+        return hour >= 0 && hour < 24 && minute >= 0 && minute < 60 ? hour * 60 + minute : null;
+      };
+      const range = right.replace(/[–—]/g, "-").split("-").map(parseClock);
+      const current = parseClock(left);
+      if (range.length !== 2 || current === null || range.some((value) => value === null)) return false;
+      if (range[0] <= range[1]) return current >= range[0] && current <= range[1];
+      return current >= range[0] || current <= range[1];
+    }
     case "like": {
       const escaped = right.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/[*%]/g, ".*").replace(/[?]/g, ".");
       try { return new RegExp(`^${escaped}$`, caseSensitive ? "" : "i").test(left); } catch { return false; }
@@ -4113,7 +4133,7 @@ function WebActivityFiltersPanel({ api }) {
   const [editingID, setEditingID] = useState(null);
   const [message, setMessage] = useState("");
   const fields = { application: "Application", bundleIdentifier: "Bundle identifier", windowTitle: "Window title", resource: "URL or path", domain: "Domain", fullURL: "Full website URL", keyword: "Keyword", device: "Device", startTime: "Start time", dayOfWeek: "Day of week" };
-  const comparisons = { contains: "contains", equals: "is", beginsWith: "begins with", endsWith: "ends with", like: "is like", isNot: "is not", matchesRegex: "matches regex" };
+  const comparisons = { contains: "contains", equals: "is", beginsWith: "begins with", endsWith: "ends with", like: "is like", isNot: "is not", isBetween: "is between", matchesRegex: "matches regex" };
   const emptyRule = () => ({ field: "application", comparison: "contains", pattern: "", case_sensitive: false });
   const resetEditor = () => {
     setName("");
@@ -4181,7 +4201,7 @@ function WebActivityCategoriesPanel({ api }) {
   const [editingID, setEditingID] = useState(null);
   const [message, setMessage] = useState("");
   const fields = { application: "Application", bundleIdentifier: "Bundle identifier", windowTitle: "Window title", resource: "URL or path", domain: "Domain", fullURL: "Full website URL", keyword: "Keyword", device: "Device", startTime: "Start time", dayOfWeek: "Day of week" };
-  const comparisons = { contains: "contains", equals: "is", beginsWith: "begins with", endsWith: "ends with", like: "is like", isNot: "is not", matchesRegex: "matches regex" };
+  const comparisons = { contains: "contains", equals: "is", beginsWith: "begins with", endsWith: "ends with", like: "is like", isNot: "is not", isBetween: "is between", matchesRegex: "matches regex" };
   const comparisonRawValue = (value) => Object.entries(comparisons).find(([raw, label]) => raw === value || label === value)?.[0] || "contains";
   const emptyRule = () => ({ field: "application", comparison: "contains", pattern: "", case_sensitive: false });
   const resetEditor = () => {
@@ -5352,7 +5372,7 @@ function WebProjectRulesPanel({ api, dateKey }) {
       setReapplyBusy("");
     }
   };
-  return <section className="project-rules-panel"><div className="project-rules-heading"><div><h2>Project automation rules</h2><p>Assign future App, title, device, domain, URL, or keyword activity to a project.</p></div><span className="api-badge">{api.projectRules.length} saved</span></div><form className="project-rules-form" onSubmit={submit}><select value={projectID} onChange={(event) => setProjectID(event.target.value)} aria-label="Project rule project"><option value="">Choose project</option>{projectOptionRows(projects).map(({ project, depth }) => <option key={project.id} value={resourceID(project.id)}>{"— ".repeat(depth)}{project.title || project.name}</option>)}</select><select value={field} onChange={(event) => setField(event.target.value)} aria-label="Project rule field">{Object.entries(fields).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={comparison} onChange={(event) => setComparison(event.target.value)} aria-label="Project rule comparison"><option value="contains">contains</option><option value="equals">is</option><option value="beginsWith">begins with</option><option value="endsWith">ends with</option><option value="like">is like</option><option value="isNot">is not</option><option value="matchesRegex">matches regex</option></select><input value={pattern} onChange={(event) => setPattern(event.target.value)} placeholder="Matching value" aria-label="Project rule value" /><button type="submit" disabled={!api.connected || !projectID || !pattern.trim()}><Plus size={16} />Add Rule</button></form>{api.projectRules.length > 0 ? <div className="project-rules-list">{api.projectRules.map((rule, index) => <div className="project-rule-row" key={rule.id}><span className="web-source-icon"><Sparkle size={17} /></span><div><strong>{rule.project_name || projectTitleFor(projects, rule.project_id)}</strong><small>{fields[rule.field] || rule.field} {rule.comparison} “{rule.pattern}”</small></div><span className="project-rule-order"><IconButton label="Move rule up" onClick={() => api.moveProjectRule(rule.id, -1)} disabled={index === 0}><CaretLeft size={15} className="rotate-up" /></IconButton><IconButton label="Move rule down" onClick={() => api.moveProjectRule(rule.id, 1)} disabled={index === api.projectRules.length - 1}><CaretRight size={15} className="rotate-down" /></IconButton></span><IconButton label={`Delete rule for ${rule.project_name || "project"}`} onClick={() => api.deleteProjectRule(rule.id)}><Trash size={15} /></IconButton></div>)}</div> : <div className="project-rules-empty"><Sparkle size={22} /><span>No project automation rules yet. Assign an activity in Activities, then save its matching pattern here.</span></div>}<div className="project-rules-footer"><span><ArrowsClockwise size={15} />{message || "Rules only change existing activity when you explicitly reapply them."}</span><div><button type="button" onClick={() => reapply("today")} disabled={!api.connected || Boolean(reapplyBusy)}>{reapplyBusy === "today" ? "Reapplying…" : "Reapply to Today"}</button><button type="button" onClick={() => reapply("all")} disabled={!api.connected || Boolean(reapplyBusy)}>{reapplyBusy === "all" ? "Reapplying…" : "Reapply All History"}</button></div></div></section>;
+  return <section className="project-rules-panel"><div className="project-rules-heading"><div><h2>Project automation rules</h2><p>Assign future App, title, device, domain, URL, or keyword activity to a project.</p></div><span className="api-badge">{api.projectRules.length} saved</span></div><form className="project-rules-form" onSubmit={submit}><select value={projectID} onChange={(event) => setProjectID(event.target.value)} aria-label="Project rule project"><option value="">Choose project</option>{projectOptionRows(projects).map(({ project, depth }) => <option key={project.id} value={resourceID(project.id)}>{"— ".repeat(depth)}{project.title || project.name}</option>)}</select><select value={field} onChange={(event) => setField(event.target.value)} aria-label="Project rule field">{Object.entries(fields).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={comparison} onChange={(event) => setComparison(event.target.value)} aria-label="Project rule comparison"><option value="contains">contains</option><option value="equals">is</option><option value="beginsWith">begins with</option><option value="endsWith">ends with</option><option value="like">is like</option><option value="isNot">is not</option><option value="isBetween">is between</option><option value="matchesRegex">matches regex</option></select><input value={pattern} onChange={(event) => setPattern(event.target.value)} placeholder={field === "startTime" && comparison === "isBetween" ? "09:00–17:00" : field === "dayOfWeek" ? "Monday, weekday, or weekend" : "Matching value"} aria-label="Project rule value" /><button type="submit" disabled={!api.connected || !projectID || !pattern.trim()}><Plus size={16} />Add Rule</button></form>{api.projectRules.length > 0 ? <div className="project-rules-list">{api.projectRules.map((rule, index) => <div className="project-rule-row" key={rule.id}><span className="web-source-icon"><Sparkle size={17} /></span><div><strong>{rule.project_name || projectTitleFor(projects, rule.project_id)}</strong><small>{fields[rule.field] || rule.field} {rule.comparison} “{rule.pattern}”</small></div><span className="project-rule-order"><IconButton label="Move rule up" onClick={() => api.moveProjectRule(rule.id, -1)} disabled={index === 0}><CaretLeft size={15} className="rotate-up" /></IconButton><IconButton label="Move rule down" onClick={() => api.moveProjectRule(rule.id, 1)} disabled={index === api.projectRules.length - 1}><CaretRight size={15} className="rotate-down" /></IconButton></span><IconButton label={`Delete rule for ${rule.project_name || "project"}`} onClick={() => api.deleteProjectRule(rule.id)}><Trash size={15} /></IconButton></div>)}</div> : <div className="project-rules-empty"><Sparkle size={22} /><span>No project automation rules yet. Assign an activity in Activities, then save its matching pattern here.</span></div>}<div className="project-rules-footer"><span><ArrowsClockwise size={15} />{message || "Rules only change existing activity when you explicitly reapply them."}</span><div><button type="button" onClick={() => reapply("today")} disabled={!api.connected || Boolean(reapplyBusy)}>{reapplyBusy === "today" ? "Reapplying…" : "Reapply to Today"}</button><button type="button" onClick={() => reapply("all")} disabled={!api.connected || Boolean(reapplyBusy)}>{reapplyBusy === "all" ? "Reapplying…" : "Reapply All History"}</button></div></div></section>;
 }
 
 function RulesPageLive({ api }) {

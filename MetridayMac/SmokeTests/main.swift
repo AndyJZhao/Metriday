@@ -996,12 +996,12 @@ Task { @MainActor in
         appName: "Safari",
         windowTitle: "Unrelated page",
         resource: "https://example.com/README.md",
-        startMinute: 600,
-        endMinute: 610,
+        startMinute: 1_200,
+        endMinute: 1_210,
         relevance: .related
     )
     expect(
-        projectStore.matchingProjectID(for: webFileActivity, date: date) == nil,
+        projectStore.matchingProjectID(for: webFileActivity, date: date.addingTimeInterval(2 * 24 * 60 * 60)) == nil,
         "File path rules should not treat web URLs as local files"
     )
     let deviceActivity = ActivitySegment(
@@ -1168,7 +1168,6 @@ Task { @MainActor in
         projectStore.matchingProjectID(for: mondayActivity, date: mondayAtTen) == timeRuleProjectID,
         "Day-of-week project rules should assign matching activities"
     )
-
     let filterRoot = tempRoot.appendingPathComponent("Filters", isDirectory: true)
     let filterStore = ActivityFilterStore(rootDirectory: filterRoot)
     let savedFilter = ActivityFilterDefinition(
@@ -2019,6 +2018,76 @@ Task { @MainActor in
     expect(store.markdown.contains("Task on next day"), "The newly created daily Markdown should be editable")
     expect(!store.load(date: date), "Returning to an existing date should open instead of recreate it")
     expect(store.markdown == originalMarkdown, "Switching dates must preserve each day's Markdown independently")
+
+    let temporalRuleStore = ProjectStore(
+        rootDirectory: tempRoot.appendingPathComponent("TemporalProjectRules", isDirectory: true)
+    )
+    guard let temporalRuleProjectID = temporalRuleStore.createProject(name: "Temporal Rules") else {
+        expect(false, "Temporal rule store should create a project")
+        return
+    }
+    _ = temporalRuleStore.addRule(
+        projectID: temporalRuleProjectID,
+        field: .startTime,
+        pattern: "09:00–17:00",
+        comparison: .isBetween
+    )
+    _ = temporalRuleStore.addRule(
+        projectID: temporalRuleProjectID,
+        field: .dayOfWeek,
+        pattern: "weekend",
+        comparison: .equals
+    )
+    let temporalWeekdayDate = mondayAtTen.addingTimeInterval(24 * 60 * 60)
+    let temporalWorkHours = ActivitySegment(
+        appName: "Calendar",
+        windowTitle: "Planning",
+        startMinute: 600,
+        endMinute: 610,
+        relevance: .other
+    )
+    let temporalOutsideHours = ActivitySegment(
+        appName: "Calendar",
+        windowTitle: "Planning",
+        startMinute: 1_200,
+        endMinute: 1_210,
+        relevance: .other
+    )
+    expect(
+        temporalRuleStore.matchingProjectID(for: temporalWorkHours, date: temporalWeekdayDate) == temporalRuleProjectID,
+        "Start-time rules should match a time inside the configured range"
+    )
+    expect(
+        temporalRuleStore.matchingProjectID(for: temporalOutsideHours, date: temporalWeekdayDate) == nil,
+        "Start-time rules should reject an out-of-range weekday activity"
+    )
+    expect(
+        temporalRuleStore.matchingProjectID(for: temporalOutsideHours, date: date) == temporalRuleProjectID,
+        "Day-of-week rules should recognize weekend activities"
+    )
+    let temporalFilterStore = ActivityFilterStore(
+        rootDirectory: tempRoot.appendingPathComponent("TemporalFilters", isDirectory: true)
+    )
+    let temporalFilter = ActivityFilterDefinition(
+        name: "Temporal filter",
+        matchMode: .any,
+        rules: [
+            ActivityFilterRule(
+                field: .startTime,
+                pattern: "09:00–17:00",
+                comparison: .isBetween
+            ),
+            ActivityFilterRule(
+                field: .dayOfWeek,
+                pattern: "weekday",
+                comparison: .equals
+            )
+        ]
+    )
+    expect(
+        temporalFilterStore.matches(temporalFilter, activity: temporalWorkHours, date: temporalWeekdayDate),
+        "Activity filters should share time-range and weekday matching"
+    )
 
     try? FileManager.default.removeItem(at: tempRoot)
     print("Metriday smoke tests passed")

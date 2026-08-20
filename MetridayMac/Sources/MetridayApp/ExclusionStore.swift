@@ -244,6 +244,8 @@ final class ExclusionStore: ObservableObject {
             return regexMatches("^\(pattern)$", value: value, caseSensitive: rule.isCaseSensitive)
         case .isNot:
             return value.compare(rule.pattern, options: options) != .orderedSame
+        case .isBetween:
+            return false
         case .matchesRegex:
             return regexMatches(rule.pattern, value: value, caseSensitive: rule.isCaseSensitive)
         }
