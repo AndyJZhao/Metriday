@@ -87,15 +87,21 @@ struct SettingsSheet: View {
             ))
             .toggleStyle(.checkbox)
             .font(.system(size: 12))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .accessibilityIdentifier("settings.automatic-tracking")
 
             Toggle("Start tracking when Metriday opens", isOn: $preferences.startTrackingWhenAppOpens)
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
 
             Toggle("Stop timers when the Mac goes to sleep", isOn: $preferences.autoStopTimerOnSleep)
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
 
             Toggle("Launch Metriday at login", isOn: Binding(
                 get: { loginItemManager.isEnabled },
@@ -103,6 +109,8 @@ struct SettingsSheet: View {
             ))
             .toggleStyle(.checkbox)
             .font(.system(size: 12))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             Text(loginItemManager.statusMessage)
                 .font(.system(size: 10))
                 .foregroundStyle(MetridayTheme.secondary)
@@ -135,14 +143,20 @@ struct SettingsSheet: View {
             Toggle("Track on weekends", isOn: $preferences.trackWeekends)
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
 
             Toggle("Track only during working hours", isOn: $preferences.trackOnlyDuringWorkingHours)
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
 
             Toggle("Automatically zoom timeline to working hours", isOn: $preferences.automaticallyZoomTimelineToWorkingHours)
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
 
             Text("When enabled, Activities opens the timeline around the configured working-hours window.")
                 .font(.system(size: 10))
@@ -319,6 +333,8 @@ struct SettingsSheet: View {
             Toggle("Include sub-projects when selecting a project", isOn: $preferences.includeSubprojectsWhenSelectingProject)
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
 
             Text("When enabled, selecting a parent project in Activities or Stats includes activity assigned to its descendants. Collapsed project totals always include their children.")
                 .font(.system(size: 10))
@@ -337,6 +353,8 @@ struct SettingsSheet: View {
                 Toggle("Hide recurring reminders", isOn: $reminderStore.hideRecurringReminders)
                     .toggleStyle(.checkbox)
                     .font(.system(size: 12))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
 
                 Toggle("All reminder lists", isOn: Binding(
                     get: { reminderStore.includedListTitles.isEmpty },
@@ -344,6 +362,8 @@ struct SettingsSheet: View {
                 ))
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
 
                 ForEach(reminderStore.availableListTitles, id: \.self) { listTitle in
                     Toggle(listTitle, isOn: Binding(
@@ -356,6 +376,8 @@ struct SettingsSheet: View {
                     .toggleStyle(.checkbox)
                     .font(.system(size: 11))
                     .padding(.leading, 16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
 
                 Text(reminderStore.includedListTitles.isEmpty ? "Showing completed reminders from every list." : "Only selected reminder lists are shown on the Activities timeline.")
@@ -382,6 +404,8 @@ struct SettingsSheet: View {
                 ))
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
 
                 ForEach(calendarStore.availableCalendarTitles, id: \.self) { calendarTitle in
                     Toggle(calendarTitle, isOn: Binding(
@@ -394,6 +418,8 @@ struct SettingsSheet: View {
                     .toggleStyle(.checkbox)
                     .font(.system(size: 11))
                     .padding(.leading, 16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
 
                 Text(calendarStore.includedCalendarTitles.isEmpty ? "Showing timed events from every calendar. All-day events stay hidden to keep the timeline focused." : "Only selected calendars are shown; all-day events stay hidden.")
@@ -493,6 +519,8 @@ struct SettingsSheet: View {
             ))
             .toggleStyle(.checkbox)
             .font(.system(size: 12))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             Text(localAPIServer.allowsLAN
                  ? "LAN access is enabled on port \(localAPIServer.port). Enter this Mac's local IP in the Web App Settings on another device. The API has no login, so use this only on a trusted private network."
                  : "Read activities, projects, and time entries through localhost HTTP. LAN access stays off until you explicitly enable it here.")
@@ -1164,6 +1192,8 @@ private struct ExclusionRuleEditorSheet: View {
             Toggle("Case sensitive", isOn: $caseSensitive)
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
 
             Text("Domain rules compare the browser host. Regex rules compare the selected field directly.")
                 .font(.system(size: 10))
