@@ -154,6 +154,7 @@ struct ActivitiesView: View {
     @ObservedObject var filterStore: ActivityFilterStore
     @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var preferences: ActivitiesPreferencesStore
+    @ObservedObject var trackingPreferences: PreferencesStore
     @ObservedObject var timeEntryStore: TimeEntryStore
     @ObservedObject var calendarStore: CalendarEventStore
     @ObservedObject var reminderStore: ReminderStore
@@ -2416,6 +2417,12 @@ struct ActivitiesView: View {
         projectStore.descendantProjectIDs(including: projectID)
     }
 
+    private func selectedProjectIDs(including projectID: UUID) -> Set<UUID> {
+        trackingPreferences.includeSubprojectsWhenSelectingProject
+            ? descendantProjectIDs(including: projectID)
+            : [projectID]
+    }
+
     private func projectTree(_ project: TrackingProject, depth: Int) -> AnyView {
         AnyView(
             VStack(alignment: .leading, spacing: 0) {
@@ -2738,7 +2745,7 @@ struct ActivitiesView: View {
         case .unassigned:
             return source.filter { $0.projectID == nil }
         case .project(let id):
-            let projectIDs = descendantProjectIDs(including: id)
+            let projectIDs = selectedProjectIDs(including: id)
             return source.filter { segment in
                 guard let projectID = segment.projectID else { return false }
                 return projectIDs.contains(projectID)

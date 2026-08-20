@@ -38,6 +38,7 @@ struct RootView: View {
                             filterStore: appState.filterStore,
                             categoryStore: appState.categoryStore,
                             preferences: appState.activitiesPreferences,
+                            trackingPreferences: appState.preferences,
                             timeEntryStore: appState.timeEntryStore,
                             calendarStore: appState.calendarStore,
                             reminderStore: appState.reminderStore,
@@ -54,6 +55,7 @@ struct RootView: View {
                             screenTimeStore: appState.screenTimeStore,
                             projectStore: appState.projectStore,
                             timeEntryStore: appState.timeEntryStore,
+                            trackingPreferences: appState.preferences,
                             selectedDate: appState.selectedDate
                         )
                     case .reports:

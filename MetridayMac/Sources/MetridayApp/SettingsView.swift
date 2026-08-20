@@ -41,6 +41,7 @@ struct SettingsSheet: View {
                     trackingPanel
                     reviewReminderPanel
                     workingHoursPanel
+                    projectSelectionPanel
                     permissionsPanel
                     calendarPreferencesPanel
                     reminderPreferencesPanel
@@ -293,6 +294,23 @@ struct SettingsSheet: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
+        }
+        .settingsPanel()
+    }
+
+    private var projectSelectionPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Project selection", systemImage: "folder.badge.gearshape")
+                .font(.system(size: 15, weight: .bold))
+
+            Toggle("Include sub-projects when selecting a project", isOn: $preferences.includeSubprojectsWhenSelectingProject)
+                .toggleStyle(.checkbox)
+                .font(.system(size: 12))
+
+            Text("When enabled, selecting a parent project in Activities or Stats includes activity assigned to its descendants. Collapsed project totals always include their children.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .lineSpacing(2)
         }
         .settingsPanel()
     }

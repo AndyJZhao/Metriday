@@ -1145,6 +1145,7 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
     review_reminder_interval_minutes: 0,
     review_reminder_notifications_authorized: false,
     review_reminder_notification_status: "Notifications not requested",
+    include_subprojects_when_selecting_project: true,
     allow_local_network_api: false,
     launch_at_login: false,
     launch_at_login_status: "Login item not configured",
@@ -1273,6 +1274,10 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
       <div className="settings-section"><div className="settings-section-heading"><strong>Activity review reminders</strong><span className={`settings-state-dot ${preferences.review_reminder_notifications_authorized ? "connected" : ""}`} /></div>
         <label className="settings-field-row"><span>Remind to review activities</span><select value={Number(preferences.review_reminder_interval_minutes || 0)} onChange={(event) => updatePreference("review_reminder_interval_minutes", Number(event.target.value))} disabled={!connected || saving}><option value={0}>Never</option><option value={15}>Every 15 minutes</option><option value={30}>Every 30 minutes</option><option value={60}>Every hour</option><option value={120}>Every 2 hours</option></select></label>
         <small className="settings-help-text">The native app sends a local notification summarizing today's tracked time. {preferences.review_reminder_notification_status || "Notifications not requested"}</small>
+      </div>
+      <div className="settings-section"><div className="settings-section-heading"><strong>Project selection</strong></div>
+        <label className="settings-toggle-row"><span><input type="checkbox" checked={preferences.include_subprojects_when_selecting_project !== false} onChange={(event) => updatePreference("include_subprojects_when_selecting_project", event.target.checked)} disabled={!connected || saving} />Include sub-projects when selecting a project</span></label>
+        <small className="settings-help-text">Selecting a parent in Activities or Stats includes descendant activity when enabled. Collapsed project totals always include their children.</small>
       </div>
       <div className="settings-section"><div className="settings-section-heading"><strong>Privacy & connection</strong></div>
         <div className="settings-toggle-row"><label><input type="checkbox" checked={Boolean(preferences.allow_local_network_api)} onChange={(event) => updatePreference("allow_local_network_api", event.target.checked)} disabled={!connected || saving} />Allow local network access</label><small>Required for another device to use this Web companion</small></div>
@@ -4004,8 +4009,9 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   const normalizedQuery = query.trim().toLowerCase();
   const builtinFilterKey = categoryFilter.startsWith("builtin:") ? categoryFilter.slice("builtin:".length) : "all";
   const savedFilter = api.filters.find((filter) => resourceID(filter.id) === savedFilterID);
+  const includeSubprojects = api.preferences?.include_subprojects_when_selecting_project !== false;
   const scopedProjectIDs = projectFilterID !== "all" && projectFilterID !== "unassigned"
-    ? descendantProjectIDs(api.projects, projectFilterID)
+    ? includeSubprojects ? descendantProjectIDs(api.projects, projectFilterID) : new Set([resourceID(projectFilterID)])
     : null;
   const filterActivity = (activity) => {
     const category = activityCategory(activity);
@@ -4344,8 +4350,9 @@ function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProje
     : baseDays;
   const secondsForActivity = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
   const productivityValue = (activity) => activityProductivityValue(activity, api.projects);
+  const includeSubprojects = api.preferences?.include_subprojects_when_selecting_project !== false;
   const scopedProjectIDs = projectScopeID !== "all" && projectScopeID !== "unassigned"
-    ? descendantProjectIDs(api.projects, projectScopeID)
+    ? includeSubprojects ? descendantProjectIDs(api.projects, projectScopeID) : new Set([resourceID(projectScopeID)])
     : null;
   const inProjectScope = (activity) => projectScopeID === "all" || (projectScopeID === "unassigned" ? !activity.projectID : scopedProjectIDs.has(resourceID(activity.projectID)));
   const allSegments = days.flatMap((day) => day.activities || []);

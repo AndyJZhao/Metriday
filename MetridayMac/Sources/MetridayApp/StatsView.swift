@@ -45,6 +45,7 @@ struct StatsView: View {
     @ObservedObject var screenTimeStore: ScreenTimeStore
     @ObservedObject var projectStore: ProjectStore
     @ObservedObject var timeEntryStore: TimeEntryStore
+    @ObservedObject var trackingPreferences: PreferencesStore
     let selectedDate: Date
 
     @State private var projectUnit: StatsProjectUnit = .hour
@@ -59,6 +60,7 @@ struct StatsView: View {
         screenTimeStore: ScreenTimeStore,
         projectStore: ProjectStore,
         timeEntryStore: TimeEntryStore,
+        trackingPreferences: PreferencesStore,
         selectedDate: Date
     ) {
         self.monitor = monitor
@@ -67,6 +69,7 @@ struct StatsView: View {
         self.screenTimeStore = screenTimeStore
         self.projectStore = projectStore
         self.timeEntryStore = timeEntryStore
+        self.trackingPreferences = trackingPreferences
         self.selectedDate = selectedDate
         let day = Calendar.current.startOfDay(for: selectedDate)
         _customStartDate = State(initialValue: day)
@@ -1166,7 +1169,10 @@ struct StatsView: View {
             return projectID == nil
         case .project(let selectedID):
             guard let projectID else { return false }
-            return projectStore.descendantProjectIDs(including: selectedID).contains(projectID)
+            let projectIDs = trackingPreferences.includeSubprojectsWhenSelectingProject
+                ? projectStore.descendantProjectIDs(including: selectedID)
+                : [selectedID]
+            return projectIDs.contains(projectID)
         }
     }
 
