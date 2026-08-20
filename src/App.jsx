@@ -918,7 +918,7 @@ function activityFilterValues(activity, field) {
     case "domain":
       try { return [new URL(activity.resource || "").host]; } catch { return [""]; }
     case "fullURL": return [activity.resource || ""];
-    case "keyword": return [activity.windowTitle, activity.resource].filter(Boolean);
+    case "keyword": return [`${activity.windowTitle || ""} ${activity.resource || ""}`.trim()];
     case "device": return [activity.deviceName || "This Mac"];
     case "startTime": return [String(Math.floor(startMinute / 60)).padStart(2, "0") + ":" + String(startMinute % 60).padStart(2, "0")];
     case "dayOfWeek": return Number.isNaN(startDate.getTime()) ? [] : [startDate.toLocaleDateString("en-US", { weekday: "long" })];
@@ -926,27 +926,40 @@ function activityFilterValues(activity, field) {
   }
 }
 
+function activityFilterAtomMatches(source, pattern, comparison, caseSensitive) {
+  const left = String(source);
+  const right = String(pattern).trim();
+  if (!right) return false;
+  const normalizedLeft = caseSensitive ? left : left.toLowerCase();
+  const normalizedRight = caseSensitive ? right : right.toLowerCase();
+  switch (comparison) {
+    case "equals": return normalizedLeft === normalizedRight;
+    case "beginsWith": return normalizedLeft.startsWith(normalizedRight);
+    case "endsWith": return normalizedLeft.endsWith(normalizedRight);
+    case "isNot": return normalizedLeft !== normalizedRight;
+    case "like": {
+      const escaped = right.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/[*%]/g, ".*").replace(/[?]/g, ".");
+      try { return new RegExp(`^${escaped}$`, caseSensitive ? "" : "i").test(left); } catch { return false; }
+    }
+    default: return normalizedLeft.includes(normalizedRight);
+  }
+}
+
 function activityFilterRuleMatches(activity, rule) {
   const pattern = String(rule.pattern || "");
-  const flags = rule.case_sensitive ? "" : "i";
+  const caseSensitive = Boolean(rule.case_sensitive);
+  const flags = caseSensitive ? "" : "i";
   const values = activityFilterValues(activity, rule.field);
   if (!values.length || !pattern) return false;
   if (rule.comparison === "matchesRegex") {
     try { return values.some((value) => new RegExp(pattern, flags).test(String(value))); } catch { return false; }
   }
-  return values.some((value) => {
-    const source = String(value);
-    const left = rule.case_sensitive ? source : source.toLowerCase();
-    const right = rule.case_sensitive ? pattern : pattern.toLowerCase();
-    switch (rule.comparison) {
-      case "equals": return left === right;
-      case "beginsWith": return left.startsWith(right);
-      case "endsWith": return left.endsWith(right);
-      case "isNot": return left !== right;
-      case "like": return left.includes(right.replaceAll("%", ""));
-      default: return left.includes(right);
-    }
-  });
+  const matchesExpression = (value) => pattern
+    .split("||")
+    .some((orBranch) => orBranch
+      .split("&&")
+      .every((atom) => activityFilterAtomMatches(value, atom, rule.comparison, caseSensitive)));
+  return values.some((value) => matchesExpression(value));
 }
 
 function activityMatchesFilter(activity, filter) {
