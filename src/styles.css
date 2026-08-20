@@ -1119,7 +1119,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .settings-state-dot, .settings-connection-state i, .settings-source-status i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #c2c5ce; }
 .settings-state-dot.connected, .settings-connection-state i.connected, .settings-source-status i.connected { background: var(--success); }
 .settings-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #454a55; font-size: 12px; }
-.settings-toggle-row label, .settings-toggle-row > span { display: inline-flex; align-items: center; gap: 7px; }
+.settings-toggle-row label, .settings-toggle-row > span { display: inline-flex; flex: 1 1 auto; align-items: center; gap: 7px; min-width: 0; cursor: pointer; }
 .settings-toggle-row small { color: var(--muted); font-size: 10px; text-align: right; }
 .settings-toggle-row input { accent-color: var(--accent); }
 .settings-field-row { display: flex; align-items: center; justify-content: space-between; color: #454a55; font-size: 12px; }
