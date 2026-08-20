@@ -62,6 +62,7 @@ Activity rows expose a Timing-style double-click/context-menu path to create a T
 
 Recorded manual and timer entries now appear as a distinct amber lane in Today’s Actual timeline and in the Activities 24-hour timeline. Cross-midnight entries are clipped to the selected day, while a running timer is rendered as a live entry without being persisted until it stops.
 Recorded entries in the Activities timeline are clickable and open the full Time Entry editor; the context menu exposes the same action.
+The Activities timeline context menu also exposes Delete Time Entry, matching Timing's direct timeline cleanup workflow in both horizontal and vertical orientations.
 When a new or edited time entry replaces an overlapping entry, only the selected range is replaced. Any time before or after that range is preserved as one or more fragments, and Entry-O-Matic undo restores the original entry atomically.
 
 Timeline colors are explained inline: filled deep-blue/red/gray blocks are Focused, Distracting, and Other/Idle app usage; the amber outlined lane is a manual or timer Time Entry; the blue dashed lane is a Calendar event. Hovering any block opens a Timing-style detail banner with the exact second-level range, duration, source, and Project marker; an unassigned App block shows `None · From the app usage`.

@@ -188,6 +188,9 @@ struct ActivitiesView: View {
                             },
                             onEditTimeEntry: { entry in
                                 editingEntry = entry
+                            },
+                            onDeleteTimeEntry: { entry in
+                                timeEntryStore.delete(entry)
                             }
                         )
                         CalendarEventsPanel(
@@ -4862,6 +4865,7 @@ private struct ActivityTimelinePanel: View {
     let onRecordCalendarEvent: (CalendarEventItem, Bool) -> Void
     let onSelectActivity: (ActivitySegment) -> Void
     let onEditTimeEntry: (TimeEntry) -> Void
+    let onDeleteTimeEntry: (TimeEntry) -> Void
 
     @State private var dragAnchorMinute: Int?
     @State private var hoveredSegmentID: UUID?
@@ -5102,6 +5106,9 @@ private struct ActivityTimelinePanel: View {
                                     Button("Edit Time Entry") {
                                         onEditTimeEntry(entry)
                                     }
+                                    Button("Delete Time Entry", role: .destructive) {
+                                        onDeleteTimeEntry(entry)
+                                    }
                                 }
                                 .help("Recorded time · \(entry.title)")
                         }
@@ -5307,6 +5314,14 @@ private struct ActivityTimelinePanel: View {
                                 .accessibilityLabel("Recorded time · \(entry.title)")
                                 .accessibilityIdentifier("activities.vertical-timeline.time-entry.\(entry.id.uuidString)")
                                 .onTapGesture { onEditTimeEntry(entry) }
+                                .contextMenu {
+                                    Button("Edit Time Entry") {
+                                        onEditTimeEntry(entry)
+                                    }
+                                    Button("Delete Time Entry", role: .destructive) {
+                                        onDeleteTimeEntry(entry)
+                                    }
+                                }
                                 .help("Recorded time · \(entry.title)")
                         }
                     }
