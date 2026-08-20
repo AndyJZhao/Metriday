@@ -2988,7 +2988,12 @@ function WebReportPanel({ api, dateKey }) {
   const entrySeconds = dataset.entries.reduce((total, entry) => {
     const start = new Date(entry.start_date || entry.start).getTime();
     const end = new Date(entry.end_date || entry.end).getTime();
-    return Number.isFinite(start) && Number.isFinite(end) ? total + Math.max(0, Math.round((end - start) / 1000)) : total;
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return total;
+    const startBound = new Date(`${rangeStart}T00:00:00`).getTime();
+    const endBound = new Date(`${offsetDateKey(rangeEnd, 1)}T00:00:00`).getTime();
+    const clippedStart = Math.max(start, startBound);
+    const clippedEnd = Math.min(end, endBound);
+    return clippedEnd > clippedStart ? total + Math.max(1, Math.round((clippedEnd - clippedStart) / 1000)) : total;
   }, 0);
   const reportRangeLabel = rangeStart === rangeEnd ? rangeStart : `${rangeStart}–${rangeEnd}`;
   return <section className="web-report-panel">
