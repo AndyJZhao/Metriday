@@ -1287,9 +1287,24 @@ struct ActivitiesView: View {
             alignment: .leading,
             spacing: 12
         ) {
-            categoryCard(title: "Websites", icon: "globe", segments: websiteSegments)
-            categoryCard(title: "Applications", icon: "rectangle.on.rectangle", segments: applicationSegments)
-            categoryCard(title: "Paths", icon: "folder", segments: pathSegments)
+            categoryCard(
+                title: "Websites",
+                icon: "globe",
+                segments: websiteSegments,
+                nameFor: { resourceLabel($0.resource) }
+            )
+            categoryCard(
+                title: "Applications",
+                icon: "rectangle.on.rectangle",
+                segments: applicationSegments,
+                nameFor: { appName(for: $0) }
+            )
+            categoryCard(
+                title: "Paths",
+                icon: "folder",
+                segments: pathSegments,
+                nameFor: { $0.resource.replacingOccurrences(of: "file://", with: "") }
+            )
             categoryCard(
                 title: "Keywords",
                 icon: "textformat.abc",
@@ -1567,7 +1582,8 @@ struct ActivitiesView: View {
         title: String,
         icon: String,
         segments: [ActivitySegment],
-        rows: [CategoryRow]? = nil
+        rows: [CategoryRow]? = nil,
+        nameFor: ((ActivitySegment) -> String)? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -1584,7 +1600,7 @@ struct ActivitiesView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
-                ForEach((rows ?? categoryRows(segments)).prefix(6)) { row in
+                ForEach((rows ?? categoryRows(segments, nameFor: nameFor)).prefix(6)) { row in
                     HStack(spacing: 7) {
                         Circle()
                             .fill(categoryColor(for: row.category))
@@ -1596,6 +1612,34 @@ struct ActivitiesView: View {
                         Text(formatMinutes(row.seconds))
                             .font(.system(size: 10, weight: .semibold))
                     }
+                    .contentShape(Rectangle())
+                    .gesture(
+                        TapGesture(count: 2)
+                            .exclusively(before: TapGesture())
+                            .onEnded { result in
+                                guard let activity = row.segments.first else { return }
+                                switch result {
+                                case .first:
+                                    prepareNewEntry(for: activity)
+                                    showingNewEntry = true
+                                case .second:
+                                    selectedActivity = activity
+                                }
+                            }
+                    )
+                    .contextMenu {
+                        if let activity = row.segments.first {
+                            Button("Create Time Entry") {
+                                prepareNewEntry(for: activity)
+                                showingNewEntry = true
+                            }
+                        }
+                    }
+                    .help("Click for details · double-click to create a time entry")
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Open \(row.name) in \(title)")
+                    .accessibilityHint("Double-click to create a time entry")
+                    .accessibilityAddTraits(.isButton)
                 }
             }
         }
@@ -2382,6 +2426,16 @@ struct ActivitiesView: View {
         newEntryStart = newEntryEnd.addingTimeInterval(-3600)
     }
 
+    private func prepareNewEntry(for activity: ActivitySegment) {
+        prepareNewEntry(startMinute: activity.startMinute, endMinute: activity.endMinute)
+        newEntryTitle = activity.appName.isEmpty ? "App activity" : activity.appName
+        newEntryNotes = activity.displayTitle
+        newEntryProjectID = activity.projectID ?? selectedProjectID
+        newEntryBillingStatus = newEntryProjectID
+            .flatMap { projectStore.project($0)?.defaultBillingStatus }
+            ?? .billable
+    }
+
     private func prepareNewEntry(for reminder: ReminderItem) {
         newEntryTitle = reminder.title
         newEntryNotes = [reminder.listTitle, reminder.notes]
@@ -2538,7 +2592,8 @@ struct ActivitiesView: View {
             for word in Set(words) {
                 values[word, default: CategoryAggregation()].add(
                     seconds: segment.durationSeconds,
-                    category: category
+                    category: category,
+                    segment: segment
                 )
             }
         }
@@ -2550,20 +2605,26 @@ struct ActivitiesView: View {
                     name: "Other",
                     role: .other,
                     isSystem: true
-                )
+                ),
+                segments: value.segments
             )
         }
         .sorted { $0.seconds > $1.seconds }
     }
 
-    private func categoryRows(_ segments: [ActivitySegment]) -> [CategoryRow] {
+    private func categoryRows(
+        _ segments: [ActivitySegment],
+        nameFor: ((ActivitySegment) -> String)? = nil
+    ) -> [CategoryRow] {
         var values: [String: CategoryAggregation] = [:]
         for segment in segments {
-            let name = categoryName(for: segment)
+            let name = (nameFor?(segment) ?? categoryName(for: segment))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else { continue }
             values[name, default: CategoryAggregation()].add(
                 seconds: segment.durationSeconds,
-                category: category(for: segment)
+                category: category(for: segment),
+                segment: segment
             )
         }
         return values.map { name, value in
@@ -2574,7 +2635,8 @@ struct ActivitiesView: View {
                     name: "Other",
                     role: .other,
                     isSystem: true
-                )
+                ),
+                segments: value.segments
             )
         }
         .sorted { $0.seconds > $1.seconds }
@@ -3279,6 +3341,7 @@ private struct CategoryRow: Identifiable {
     let name: String
     let seconds: Int
     let category: ActivityCategoryDefinition
+    let segments: [ActivitySegment]
 }
 
 private struct CategoryAggregation {
@@ -3288,10 +3351,12 @@ private struct CategoryAggregation {
     }
 
     private(set) var seconds = 0
+    private(set) var segments: [ActivitySegment] = []
     private var buckets: [UUID: Bucket] = [:]
 
-    mutating func add(seconds: Int, category: ActivityCategoryDefinition) {
+    mutating func add(seconds: Int, category: ActivityCategoryDefinition, segment: ActivitySegment) {
         self.seconds += seconds
+        segments.append(segment)
         if var bucket = buckets[category.id] {
             bucket.seconds += seconds
             buckets[category.id] = bucket
