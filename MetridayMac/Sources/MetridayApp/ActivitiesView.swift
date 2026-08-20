@@ -2510,15 +2510,16 @@ struct ActivitiesView: View {
             ? resourceLabel(segment.resource)
             : nil
         let context: String?
-        if preferences.showWindowTitles,
-           let usefulTitle,
-           let path,
-           preferences.includeTitlesInAdditionToPaths {
-            context = "\(path) · \(usefulTitle)"
+        if let path {
+            if preferences.showWindowTitles,
+               let usefulTitle,
+               preferences.includeTitlesInAdditionToPaths {
+                context = "\(path) · \(usefulTitle)"
+            } else {
+                context = path
+            }
         } else if preferences.showWindowTitles, let usefulTitle {
             context = usefulTitle
-        } else if let path {
-            context = path
         } else if segment.deviceName != appState.syncStore.deviceName {
             context = segment.deviceName
         } else {
