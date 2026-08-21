@@ -14,6 +14,9 @@ swiftc \
   "$project_dir/Sources/MetridayApp/TimeEntryStore.swift" \
   "$project_dir/Sources/MetridayApp/PreferencesStore.swift" \
   "$project_dir/Sources/MetridayApp/CalendarEventStore.swift" \
+  "$project_dir/Sources/MetridayApp/Theme.swift" \
+  "$project_dir/Sources/MetridayApp/TimelineComponents.swift" \
+  "$project_dir/Sources/MetridayApp/CalendarEventTimeline.swift" \
   "$project_dir/Sources/MetridayApp/PhoneCallStore.swift" \
   "$project_dir/Sources/MetridayApp/ReminderStore.swift" \
   "$project_dir/Sources/MetridayApp/ScreenTimeStore.swift" \
@@ -34,6 +37,7 @@ swiftc \
   "$project_dir/Sources/MetridayApp/MarkdownStore.swift" \
   "$project_dir/SmokeTests/main.swift" \
   -framework AppKit \
+  -framework SwiftUI \
   -framework ApplicationServices \
   -framework CoreGraphics \
   -framework EventKit \

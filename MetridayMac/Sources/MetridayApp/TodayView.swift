@@ -8,8 +8,10 @@ struct TodayView: View {
     @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var timeEntryStore: TimeEntryStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
+    @ObservedObject var calendarStore: CalendarEventStore
     @State private var selectedActivity: ActivitySegment?
     @State private var selectedTimeEntry: TimeEntry?
+    @State private var selectedCalendarEvent: CalendarEventItem?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,6 +53,13 @@ struct TodayView: View {
                 timeEntryStore: timeEntryStore
             )
         }
+        .sheet(item: $selectedCalendarEvent) { event in
+            CalendarEventDetailSheet(
+                event: event,
+                projectID: appState.suggestedProjectID(for: event),
+                timeEntryStore: timeEntryStore
+            )
+        }
     }
 
     private var plannedColumn: some View {
@@ -58,6 +67,13 @@ struct TodayView: View {
             TimelineColumnHeader(title: "Plan", subtitle: "What I planned")
             ZStack(alignment: .topLeading) {
                 TimelineGrid()
+                ForEach(calendarEventTimelineItems(events: calendarStore.events, date: appState.selectedDate)) { item in
+                    CalendarEventTimelineBlock(item: item) {
+                        selectedCalendarEvent = item.event
+                    }
+                    .padding(.horizontal, 10)
+                    .zIndex(1)
+                }
                 ForEach(scheduledTasks) { task in
                     if let start = task.startMinute, let end = task.endMinute {
                         StaticTimelineBlock(

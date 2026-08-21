@@ -31,7 +31,8 @@ struct RootView: View {
                             filterStore: appState.filterStore,
                             categoryStore: appState.categoryStore,
                             timeEntryStore: appState.timeEntryStore,
-                            screenTimeStore: appState.screenTimeStore
+                            screenTimeStore: appState.screenTimeStore,
+                            calendarStore: appState.calendarStore
                         )
                     case .plan:
                         PlanView()

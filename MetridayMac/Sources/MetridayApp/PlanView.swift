@@ -495,6 +495,7 @@ struct PlanCalendarPane: View {
     @ObservedObject var store: MarkdownStore
     @State private var isSystemDropTargeted = false
     @State private var now = Date()
+    @State private var selectedCalendarEvent: CalendarEventItem?
 
     private var visibleDates: [Date] {
         (0..<4).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: appState.selectedDate) }
@@ -551,6 +552,13 @@ struct PlanCalendarPane: View {
         }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { value in
             now = value
+        }
+        .sheet(item: $selectedCalendarEvent) { event in
+            CalendarEventDetailSheet(
+                event: event,
+                projectID: appState.suggestedProjectID(for: event),
+                timeEntryStore: appState.timeEntryStore
+            )
         }
     }
 
@@ -695,6 +703,14 @@ struct PlanCalendarPane: View {
                                             .stroke(MetridayTheme.accent, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                                             .padding(3)
                                     )
+                            }
+
+                            ForEach(calendarEventTimelineItems(events: appState.calendarStore.events, date: appState.selectedDate)) { item in
+                                CalendarEventTimelineBlock(item: item) {
+                                    selectedCalendarEvent = item.event
+                                }
+                                .padding(.horizontal, 6)
+                                .zIndex(1)
                             }
 
                             ForEach(store.tasks.filter { $0.startMinute != nil }) { task in

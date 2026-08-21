@@ -138,6 +138,8 @@ The left pane is a native continuous Markdown editor with NotePlan-style live pr
 
 The selected-day Plan timeline shows a live current-time marker during the visible 08:00–20:00 window. It refreshes every 30 seconds, uses the same blue-violet accent as other time navigation, and is display-only so it never intercepts task selection, resizing, or drag/drop.
 
+Read-only EventKit Calendar Events are also mirrored into the selected-day Plan and Today timelines with a distinct amber dashed treatment. Selecting an event opens its calendar, location, notes, and exact range; `Record Time Entry` is always explicit, preserves the Calendar Event identifier in local custom fields, and never creates Markdown or starts a Timer automatically. The Web Plan and Today timelines expose the same event treatment and record-time path through the local API.
+
 ## Website blocking MVP
 
 While a focus session is active, Metriday can inspect the frontmost Safari or Chrome tab through macOS Automation and redirect blocklisted domains to a local focus page. The app asks for Automation permission when this feature is first used.

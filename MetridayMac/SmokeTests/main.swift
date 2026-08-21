@@ -18,6 +18,21 @@ func sqliteExec(_ database: OpaquePointer, _ sql: String) -> Bool {
 }
 
 let date = Date(timeIntervalSince1970: 1_786_729_600)
+let calendarEventDay = Calendar.current.date(from: DateComponents(year: 2026, month: 8, day: 21))!
+let calendarEvent = CalendarEventItem(
+    id: "event-smoke",
+    title: "Research sync",
+    calendarTitle: "Work",
+    location: "Room 1",
+    notes: "Bring draft",
+    urlString: "",
+    start: calendarEventDay.addingTimeInterval(7 * 60 * 60 + 30 * 60),
+    end: calendarEventDay.addingTimeInterval(9 * 60 * 60 + 15 * 60)
+)
+let calendarTimelineItems = calendarEventTimelineItems(events: [calendarEvent], date: calendarEventDay)
+expect(calendarTimelineItems.count == 1, "Calendar events should produce one visible timeline item")
+expect(calendarTimelineItems[0].startMinute == TimelineMetrics.startMinute, "Calendar event timeline should clip before the visible workday")
+expect(calendarTimelineItems[0].endMinute == TimelineMetrics.startMinute + 75, "Calendar event timeline should preserve its clipped end")
 let seeded = MarkdownCodec.seed(for: date)
 let markdown = MarkdownCodec.serialize(seeded)
 let parsed = MarkdownCodec.parse(markdown, date: date)

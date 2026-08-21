@@ -1671,12 +1671,12 @@ function planTimelineBlocks(tasks, connected) {
   });
 }
 
-function PlannedTrack({ tasks, connected, onSelect }) {
+function PlannedTrack({ tasks, connected, onSelect, calendarEvents = [], dateKey, onRecordCalendarEvent }) {
  const blocks = planTimelineBlocks(tasks, connected);
  return (
    <section className="today-track planned-track" aria-label="Planned timeline">
      <div className="track-heading"><div><strong>Plan</strong><span>What I planned</span></div></div>
-     <div className="track-canvas"><GridLines />{blocks.map(({ id, title, start, end, icon: Icon, current }) => (
+     <div className="track-canvas"><GridLines />{calendarEvents.map((event) => <CalendarEventBlock key={`today-calendar-${event.id}`} event={event} dateKey={dateKey} onRecord={onRecordCalendarEvent} />)}{blocks.map(({ id, title, start, end, icon: Icon, current }) => (
         <button key={id} type="button" className={`planned-block ${current ? "current" : ""}`} style={blockStyle(start, end)} onClick={() => onSelect?.(id)} aria-label={`Open planned task ${title}`}><Icon size={18} weight="duotone" /><span><strong>{title}</strong><small>{formatRange(start, end)}</small></span></button>
      ))}{connected && blocks.length === 0 ? <div className="planned-empty">No scheduled tasks in this Markdown plan.</div> : null}</div>
    </section>
@@ -1752,12 +1752,22 @@ function TodayPage({ setPage, api, dateKey, setDateKey }) {
     });
     return { opened: true };
   };
+  const recordCalendarEvent = (event) => {
+    setTimeEntryPrefill({
+      title: event.title || "Calendar event",
+      notes: [event.calendar, event.location, event.notes].filter(Boolean).join(" · "),
+      start: event.start,
+      end: event.end,
+      projectID: resourceID(event.suggested_project_id || event.suggestedProjectID) || "",
+      billingStatus: "billable",
+    });
+  };
   const now = currentMinuteAndLabel();
   const showNow = dateKey === localDateKey();
   const nowStyle = showNow ? { top: `${56 + ((now.minute - DAY_START) / 60) * HOUR_HEIGHT}px` } : { display: "none" };
   return (
     <main className="page today-page">
-      <div className="today-comparison"><div className="timeline-label-column"><HourLabels /></div><PlannedTrack tasks={api.plan?.tasks} connected={api.connected} onSelect={() => setPage("plan")} /><ActualTrack activities={api.activities} connected={api.connected} onRecord={recordActivity} onSelect={setSelectedActivity} projects={api.projects} api={api} /><div className="now-marker" style={nowStyle} aria-label={`Current time ${now.label}`}><span /></div></div>
+      <div className="today-comparison"><div className="timeline-label-column"><HourLabels /></div><PlannedTrack tasks={api.plan?.tasks} connected={api.connected} calendarEvents={api.calendarEvents?.data || []} dateKey={dateKey} onRecordCalendarEvent={recordCalendarEvent} onSelect={() => setPage("plan")} /><ActualTrack activities={api.activities} connected={api.connected} onRecord={recordActivity} onSelect={setSelectedActivity} projects={api.projects} api={api} /><div className="now-marker" style={nowStyle} aria-label={`Current time ${now.label}`}><span /></div></div>
       <TodayInsightBar api={api} setPage={setPage} />
       {api.connected ? <WebActivityInsights insights={api.insights} dateKey={dateKey} /> : null}{selectedActivity ? <ActivityDetailDialog activity={selectedActivity} api={api} dateKey={dateKey} displayPreferences={api.activityPreferences} onClose={() => setSelectedActivity(null)} /> : null}<WebTimeEntryDialog mode="new" open={Boolean(timeEntryPrefill)} api={api} projects={api.projects} recentEntries={api.entries} dateKey={dateKey} initialEntry={timeEntryPrefill} onClose={() => setTimeEntryPrefill(null)} />
     </main>
@@ -1927,6 +1937,23 @@ function MarkdownEditor({ tasks, markdown, planDate, onMarkdownChange, onMarkdow
   );
 }
 
+function calendarEventRange(event, dateKey) {
+  const dayStart = new Date(`${dateKey}T00:00:00`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const eventStart = new Date(event?.start || "");
+  const eventEnd = new Date(event?.end || "");
+  if (Number.isNaN(eventStart.getTime()) || Number.isNaN(eventEnd.getTime()) || eventEnd <= eventStart) return null;
+  const start = Math.max(DAY_START, Math.floor((Math.max(eventStart, dayStart) - dayStart) / 60000));
+  const end = Math.min(DAY_END, Math.ceil((Math.min(eventEnd, dayEnd) - dayStart) / 60000));
+  return end > start ? { start, end } : null;
+}
+
+function CalendarEventBlock({ event, dateKey, onRecord }) {
+  const range = calendarEventRange(event, dateKey);
+  if (!range) return null;
+  return <button type="button" className="calendar-event-block" style={blockStyle(range.start, range.end)} onClick={() => onRecord?.(event)} aria-label={`Record calendar event ${event.title || "Untitled event"}, ${formatRange(range.start, range.end)}`} title={`${event.calendar || "Calendar"} · ${event.title || "Untitled event"}`}><span><CalendarBlank size={12} /><strong>{event.title || "Untitled event"}</strong></span><small>{formatRange(range.start, range.end)} · {event.calendar || "Calendar"}</small></button>;
+}
+
 function CalendarBlock({ task, selected, onSelect, onMoveStart, onComplete, onUnschedule, onResizeStart }) {
   return (
     <div className={`calendar-task-block ${task.tone} ${selected ? "selected" : ""} ${task.completed ? "completed" : ""}`} style={blockStyle(task.start, task.end)}>
@@ -1937,7 +1964,7 @@ function CalendarBlock({ task, selected, onSelect, onMoveStart, onComplete, onUn
   );
 }
 
-function CalendarPanel({ tasks, neighborPlans, selectedTaskId, setSelectedTaskId, onDropTask, onMoveStart, onComplete, onUnschedule, onResizeStart, dateKey, onSelectDate, connected = false }) {
+function CalendarPanel({ tasks, neighborPlans, calendarEvents = [], onRecordCalendarEvent, selectedTaskId, setSelectedTaskId, onDropTask, onMoveStart, onComplete, onUnschedule, onResizeStart, dateKey, onSelectDate, connected = false }) {
   const timelineRef = useRef(null);
   const timelineBodyRef = useRef(null);
   const [now, setNow] = useState(() => new Date());
@@ -1975,7 +2002,7 @@ function CalendarPanel({ tasks, neighborPlans, selectedTaskId, setSelectedTaskId
       <div className="calendar-toolbar"><div className="month-navigation"><IconButton label="Previous month" onClick={() => setVisibleMonth((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1, 12))}><CaretLeft size={16} /></IconButton><strong>{monthTitle}</strong><IconButton label="Next month" onClick={() => setVisibleMonth((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1, 12))}><CaretRight size={16} /></IconButton></div><ActionMenu label="Calendar options" items={calendarItems}><DotsThree size={21} /></ActionMenu></div>
       <div className="month-calendar" aria-label={`${monthTitle} calendar`}><div className="month-weekdays" aria-hidden="true">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => <span key={day}>{day}</span>)}</div><div className="month-grid">{monthDays.map((day) => { const date = new Date(`${day}T12:00:00`); const isCurrentMonth = date.getMonth() === visibleMonth.getMonth(); const isSelected = day === dateKey; const isToday = day === localDateKey(); const taskCount = isSelected ? tasks.filter((task) => task.start != null).length : 0; return <button type="button" key={day} className={`month-day ${isCurrentMonth ? "" : "outside"} ${isSelected ? "selected" : ""} ${isToday ? "today" : ""}`} onClick={() => onSelectDate(day)} aria-label={`${date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}${taskCount ? `, ${taskCount} scheduled blocks` : ""}`}><span>{date.getDate()}</span>{taskCount ? <small>{taskCount}</small> : null}</button>; })}</div></div>
       <h2>{selectedDateLabel}</h2><div className="all-day-row"><span>all-day</span></div>
-      <div className="continuous-timeline" aria-label="Three-day continuous timeline"><div className="continuous-timeline-head"><div /><div className="continuous-day-labels">{timelineDays.map((day) => { const date = new Date(`${day}T12:00:00`); return <button type="button" key={day} className={day === dateKey ? "selected" : ""} onClick={() => onSelectDate(day)}><span>{date.toLocaleDateString(undefined, { weekday: "short" })}</span><strong>{date.getDate()}</strong></button>; })}</div></div><div className="continuous-timeline-body" ref={timelineBodyRef}><div className="continuous-hour-axis"><HourLabels end={20} /></div>{timelineDays.map((day) => { const isSelected = day === dateKey; const dayTasks = isSelected ? tasks : (neighborPlans?.[day] || []); if (isSelected) return <div ref={timelineRef} key={day} className={`plan-calendar-canvas continuous-day-canvas ${selectedTaskId ? "ready-to-schedule" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={drop} onClick={(event) => { if (!selectedTaskId || !timelineRef.current) return; const rect = timelineRef.current.getBoundingClientRect(); onDropTask(selectedTaskId, event.clientY - rect.top + (timelineBodyRef.current?.scrollTop || 0), { metaKey: event.metaKey, altKey: event.altKey }); }}><GridLines end={20} />{!connected ? <><div className="static-calendar-block morning" style={blockStyle(8 * 60, 9 * 60)}><strong>Morning routine</strong><span>08:00–09:00</span></div><div className="static-calendar-block team" style={blockStyle(9 * 60 + 30, 10 * 60 + 15)}><strong>Team sync</strong><span>09:30–10:15</span></div><div className="static-calendar-block lunch" style={blockStyle(12 * 60, 13 * 60)}><strong>Lunch</strong><span>12:00–13:00</span></div></> : null}{dayTasks.filter((task) => task.start != null).map((task) => <CalendarBlock key={task.id} task={task} selected={selectedTaskId === task.id} onSelect={setSelectedTaskId} onMoveStart={onMoveStart} onComplete={onComplete} onUnschedule={onUnschedule} onResizeStart={onResizeStart} />)}{showNowMarker ? <div className="plan-now-marker" style={{ top: `${((currentMinute - DAY_START) / 60) * HOUR_HEIGHT}px` }} aria-label={"Current time " + nowLabel}><span /></div> : null}</div>; return <div key={day} className="continuous-day-canvas adjacent" role="button" tabIndex={0} aria-label={`Open Plan for ${day}`} onClick={() => onSelectDate(day)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectDate(day); } }}><GridLines end={20} />{dayTasks.filter((task) => task.start != null).map((task) => <div key={task.id} className={`continuous-neighbor-block ${task.tone}`} style={blockStyle(task.start, task.end)}><strong>{task.title}</strong><span>{formatRange(task.start, task.end)}</span></div>)}</div>; })}</div></div>
+      <div className="continuous-timeline" aria-label="Three-day continuous timeline"><div className="continuous-timeline-head"><div /><div className="continuous-day-labels">{timelineDays.map((day) => { const date = new Date(`${day}T12:00:00`); return <button type="button" key={day} className={day === dateKey ? "selected" : ""} onClick={() => onSelectDate(day)}><span>{date.toLocaleDateString(undefined, { weekday: "short" })}</span><strong>{date.getDate()}</strong></button>; })}</div></div><div className="continuous-timeline-body" ref={timelineBodyRef}><div className="continuous-hour-axis"><HourLabels end={20} /></div>{timelineDays.map((day) => { const isSelected = day === dateKey; const dayTasks = isSelected ? tasks : (neighborPlans?.[day] || []); if (isSelected) return <div ref={timelineRef} key={day} className={`plan-calendar-canvas continuous-day-canvas ${selectedTaskId ? "ready-to-schedule" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={drop} onClick={(event) => { if (!selectedTaskId || !timelineRef.current) return; const rect = timelineRef.current.getBoundingClientRect(); onDropTask(selectedTaskId, event.clientY - rect.top + (timelineBodyRef.current?.scrollTop || 0), { metaKey: event.metaKey, altKey: event.altKey }); }}><GridLines end={20} />{calendarEvents.map((event) => <CalendarEventBlock key={`calendar-${event.id}`} event={event} dateKey={dateKey} onRecord={onRecordCalendarEvent} />)}{!connected ? <><div className="static-calendar-block morning" style={blockStyle(8 * 60, 9 * 60)}><strong>Morning routine</strong><span>08:00–09:00</span></div><div className="static-calendar-block team" style={blockStyle(9 * 60 + 30, 10 * 60 + 15)}><strong>Team sync</strong><span>09:30–10:15</span></div><div className="static-calendar-block lunch" style={blockStyle(12 * 60, 13 * 60)}><strong>Lunch</strong><span>12:00–13:00</span></div></> : null}{dayTasks.filter((task) => task.start != null).map((task) => <CalendarBlock key={task.id} task={task} selected={selectedTaskId === task.id} onSelect={setSelectedTaskId} onMoveStart={onMoveStart} onComplete={onComplete} onUnschedule={onUnschedule} onResizeStart={onResizeStart} />)}{showNowMarker ? <div className="plan-now-marker" style={{ top: `${((currentMinute - DAY_START) / 60) * HOUR_HEIGHT}px` }} aria-label={"Current time " + nowLabel}><span /></div> : null}</div>; return <div key={day} className="continuous-day-canvas adjacent" role="button" tabIndex={0} aria-label={`Open Plan for ${day}`} onClick={() => onSelectDate(day)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectDate(day); } }}><GridLines end={20} />{dayTasks.filter((task) => task.start != null).map((task) => <div key={task.id} className={`continuous-neighbor-block ${task.tone}`} style={blockStyle(task.start, task.end)}><strong>{task.title}</strong><span>{formatRange(task.start, task.end)}</span></div>)}</div>; })}</div></div>
       <div className="calendar-drop-hint"><LinkSimple size={19} /><span>{selectedTaskId ? "Click a time or drag here to schedule" : "Drag a Markdown task here to schedule it"}</span></div>
     </section>
   );
@@ -1989,6 +2016,7 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
   const markdownRef = useRef(markdown);
   const [neighborPlans, setNeighborPlans] = useState({});
   const [pendingSchedule, setPendingSchedule] = useState(null);
+  const [timeEntryPrefill, setTimeEntryPrefill] = useState(null);
   const planDate = dateKey;
   useEffect(() => {
     if (!api.connected || !api.plan?.tasks) return;
@@ -2088,6 +2116,16 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
   };
   const dropTask = (id, offsetY, modifiers = {}) => { const raw = DAY_START + (offsetY / HOUR_HEIGHT) * 60; const start = Math.max(DAY_START, Math.min(DAY_END - 30, Math.round(raw / 15) * 15)); const task = tasks.find((item) => item.id === id); if (!task) return; const end = Math.min(start + (task.start != null ? Math.max(task.end - task.start, 30) : 60), DAY_END); if (modifiers.altKey) { void createCalendarEvent(id, start, end); return; } if (modifiers.metaKey) { scheduleTask(id, start, end); return; } setPendingSchedule({ id, start, end, title: task.title }); };
   const confirmSchedule = (kind) => { if (!pendingSchedule) return; if (kind === "time-block") { scheduleTask(pendingSchedule.id, pendingSchedule.start, pendingSchedule.end); setPendingSchedule(null); return; } void createCalendarEvent(pendingSchedule.id, pendingSchedule.start, pendingSchedule.end); setPendingSchedule(null); };
+  const recordCalendarEvent = (event) => {
+    setTimeEntryPrefill({
+      title: event.title || "Calendar event",
+      notes: [event.calendar, event.location, event.notes].filter(Boolean).join(" · "),
+      start: event.start,
+      end: event.end,
+      projectID: resourceID(event.suggested_project_id || event.suggestedProjectID) || "",
+      billingStatus: "billable",
+    });
+  };
   const taskDragStart = (event, id) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/task-id", id); setSelectedTaskId(id); };
   const pointerMoveStart = (event, id) => {
     event.preventDefault();
@@ -2124,8 +2162,9 @@ function PlanPage({ tasks, setTasks, api, dateKey, setDateKey }) {
   const addTask = (title) => { const nextTasks = [...tasks, { id: "task-" + Date.now(), title, tags: [], start: null, end: null, completed: false, tone: "soft" }]; persistTasks(nextTasks, "Markdown task added"); };
   return (
     <main className="page plan-page"><header className="plan-header"><h1>Plan <span>·</span> {planDateLabel(planDate)}</h1><DateControls dateKey={planDate} onChange={setDateKey} label="Choose Plan date" /></header>
-      <div className="plan-workspace"><MarkdownEditor tasks={tasks} markdown={markdown} planDate={planDate} onMarkdownChange={updateMarkdown} onMarkdownCommit={commitMarkdown} onTaskDragStart={taskDragStart} onPointerDragStart={pointerMoveStart} onSelectTask={setSelectedTaskId} onComplete={completeTask} onReload={reloadPlan} /><CalendarPanel tasks={tasks} neighborPlans={neighborPlans} selectedTaskId={selectedTaskId} setSelectedTaskId={setSelectedTaskId} onDropTask={dropTask} onMoveStart={pointerMoveStart} onComplete={completeTask} onUnschedule={unscheduleTask} onResizeStart={resizeStart} dateKey={planDate} onSelectDate={setDateKey} connected={api.connected} /></div>
+      <div className="plan-workspace"><MarkdownEditor tasks={tasks} markdown={markdown} planDate={planDate} onMarkdownChange={updateMarkdown} onMarkdownCommit={commitMarkdown} onTaskDragStart={taskDragStart} onPointerDragStart={pointerMoveStart} onSelectTask={setSelectedTaskId} onComplete={completeTask} onReload={reloadPlan} /><CalendarPanel tasks={tasks} neighborPlans={neighborPlans} calendarEvents={api.calendarEvents?.data || []} onRecordCalendarEvent={recordCalendarEvent} selectedTaskId={selectedTaskId} setSelectedTaskId={setSelectedTaskId} onDropTask={dropTask} onMoveStart={pointerMoveStart} onComplete={completeTask} onUnschedule={unscheduleTask} onResizeStart={resizeStart} dateKey={planDate} onSelectDate={setDateKey} connected={api.connected} /></div>
       {pendingSchedule ? <div className="schedule-choice-backdrop" role="presentation" onClick={() => setPendingSchedule(null)}><section className="schedule-choice-dialog" role="dialog" aria-modal="true" aria-labelledby="schedule-choice-title" onClick={(event) => event.stopPropagation()}><div><span>Schedule task</span><h2 id="schedule-choice-title">{pendingSchedule.title}</h2><p>{formatRange(pendingSchedule.start, pendingSchedule.end)} · Choose how this drop should be recorded.</p></div><div className="schedule-choice-actions"><button type="button" className="secondary-button" onClick={() => confirmSchedule("event")}>{api.calendarEvents?.authorized ? "Add Event" : "Connect Calendar"} <small>{api.calendarEvents?.authorized ? "Event" : "Permission"}</small></button><button type="button" className="primary-button" onClick={() => confirmSchedule("time-block")}>Time Block</button></div><button type="button" className="schedule-choice-cancel" onClick={() => setPendingSchedule(null)}>Cancel</button></section></div> : null}
+      <WebTimeEntryDialog mode="new" open={Boolean(timeEntryPrefill)} api={api} projects={api.projects} recentEntries={api.entries} dateKey={planDate} initialEntry={timeEntryPrefill} onClose={() => setTimeEntryPrefill(null)} />
       {toast ? <div className="toast" role="status"><CheckCircle size={20} weight="fill" /><span>{toast}</span><IconButton label="Dismiss" onClick={() => setToast("")}><X size={15} /></IconButton></div> : null}
     </main>
   );

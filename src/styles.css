@@ -315,6 +315,11 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .static-calendar-block, .calendar-task-block { position: absolute; right: 18px; left: 13px; z-index: 3; display: flex; flex-direction: column; min-height: 32px; padding: 9px 11px; overflow: hidden; border: 1px solid #e1e3e8; border-radius: 7px; background: #f8f8f9; color: #30333b; font-size: 12px; }
 .static-calendar-block strong, .calendar-task-block strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .static-calendar-block span, .calendar-task-block span { margin-top: 3px; color: #777c89; font-size: 11px; }
+.calendar-event-block { position: absolute; right: 18px; left: 13px; z-index: 2; display: flex; min-height: 32px; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 3px; padding: 8px 10px; overflow: hidden; border: 1px dashed #d8a43a; border-radius: 7px; background: #fff9e9; color: #5c4b22; cursor: pointer; font: inherit; text-align: left; }
+.calendar-event-block:hover, .calendar-event-block:focus-visible { border-color: #b98516; background: #fff5d5; outline: none; box-shadow: 0 0 0 3px rgba(216, 164, 58, 0.16); }
+.calendar-event-block > span { display: flex; min-width: 0; align-items: center; gap: 5px; }
+.calendar-event-block strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-event-block small { overflow: hidden; color: #8b794e; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-task-block { cursor: grab; }
 .calendar-task-block.accent { border-color: var(--accent); background: var(--accent); color: #fff; }
 .calendar-task-block.accent span { color: #eceeff; }
