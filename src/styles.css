@@ -378,6 +378,11 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .schedule-choice-dialog > div:first-child span { color: var(--muted); font-size: 12px; }
 .schedule-choice-dialog h2 { margin: 0; color: #282b34; font-size: 20px; letter-spacing: -0.03em; }
 .schedule-choice-dialog p { margin: 0; color: var(--muted); font-size: 12px; }
+.schedule-choice-conflict { display: flex; align-items: flex-start; gap: 9px; margin-top: 16px; padding: 10px 11px; border: 1px solid rgba(213, 122, 35, 0.28); border-radius: 8px; background: rgba(213, 122, 35, 0.08); color: #9a5c1f; }
+.schedule-choice-conflict > svg { flex: 0 0 auto; margin-top: 1px; }
+.schedule-choice-conflict span { display: grid; gap: 3px; min-width: 0; }
+.schedule-choice-conflict strong { font-size: 11px; }
+.schedule-choice-conflict small { color: #8b6a48; font-size: 10px; line-height: 1.4; }
 .schedule-choice-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 22px; }
 .schedule-choice-actions button { width: 100%; }
 .schedule-choice-actions small { color: currentColor; font-size: 10px; opacity: 0.65; }
