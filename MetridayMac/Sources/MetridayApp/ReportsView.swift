@@ -11,6 +11,9 @@ struct ReportsView: View {
     let selectedDate: Date
 
     @State private var selectedPreset: ReportPreset?
+    @State private var expandedReportProjectIDs: Set<String> = []
+    @State private var expandedReportTitleIDs: Set<String> = []
+    @State private var reportPreviewProjects: [ReportPreviewProject] = []
 
     var body: some View {
         ScrollView {
@@ -102,7 +105,7 @@ struct ReportsView: View {
                 .padding(18)
                 .metridayPanel()
 
-                projectSummary
+                reportOutline
             }
             .padding(28)
         }
@@ -119,6 +122,9 @@ struct ReportsView: View {
                 trackingPreferences: appState.preferences,
                 initialPreset: preset
             )
+        }
+        .task(id: selectedDate) {
+            reportPreviewProjects = makeReportPreviewProjects()
         }
     }
 
@@ -150,41 +156,159 @@ struct ReportsView: View {
         .metridayPanel()
     }
 
-    private var projectSummary: some View {
+    private var reportOutline: some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack {
-                Text("Projects & Time Entries")
+                Text("Report Outline")
                     .font(.system(size: 16, weight: .bold))
                 Spacer()
-                Text("Preview source")
+                Text("Project → Title → Entry")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(MetridayTheme.secondary)
             }
 
-            if projectTotals.isEmpty {
+            if reportPreviewProjects.isEmpty {
                 Text("No activity or time entry has been recorded in this week yet.")
                     .font(.system(size: 12))
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
-                ForEach(projectTotals) { total in
-                    HStack(spacing: 9) {
-                        Circle()
-                            .fill(total.color)
-                            .frame(width: 8, height: 8)
-                        Text(total.name)
-                            .font(.system(size: 12, weight: .medium))
-                            .lineLimit(1)
+                VStack(spacing: 0) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "calendar")
+                            .foregroundStyle(MetridayTheme.accent)
+                            .frame(width: 18)
+                        Text(dateRangeLabel)
+                            .font(.system(size: 12, weight: .semibold))
                         Spacer()
-                        Text(formatSeconds(total.seconds))
+                        Text(formatSeconds(reportPreviewProjects.reduce(0) { $0 + $1.seconds }))
                             .font(.system(size: 12, weight: .semibold))
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 9)
+                    .background(MetridayTheme.canvas)
+
+                    ForEach(reportPreviewProjects) { project in
+                        reportProjectRow(project)
+                    }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .metridayPanel()
-        .accessibilityIdentifier("reports.project-summary")
+        .accessibilityIdentifier("reports.report-outline")
+    }
+
+    private func reportProjectRow(_ project: ReportPreviewProject) -> some View {
+        VStack(spacing: 0) {
+            Button {
+                if expandedReportProjectIDs.contains(project.id) {
+                    expandedReportProjectIDs.remove(project.id)
+                } else {
+                    expandedReportProjectIDs.insert(project.id)
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: expandedReportProjectIDs.contains(project.id) ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .frame(width: 12)
+                    Circle()
+                        .fill(project.color)
+                        .frame(width: 8, height: 8)
+                    Text(project.name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                    Spacer()
+                    Text(formatSeconds(project.seconds))
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("reports.outline.project.\(project.id)")
+
+            if expandedReportProjectIDs.contains(project.id) {
+                ForEach(project.titles) { title in
+                    reportTitleRow(title, projectID: project.id)
+                }
+            }
+        }
+        .overlay(alignment: .top) {
+            Divider()
+        }
+    }
+
+    private func reportTitleRow(_ title: ReportPreviewTitle, projectID: String) -> some View {
+        VStack(spacing: 0) {
+            Button {
+                if expandedReportTitleIDs.contains(title.id) {
+                    expandedReportTitleIDs.remove(title.id)
+                } else {
+                    expandedReportTitleIDs.insert(title.id)
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: expandedReportTitleIDs.contains(title.id) ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .frame(width: 12)
+                    Image(systemName: title.kind == "Time Entry" ? "clock" : "rectangle.on.rectangle")
+                        .font(.system(size: 10))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .frame(width: 14)
+                    Text(title.title)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                    Spacer()
+                    Text(formatSeconds(title.seconds))
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .padding(.leading, 38)
+                .padding(.trailing, 10)
+                .padding(.vertical, 7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("reports.outline.title.\(projectID).\(title.id)")
+
+            if expandedReportTitleIDs.contains(title.id) {
+                ForEach(title.details) { detail in
+                    Button {
+                        appState.selectDate(detail.date)
+                        appState.section = .activities
+                    } label: {
+                        HStack(spacing: 8) {
+                            Color.clear
+                                .frame(width: 12)
+                            Text(detail.kind)
+                                .font(.system(size: 10))
+                                .foregroundStyle(MetridayTheme.secondary)
+                                .frame(width: 68, alignment: .leading)
+                            Text(detail.dateLabel)
+                                .font(.system(size: 10))
+                                .foregroundStyle(MetridayTheme.graphite)
+                                .lineLimit(1)
+                            Spacer(minLength: 6)
+                            Text(formatSeconds(detail.seconds))
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .padding(.leading, 68)
+                        .padding(.trailing, 10)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("reports.outline.entry.\(detail.id)")
+                }
+            }
+        }
     }
 
     private var weekDates: [Date] {
@@ -245,30 +369,77 @@ struct ReportsView: View {
             .reduce(0) { $0 + secondsInReportRange(for: $1) }
     }
 
-    private var projectTotals: [ReportProjectTotal] {
-        var totals: [UUID?: Int] = [:]
-        for segment in activityDays.flatMap({ $0 }) where segment.relevance != .idle {
-            totals[segment.projectID, default: 0] += segment.durationSeconds
-        }
-        for entry in timeEntryStore.materializedEntries() {
-            let seconds = secondsInReportRange(for: entry)
-            if seconds > 0 {
-                totals[entry.projectID, default: 0] += seconds
+    private func makeReportPreviewProjects() -> [ReportPreviewProject] {
+        var detailsByProject: [String: [ReportPreviewDetail]] = [:]
+        var projectIDs: [String: UUID?] = [:]
+
+        for (dayIndex, date) in weekDates.enumerated() {
+            let segments = dayIndex < activityDays.count ? activityDays[dayIndex] : []
+            let dayStart = Calendar.current.startOfDay(for: date)
+            for segment in segments where segment.relevance != .idle {
+                let projectKey = segment.projectID?.uuidString ?? "unassigned"
+                projectIDs[projectKey] = segment.projectID
+                let start = dayStart.addingTimeInterval(TimeInterval(segment.startSecond))
+                let end = dayStart.addingTimeInterval(TimeInterval(segment.endSecond))
+                let detail = ReportPreviewDetail(
+                    id: "app-\(segment.id.uuidString)",
+                    kind: "App Usage",
+                    title: segment.displayTitle,
+                    date: date,
+                    start: start,
+                    end: end,
+                    seconds: segment.durationSeconds
+                )
+                detailsByProject[projectKey, default: []].append(detail)
             }
         }
-        return totals
-            .filter { $0.value > 0 }
-            .map { projectID, seconds in
-                ReportProjectTotal(
-                    id: projectID?.uuidString ?? "unassigned",
-                    name: projectStore.name(for: projectID),
-                    seconds: seconds,
-                    color: projectColor(for: projectID)
+
+        for entry in timeEntryStore.materializedEntries() {
+            let seconds = secondsInReportRange(for: entry)
+            guard seconds > 0 else { continue }
+            let projectKey = entry.projectID?.uuidString ?? "unassigned"
+            projectIDs[projectKey] = entry.projectID
+            let start = max(entry.start, reportStart)
+            let end = min(entry.end, reportEnd)
+            let detail = ReportPreviewDetail(
+                id: "entry-\(entry.id.uuidString)",
+                kind: entry.isManual ? "Time Entry" : "Timer",
+                title: entry.title.isEmpty ? "Untitled time entry" : entry.title,
+                date: start,
+                start: start,
+                end: end,
+                seconds: seconds
+            )
+            detailsByProject[projectKey, default: []].append(detail)
+        }
+
+        return detailsByProject.compactMap { key, details in
+            guard !details.isEmpty else { return nil }
+            let groupedTitles = Dictionary(grouping: details) { detail in
+                "\(detail.kind)|\(detail.title)"
+            }
+            let titles = groupedTitles.map { groupKey, groupedDetails in
+                let sortedDetails = groupedDetails.sorted { $0.start < $1.start }
+                let components = groupKey.split(separator: "|", maxSplits: 1).map(String.init)
+                return ReportPreviewTitle(
+                    id: "\(key)-\(groupKey)",
+                    kind: components.first ?? "App Usage",
+                    title: components.count > 1 ? components[1] : groupKey,
+                    seconds: groupedDetails.reduce(0) { $0 + $1.seconds },
+                    details: sortedDetails
                 )
             }
             .sorted { $0.seconds > $1.seconds }
-            .prefix(10)
-            .map { $0 }
+            let projectID = projectIDs[key] ?? nil
+            return ReportPreviewProject(
+                id: key,
+                name: projectStore.name(for: projectID),
+                seconds: details.reduce(0) { $0 + $1.seconds },
+                color: projectColor(for: projectID),
+                titles: titles
+            )
+        }
+        .sorted { $0.seconds > $1.seconds }
     }
 
     private func projectColor(for projectID: UUID?) -> Color {
@@ -304,9 +475,42 @@ struct ReportsView: View {
     }
 }
 
-private struct ReportProjectTotal: Identifiable {
+private struct ReportPreviewProject: Identifiable {
     let id: String
     let name: String
     let seconds: Int
     let color: Color
+    let titles: [ReportPreviewTitle]
+}
+
+private struct ReportPreviewTitle: Identifiable {
+    let id: String
+    let kind: String
+    let title: String
+    let seconds: Int
+    let details: [ReportPreviewDetail]
+}
+
+private struct ReportPreviewDetail: Identifiable {
+    let id: String
+    let kind: String
+    let title: String
+    let date: Date
+    let start: Date
+    let end: Date
+    let seconds: Int
+
+    var dateLabel: String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.dateFormat = "MMM d"
+        return "\(dateFormatter.string(from: date)) · \(timeString(start))–\(timeString(end))"
+    }
+
+    private func timeString(_ value: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: value)
+    }
 }
