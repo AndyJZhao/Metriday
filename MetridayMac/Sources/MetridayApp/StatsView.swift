@@ -37,22 +37,6 @@ private enum StatsPeriod: String, CaseIterable, Identifiable {
     }
 }
 
-private final class StatsActivityCache: ObservableObject {
-    private(set) var segmentsByDate: [Date: [ActivitySegment]] = [:]
-
-    func segments(for date: Date) -> [ActivitySegment]? {
-        segmentsByDate[date]
-    }
-
-    func store(_ segments: [ActivitySegment], for date: Date) {
-        segmentsByDate[date] = segments
-    }
-
-    func invalidate() {
-        segmentsByDate.removeAll(keepingCapacity: true)
-    }
-}
-
 struct StatsView: View {
     @EnvironmentObject private var appState: AppState
     let monitor: AppActivityMonitor
@@ -69,7 +53,10 @@ struct StatsView: View {
     @State private var customStartDate: Date
     @State private var customEndDate: Date
     @State private var projectSelectionAnchor: UUID?
-    @StateObject private var activityCache = StatsActivityCache()
+    @StateObject private var activityCache = ActivitySegmentCache()
+    @State private var refreshToken = 0
+
+    private static let refreshTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     init(
         monitor: AppActivityMonitor,
@@ -105,6 +92,7 @@ struct StatsView: View {
     }
 
     var body: some View {
+        let _ = refreshToken
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 PageDateHeader(
@@ -268,6 +256,10 @@ struct StatsView: View {
         }
         .onReceive(screenTimeStore.objectWillChange) { _ in
             activityCache.invalidate()
+        }
+        .onReceive(Self.refreshTimer) { _ in
+            activityCache.invalidate()
+            refreshToken &+= 1
         }
     }
 

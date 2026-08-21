@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 struct ReviewView: View {
     @EnvironmentObject private var appState: AppState
-    @ObservedObject var monitor: AppActivityMonitor
+    let monitor: AppActivityMonitor
     @ObservedObject var filterStore: ActivityFilterStore
     @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
@@ -14,6 +14,10 @@ struct ReviewView: View {
     let selectedDate: Date
 
     @State private var showingReportBuilder = false
+    @StateObject private var activityCache = ActivitySegmentCache()
+    @State private var refreshToken = 0
+
+    private static let refreshTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     private var calendar: Calendar {
         var calendar = Calendar.current
@@ -22,6 +26,7 @@ struct ReviewView: View {
     }
 
     var body: some View {
+        let _ = refreshToken
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 PageDateHeader(
@@ -139,6 +144,19 @@ struct ReviewView: View {
                 projectStore: projectStore,
                 trackingPreferences: appState.preferences
             )
+        }
+        .onReceive(categoryStore.objectWillChange) { _ in
+            activityCache.invalidate()
+        }
+        .onReceive(filterStore.objectWillChange) { _ in
+            activityCache.invalidate()
+        }
+        .onReceive(screenTimeStore.objectWillChange) { _ in
+            activityCache.invalidate()
+        }
+        .onReceive(Self.refreshTimer) { _ in
+            activityCache.invalidate()
+            refreshToken &+= 1
         }
     }
 
@@ -506,9 +524,8 @@ struct ReviewView: View {
     private var applicationTotals: [ApplicationTotal] {
         var totals: [String: (bundleIdentifier: String, seconds: Int, categories: [UUID: (category: ActivityCategoryDefinition, seconds: Int)])] = [:]
         for date in weekDates {
-            let sourceSegments = monitor.segments(for: date) + screenTimeStore.segments(for: date)
-            for segment in sourceSegments {
-                let category = categoryStore.category(for: segment, filterStore: filterStore, date: date)
+            for segment in activitySegments(for: date) {
+                let category = category(for: segment, date: date)
                 guard category.role != .idle else { continue }
                 let name = segment.displayTitle
                 var existing = totals[name, default: (
@@ -542,9 +559,8 @@ struct ReviewView: View {
     private var categoryTotals: [CategoryTotal] {
         var totals: [UUID: (category: ActivityCategoryDefinition, seconds: Int)] = [:]
         for date in weekDates {
-            let sourceSegments = monitor.segments(for: date) + screenTimeStore.segments(for: date)
-            for segment in sourceSegments {
-                let category = categoryStore.category(for: segment, filterStore: filterStore, date: date)
+            for segment in activitySegments(for: date) {
+                let category = category(for: segment, date: date)
                 guard category.role != .idle, segment.durationSeconds > 0 else { continue }
                 totals[category.id, default: (category: category, seconds: 0)].seconds += segment.durationSeconds
             }
@@ -651,11 +667,22 @@ struct ReviewView: View {
     }
 
     private func activitySegments(for date: Date) -> [ActivitySegment] {
-        categoryStore.applyingCategories(
-            to: monitor.segments(for: date) + screenTimeStore.segments(for: date),
+        let normalizedDate = calendar.startOfDay(for: date)
+        if let cached = activityCache.segments(for: normalizedDate) {
+            return cached
+        }
+
+        let resolved = categoryStore.applyingCategories(
+            to: monitor.segments(for: normalizedDate) + screenTimeStore.segments(for: normalizedDate),
             filterStore: filterStore,
-            date: date
+            date: normalizedDate
         ).filter(matchesSelectedDevice)
+        activityCache.store(resolved, for: normalizedDate)
+        return resolved
+    }
+
+    private func category(for segment: ActivitySegment, date: Date) -> ActivityCategoryDefinition {
+        categoryStore.category(for: segment, filterStore: filterStore, date: date)
     }
 
     private func matchesSelectedDevice(_ segment: ActivitySegment) -> Bool {
