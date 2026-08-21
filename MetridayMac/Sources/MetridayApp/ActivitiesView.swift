@@ -2356,71 +2356,91 @@ struct ActivitiesView: View {
     private func normalActivityRow(_ segment: ActivitySegment) -> some View {
         let category = category(for: segment)
         return HStack(spacing: 12) {
-            HStack(spacing: 9) {
-                Button {
-                    toggleActivitySelection(segment.id)
-                } label: {
-                    Image(systemName: selectedActivityIDs.contains(segment.id)
-                        ? "checkmark.circle.fill"
-                        : "circle")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(selectedActivityIDs.contains(segment.id)
-                            ? MetridayTheme.accent
-                            : MetridayTheme.secondary)
-                }
-                .buttonStyle(.plain)
-                .help(selectedActivityIDs.contains(segment.id) ? "Deselect activity" : "Select activity")
-                .accessibilityLabel(selectedActivityIDs.contains(segment.id)
-                    ? "Deselect activity"
-                    : "Select activity")
-                .accessibilityIdentifier("activity.select.\(segment.id.uuidString)")
+            Button {
+                toggleActivitySelection(segment.id)
+            } label: {
+                Image(systemName: selectedActivityIDs.contains(segment.id)
+                    ? "checkmark.circle.fill"
+                    : "circle")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(selectedActivityIDs.contains(segment.id)
+                        ? MetridayTheme.accent
+                        : MetridayTheme.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(selectedActivityIDs.contains(segment.id) ? "Deselect activity" : "Select activity")
+            .accessibilityLabel(selectedActivityIDs.contains(segment.id)
+                ? "Deselect activity"
+                : "Select activity")
+            .accessibilityIdentifier("activity.select.\(segment.id.uuidString)")
 
-                AppIdentityIcon(
-                    symbol: icon(for: segment),
-                    bundleIdentifier: segment.bundleIdentifier,
-                    size: 30
-                )
+            Button {
+                selectedActivity = segment
+            } label: {
+                HStack(spacing: 12) {
+                    HStack(spacing: 9) {
+                        AppIdentityIcon(
+                            symbol: icon(for: segment),
+                            bundleIdentifier: segment.bundleIdentifier,
+                            size: 30
+                        )
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(appName(for: segment))
-                        .font(.system(size: 13, weight: .semibold))
-                        .lineLimit(1)
-                    if let context = appContext(for: segment) {
-                        Text(context)
-                            .font(.system(size: 10))
-                            .foregroundStyle(MetridayTheme.secondary)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(appName(for: segment))
+                                .font(.system(size: 13, weight: .semibold))
+                                .lineLimit(1)
+                            if let context = appContext(for: segment) {
+                                Text(context)
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(MetridayTheme.secondary)
+                                    .lineLimit(1)
+                            }
+                            if preferences.showActivityDateRanges {
+                                Text(activityDateRangeLabel(for: segment))
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(MetridayTheme.secondary.opacity(0.82))
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .frame(width: 208, alignment: .leading)
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(categoryColor(for: category))
+                            .frame(width: 7, height: 7)
+                        Text(category.name)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(categoryColor(for: category))
                             .lineLimit(1)
                     }
-                    if preferences.showActivityDateRanges {
-                        Text(activityDateRangeLabel(for: segment))
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(MetridayTheme.secondary.opacity(0.82))
-                            .lineLimit(1)
-                    }
+                    .padding(.horizontal, 8)
+                    .frame(width: 112, height: 24, alignment: .leading)
+                    .background(categoryColor(for: category).opacity(0.10))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+                    Spacer(minLength: 10)
+
+                    Text(formatMinutes(segment.durationSeconds))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(MetridayTheme.graphite)
+                        .frame(width: 52, alignment: .trailing)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .frame(width: 220, alignment: .leading)
-
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(categoryColor(for: category))
-                    .frame(width: 7, height: 7)
-                Text(category.name)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(categoryColor(for: category))
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 8)
-            .frame(width: 112, height: 24, alignment: .leading)
-            .background(categoryColor(for: category).opacity(0.10))
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-            Spacer(minLength: 10)
-
-            Text(formatMinutes(segment.durationSeconds))
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(MetridayTheme.graphite)
-                .frame(width: 52, alignment: .trailing)
+            .buttonStyle(.plain)
+            .simultaneousGesture(
+                TapGesture(count: 2)
+                    .onEnded {
+                        prepareNewEntry(startMinute: segment.startMinute, endMinute: segment.endMinute)
+                        showingNewEntry = true
+                    }
+            )
+            .help("Click for details · double-click to create a time entry")
+            .accessibilityLabel("Open \(appName(for: segment)) activity")
+            .accessibilityHint("Double-click to create a time entry")
+            .accessibilityIdentifier("activity.open.\(segment.id.uuidString)")
 
             Menu {
                 Button("Unassigned") {
@@ -2464,19 +2484,6 @@ struct ActivitiesView: View {
         .onDrag {
             NSItemProvider(object: segment.id.uuidString as NSString)
         }
-        .gesture(
-            TapGesture(count: 2)
-                .exclusively(before: TapGesture())
-                .onEnded { result in
-                    switch result {
-                    case .first:
-                        prepareNewEntry(startMinute: segment.startMinute, endMinute: segment.endMinute)
-                        showingNewEntry = true
-                    case .second:
-                        selectedActivity = segment
-                    }
-                }
-        )
         .contextMenu {
             Button(selectedActivityIDs.contains(segment.id) ? "Deselect Activity" : "Select Activity") {
                 toggleActivitySelection(segment.id)
