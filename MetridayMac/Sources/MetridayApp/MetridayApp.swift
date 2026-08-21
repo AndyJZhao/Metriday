@@ -99,19 +99,22 @@ struct MetridayApp: App {
 
 private struct MenuBarStatusLabel: View {
     @ObservedObject var appState: AppState
+    private static let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    @State private var now = Date()
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let timer = appState.timeEntryStore.runningTimer
-            let isFocus = timer?.customFields["metriday_focus_session"] == "true"
-            let isPaused = !appState.activityMonitor.isTracking
-                && (appState.activityMonitor.isManuallyPaused || appState.activityMonitor.trackingPausedUntil != nil)
-            Label {
-                Text(statusLabel(timer: timer, isFocus: isFocus, isPaused: isPaused, now: context.date))
-            } icon: {
-                Image(systemName: isPaused ? "pause.circle" : (isFocus ? "target" : "timer"))
-            }
-            .accessibilityLabel(statusLabel(timer: timer, isFocus: isFocus, isPaused: isPaused, now: context.date))
+        let timer = appState.timeEntryStore.runningTimer
+        let isFocus = timer?.customFields["metriday_focus_session"] == "true"
+        let isPaused = !appState.activityMonitor.isTracking
+            && (appState.activityMonitor.isManuallyPaused || appState.activityMonitor.trackingPausedUntil != nil)
+        Label {
+            Text(statusLabel(timer: timer, isFocus: isFocus, isPaused: isPaused, now: now))
+        } icon: {
+            Image(systemName: isPaused ? "pause.circle" : (isFocus ? "target" : "timer"))
+        }
+        .accessibilityLabel(statusLabel(timer: timer, isFocus: isFocus, isPaused: isPaused, now: now))
+        .onReceive(Self.clock) { value in
+            now = value
         }
     }
 

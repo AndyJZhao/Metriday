@@ -27,6 +27,7 @@ final class TimelineDropReceiverNSView: NSView {
     var onTargeted: ((Bool) -> Void)?
     var onDrop: ((UUID, CGFloat) -> Bool)?
     var onScreenFrameChange: ((CGRect) -> Void)?
+    private var lastReportedScreenFrame: CGRect?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -51,7 +52,10 @@ final class TimelineDropReceiverNSView: NSView {
     func reportScreenFrame() {
         guard let window else { return }
         let windowRect = convert(bounds, to: nil)
-        onScreenFrameChange?(window.convertToScreen(windowRect))
+        let screenFrame = window.convertToScreen(windowRect)
+        guard lastReportedScreenFrame != screenFrame else { return }
+        lastReportedScreenFrame = screenFrame
+        onScreenFrameChange?(screenFrame)
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

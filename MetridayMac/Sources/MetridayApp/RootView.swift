@@ -141,7 +141,7 @@ private struct TimerCheckInPresenter: View {
     }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { _ in
+        TimelineView(.periodic(from: MetridayTimeline.anchor, by: 1)) { _ in
             Color.clear
                 .frame(width: 0, height: 0)
                 .onAppear(perform: evaluateTimer)
@@ -790,7 +790,7 @@ struct GlobalTopHeader: View {
                         .font(.system(size: 17, weight: .bold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                    TimelineView(.periodic(from: MetridayTimeline.anchor, by: 1)) { context in
                         Text(blockSubtitle(at: context.date))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(sessionActive ? MetridayTheme.accent : MetridayTheme.secondary)

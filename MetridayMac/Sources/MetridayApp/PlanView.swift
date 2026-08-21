@@ -493,6 +493,7 @@ private struct SixDotDragHandle: View {
 struct PlanCalendarPane: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var store: MarkdownStore
+    private static let refreshTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
     @State private var isSystemDropTargeted = false
     @State private var now = Date()
     @State private var selectedCalendarEvent: CalendarEventItem?
@@ -551,7 +552,7 @@ struct PlanCalendarPane: View {
                     .padding(.bottom, 42)
             }
         }
-        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { value in
+        .onReceive(Self.refreshTimer) { value in
             now = value
         }
         .sheet(item: $selectedCalendarEvent) { event in

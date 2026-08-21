@@ -5649,7 +5649,7 @@ private struct RunningTimerStatus: View {
     let title: String
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { _ in
+        TimelineView(.periodic(from: MetridayTimeline.anchor, by: 1)) { _ in
             HStack(spacing: 7) {
                 Label(
                     "\(title) · \(formatMinutes(store.runningDurationSeconds))",
@@ -5976,7 +5976,7 @@ private struct ActivityTimelinePanel: View {
                             )
                     }
 
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                    TimelineView(.periodic(from: MetridayTimeline.anchor, by: 30)) { context in
                         if let second = currentTimeSecond(at: context.date) {
                             let x = timelineWindow.x(
                                 for: timelineWindow.absoluteMinute(for: second),
@@ -6560,7 +6560,7 @@ private struct ActivityTimelinePanel: View {
             .accessibilityLabel("Vertical activity timeline")
             .accessibilityIdentifier("activities.vertical-timeline")
             .overlay(alignment: .topLeading) {
-                TimelineView(.periodic(from: .now, by: 30)) { context in
+                TimelineView(.periodic(from: MetridayTimeline.anchor, by: 30)) { context in
                     if let second = currentTimeSecond(at: context.date) {
                         let x = 16 + labelWidth + 6 + timelineWindow.x(
                             for: timelineWindow.absoluteMinute(for: second),

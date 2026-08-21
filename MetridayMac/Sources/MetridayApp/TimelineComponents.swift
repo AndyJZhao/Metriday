@@ -1,6 +1,12 @@
 import AppKit
 import SwiftUI
 
+enum MetridayTimeline {
+    /// A stable, recent anchor prevents SwiftUI from rebuilding a periodic
+    /// schedule from `.now` on every render or enumerating years of past ticks.
+    static let anchor = Date()
+}
+
 enum TimelineMetrics {
     static let startMinute = 8 * 60
     static let endMinute = 20 * 60
