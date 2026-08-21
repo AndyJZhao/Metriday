@@ -1178,6 +1178,30 @@ final class AppState: ObservableObject {
             ])
         }
 
+        if (request.method == "PATCH" || request.method == "PUT"), path == "/v1/sync/preferences" {
+            guard let body = apiBody(request) else {
+                return .error("Sync preferences body is invalid", statusCode: 400)
+            }
+            let rawName = (body["device_name"] as? String) ?? (body["deviceName"] as? String) ?? ""
+            let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else {
+                return .error("Device name cannot be empty", statusCode: 400)
+            }
+            guard name.count <= 120 else {
+                return .error("Device name is too long", statusCode: 400)
+            }
+            syncStore.deviceName = name
+            return .jsonObject([
+                "enabled": syncStore.isEnabled,
+                "deviceID": syncStore.deviceID,
+                "deviceName": syncStore.deviceName,
+                "folder": syncStore.folderURL?.path ?? NSNull(),
+                "lastSyncAt": syncStore.lastSyncAt.map(apiDate) ?? NSNull(),
+                "backupCount": syncStore.backupCount,
+                "status": syncStore.statusMessage
+            ])
+        }
+
         if request.method == "GET", path == "/v1/integrations" {
             let integrations = ExternalIntegrationProvider.allCases.map { provider -> [String: Any] in
                 let configuration = integrationStore.configuration(for: provider)
@@ -1872,6 +1896,7 @@ final class AppState: ObservableObject {
                     "GET /v1/teams",
                     "GET /v1/time-entries/export",
                     "GET /v1/sync/status",
+                    "PATCH /v1/sync/preferences",
                     "GET /v1/integrations",
                     "GET /v1/integrations/{provider}",
                     "POST /v1/integrations/{provider}/sync",

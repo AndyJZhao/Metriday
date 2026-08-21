@@ -453,6 +453,10 @@ function useMetridayAPI(dateKey, apiBase) {
       await request("/v1/source-preferences", { method: "PATCH", body: JSON.stringify(preferences) });
       await refresh();
     },
+    updateSyncPreferences: async (preferences) => {
+      await request("/v1/sync/preferences", { method: "PATCH", body: JSON.stringify(preferences) });
+      await refresh();
+    },
     requestSourceAccess: async (source) => {
       await request("/v1/source-preferences/access", { method: "POST", body: JSON.stringify({ source }) });
       await refresh();
@@ -1307,6 +1311,7 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
     launch_at_login: false,
     launch_at_login_status: "Login item not configured",
   });
+  const [deviceName, setDeviceName] = useState("This Mac");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [transferBusy, setTransferBusy] = useState(false);
@@ -1317,6 +1322,7 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
     if (open) {
       setDraft(apiBase);
       setPreferences((current) => ({ ...current, ...(api?.preferences || {}) }));
+      setDeviceName(api?.sync?.deviceName || api?.status?.deviceName || "This Mac");
       setMessage("");
     }
   }, [apiBase, open]);
@@ -1368,6 +1374,14 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
       window.localStorage.setItem(API_BASE_STORAGE_KEY, normalized);
       setSaving(true);
       if (connected && api?.updatePreferences) await api.updatePreferences(preferences);
+      if (connected && api?.updateSyncPreferences) {
+        const nextDeviceName = String(deviceName || "").trim();
+        if (!nextDeviceName) {
+          setMessage("设备名称不能为空。");
+          return;
+        }
+        await api.updateSyncPreferences({ device_name: nextDeviceName });
+      }
       onSave(normalized);
       onClose();
     } catch {
@@ -1446,6 +1460,8 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
       <div className="settings-section"><div className="settings-section-heading"><strong>Local data</strong></div><span className="settings-help-text">Projects and time entries remain in the native Application Support store. Archives merge locally; time-entry IDs are deduplicated on import.</span><div className="settings-data-actions"><button type="button" onClick={() => exportArchive("projects")} disabled={!connected || saving || transferBusy}>Export projects</button><button type="button" onClick={() => projectsFileRef.current?.click()} disabled={!connected || saving || transferBusy}>Import projects</button><button type="button" onClick={() => exportArchive("time entries")} disabled={!connected || saving || transferBusy}>Export time entries</button><button type="button" onClick={() => entriesFileRef.current?.click()} disabled={!connected || saving || transferBusy}>Import time entries</button><input ref={projectsFileRef} type="file" accept="application/json,.json" hidden onChange={(event) => importArchive(event, "projects")} /><input ref={entriesFileRef} type="file" accept="application/json,.json" hidden onChange={(event) => importArchive(event, "entries")} /></div></div>
       <div className="settings-section"><div className="settings-section-heading"><strong>Sync & integrations</strong></div>
         <div className="settings-toggle-row"><span>{api.sync?.enabled ? "Local sync enabled" : "Local sync not configured"}</span><small>{api.sync?.status || "No sync status"}</small></div>
+        <label className="settings-field-row"><span>Device name</span><input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} placeholder="This Mac" maxLength={120} disabled={!connected || saving} /></label>
+        <small className="settings-help-text">This name appears in Activities, device filters, reports, and shared Timing Sync archives.</small>
         <div className="settings-sync-actions"><button type="button" className="secondary-button" onClick={() => api.syncNow().then(() => setMessage("Sync completed.")).catch((error) => setMessage(error.message || "Sync failed."))} disabled={!connected || saving}>Sync now</button><button type="button" className="secondary-button" onClick={() => api.restoreSync().then(() => setMessage("Latest backup restored.")).catch((error) => setMessage(error.message || "Restore failed."))} disabled={!connected || saving || !api.sync?.backupCount}>Restore latest backup</button></div>
         <div className="settings-integration-list">{api.integrations?.map((integration) => <div className="settings-integration-row" key={integration.provider}><div><strong>{integration.title || integration.provider}</strong><small>{integration.connected ? integration.workspace || "Connected" : integration.status || "Not connected"}</small></div><button type="button" className="quiet-pill" onClick={() => api.syncIntegration(integration.provider).then(() => setMessage(`${integration.title || integration.provider} sync started.`)).catch((error) => setMessage(error.message || "Integration sync failed."))} disabled={!connected || saving || api.sync?.isWorking}>{integration.connected ? "Sync" : "Connect"}</button></div>)}</div>
       </div>
