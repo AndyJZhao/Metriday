@@ -41,18 +41,30 @@ struct TimeBlockDetailSheet: View {
         appState.focusSessionActive && !isFocused
     }
 
-    private var evidenceRows: [TimeBlockEvidence] {
-        guard let startMinute = task.startMinute, let endMinute = task.endMinute else { return [] }
-        let plannedStart = startMinute * 60
-        let plannedEnd = endMinute * 60
-        let segments = appState.categoryStore.applyingCategories(
+    private var effectiveActivitySegments: [ActivitySegment] {
+        appState.categoryStore.applyingCategories(
             to: appState.activityMonitor.segments(for: selectedDate) + appState.screenTimeStore.segments(for: selectedDate),
             filterStore: appState.filterStore,
             date: selectedDate
         )
+    }
+
+    private var activityQuality: TimeBlockActivityQuality {
+        guard let startMinute = task.startMinute, let endMinute = task.endMinute else { return .empty }
+        return timeBlockActivityQuality(
+            segments: effectiveActivitySegments,
+            plannedStartSecond: startMinute * 60,
+            plannedEndSecond: endMinute * 60
+        )
+    }
+
+    private var evidenceRows: [TimeBlockEvidence] {
+        guard let startMinute = task.startMinute, let endMinute = task.endMinute else { return [] }
+        let plannedStart = startMinute * 60
+        let plannedEnd = endMinute * 60
 
         var grouped: [String: TimeBlockEvidence] = [:]
-        for segment in segments {
+        for segment in effectiveActivitySegments {
             let overlapStart = max(plannedStart, segment.startSecond)
             let overlapEnd = min(plannedEnd, segment.endSecond)
             guard overlapEnd > overlapStart else { continue }
@@ -167,6 +179,9 @@ struct TimeBlockDetailSheet: View {
             Text(execution.isRunning ? "Focus is running for this block." : execution.hasExecution ? "Actual time is linked to this Markdown task." : "Start Focus to link the actual interval to this Time Block.")
                 .font(.system(size: 11))
                 .foregroundStyle(MetridayTheme.secondary)
+            if activityQuality.hasActivity {
+                activityQualityView
+            }
         }
         .padding(15)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -183,6 +198,34 @@ struct TimeBlockDetailSheet: View {
                 .font(.system(size: 15, weight: .bold))
         }
         .frame(minWidth: 76, alignment: .leading)
+    }
+
+    private var activityQualityView: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Focus quality · (activityQuality.focusedPercentage)% focused")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(MetridayTheme.graphite)
+            HStack(spacing: 12) {
+                qualityMetric(label: "Focused", seconds: activityQuality.focusedSeconds, color: MetridayTheme.accentDeep)
+                qualityMetric(label: "Distracting", seconds: activityQuality.distractedSeconds, color: MetridayTheme.danger)
+                qualityMetric(label: "Other", seconds: activityQuality.otherSeconds, color: MetridayTheme.secondary)
+                if activityQuality.idleSeconds > 0 {
+                    qualityMetric(label: "Idle", seconds: activityQuality.idleSeconds, color: MetridayTheme.line)
+                }
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func qualityMetric(label: String, seconds: Int, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            Text("\(label) \(formatDuration(seconds: seconds))")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(MetridayTheme.secondary)
+        }
     }
 
     private var plannedDurationLabel: String {

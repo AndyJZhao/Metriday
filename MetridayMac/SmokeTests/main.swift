@@ -82,6 +82,17 @@ expect(
     TimeBlockRelevance.explanation(task: relevanceTask, activity: distractingActivity, category: distractingCategory) == "Distracting category",
     "Time Block evidence should explain distracting category matches"
 )
+let quality = timeBlockActivityQuality(
+    segments: [
+        ActivitySegment(appName: "Xcode", startMinute: 9, endMinute: 9, startSecond: 9 * 60 * 60, endSecond: 9 * 60 * 60 + 30 * 60, relevance: .related),
+        ActivitySegment(appName: "Chrome", startMinute: 9, endMinute: 9, startSecond: 9 * 60 * 60 + 30 * 60, endSecond: 9 * 60 * 60 + 40 * 60, relevance: .distracted),
+        ActivitySegment(appName: "Idle", startMinute: 9, endMinute: 9, startSecond: 9 * 60 * 60 + 40 * 60, endSecond: 9 * 60 * 60 + 45 * 60, relevance: .idle)
+    ],
+    plannedStartSecond: 9 * 60 * 60,
+    plannedEndSecond: 10 * 60 * 60
+)
+expect(quality.focusedSeconds == 30 * 60 && quality.distractedSeconds == 10 * 60, "Time Block quality should split focused and distracting overlap")
+expect(quality.idleSeconds == 5 * 60 && quality.focusedPercentage == 75, "Time Block quality should expose idle time and active focus percentage")
 let seeded = MarkdownCodec.seed(for: date)
 let markdown = MarkdownCodec.serialize(seeded)
 let parsed = MarkdownCodec.parse(markdown, date: date)

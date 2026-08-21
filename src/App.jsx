@@ -1708,6 +1708,31 @@ function timeBlockExecutionSummary(taskID, entries = [], timer = null, dateKey =
   };
 }
 
+function timeBlockActivityQuality(activities = [], range = null) {
+  const quality = { focusedSeconds: 0, distractedSeconds: 0, otherSeconds: 0, idleSeconds: 0 };
+  if (!range) return { ...quality, activeSeconds: 0, hasActivity: false, focusedPercentage: 0, distractedPercentage: 0 };
+  const plannedStart = range.start * 60;
+  const plannedEnd = range.end * 60;
+  (Array.isArray(activities) ? activities : []).forEach((activity) => {
+    const start = Number(activity.startSecond ?? activity.start_second ?? Number(activity.startMinute || 0) * 60);
+    const end = Number(activity.endSecond ?? activity.end_second ?? Number(activity.endMinute || 0) * 60);
+    const overlapStart = Math.max(plannedStart, start);
+    const overlapEnd = Math.min(plannedEnd, end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || overlapEnd <= overlapStart) return;
+    const role = String(activity.categoryRole || activity.relevance || "other").toLowerCase();
+    const key = role === "focused" || role === "related" ? "focusedSeconds" : role === "distracting" || role === "distracted" ? "distractedSeconds" : role === "idle" ? "idleSeconds" : "otherSeconds";
+    quality[key] += overlapEnd - overlapStart;
+  });
+  const activeSeconds = quality.focusedSeconds + quality.distractedSeconds + quality.otherSeconds;
+  return {
+    ...quality,
+    activeSeconds,
+    hasActivity: activeSeconds + quality.idleSeconds > 0,
+    focusedPercentage: activeSeconds ? Math.round((quality.focusedSeconds / activeSeconds) * 100) : 0,
+    distractedPercentage: activeSeconds ? Math.round((quality.distractedSeconds / activeSeconds) * 100) : 0,
+  };
+}
+
 function planTimelineBlocks(tasks, connected, entries = [], timer = null, dateKey = localDateKey()) {
   if (!connected || !Array.isArray(tasks)) return fixedPlanBlocks;
   return tasks.filter((task) => Number.isFinite(task.start_minute) && Number.isFinite(task.end_minute) && task.end_minute > task.start_minute).map((task, index) => {
@@ -2058,6 +2083,7 @@ function WebTimeBlockDialog({ task, api, dateKey, onClose, onOpenPlan }) {
   if (!task) return null;
   const range = taskMinuteRange(task);
   const execution = timeBlockExecutionSummary(task.id, api.entries, api.status?.timer, dateKey);
+  const activityQuality = timeBlockActivityQuality(api.activities, range);
   const timer = api.status?.timer || api.status?.runningTimer;
   const timerFields = timer?.custom_fields || timer?.customFields || {};
   const focusForTask = Boolean(api.focusSessionActive) && resourceID(timerFields.metriday_plan_task_id).toLowerCase() === resourceID(task.id).toLowerCase();
@@ -2092,7 +2118,18 @@ function WebTimeBlockDialog({ task, api, dateKey, onClose, onOpenPlan }) {
       row.seconds += overlapEnd - overlapStart;
       grouped.set(key, row);
     });
-    return [...grouped.values()].sort((left, right) => right.seconds - left.seconds).slice(0, 8);
+    const rows = [...grouped.values()].sort((left, right) => right.seconds - left.seconds).slice(0, 8);
+    if (activityQuality.hasActivity) {
+      rows.push({
+        key: "time-block-quality",
+        appName: "Focus quality",
+        detail: `${activityQuality.focusedPercentage}% focused · ${activityQuality.distractedPercentage}% distracting`,
+        categoryName: "Planned-window summary",
+        color: "var(--accent)",
+        seconds: activityQuality.activeSeconds,
+      });
+    }
+    return rows;
   })();
   const run = async (action) => {
     if (busy) return;

@@ -65,6 +65,77 @@ struct TimeBlockExecutionSummary: Hashable {
     }
 }
 
+struct TimeBlockActivityQuality: Hashable {
+    let focusedSeconds: Int
+    let distractedSeconds: Int
+    let otherSeconds: Int
+    let idleSeconds: Int
+
+    static let empty = TimeBlockActivityQuality(
+        focusedSeconds: 0,
+        distractedSeconds: 0,
+        otherSeconds: 0,
+        idleSeconds: 0
+    )
+
+    var activeSeconds: Int {
+        focusedSeconds + distractedSeconds + otherSeconds
+    }
+
+    var hasActivity: Bool {
+        activeSeconds + idleSeconds > 0
+    }
+
+    var focusedPercentage: Int {
+        percentage(focusedSeconds, of: activeSeconds)
+    }
+
+    var distractedPercentage: Int {
+        percentage(distractedSeconds, of: activeSeconds)
+    }
+
+    private func percentage(_ value: Int, of total: Int) -> Int {
+        guard total > 0 else { return 0 }
+        return Int((Double(value) / Double(total) * 100).rounded())
+    }
+}
+
+func timeBlockActivityQuality(
+    segments: [ActivitySegment],
+    plannedStartSecond: Int,
+    plannedEndSecond: Int
+) -> TimeBlockActivityQuality {
+    guard plannedEndSecond > plannedStartSecond else { return .empty }
+    var focusedSeconds = 0
+    var distractedSeconds = 0
+    var otherSeconds = 0
+    var idleSeconds = 0
+
+    for segment in segments {
+        let overlapStart = max(plannedStartSecond, segment.startSecond)
+        let overlapEnd = min(plannedEndSecond, segment.endSecond)
+        guard overlapEnd > overlapStart else { continue }
+        let seconds = overlapEnd - overlapStart
+        switch segment.relevance {
+        case .related:
+            focusedSeconds += seconds
+        case .distracted:
+            distractedSeconds += seconds
+        case .other:
+            otherSeconds += seconds
+        case .idle:
+            idleSeconds += seconds
+        }
+    }
+
+    return TimeBlockActivityQuality(
+        focusedSeconds: focusedSeconds,
+        distractedSeconds: distractedSeconds,
+        otherSeconds: otherSeconds,
+        idleSeconds: idleSeconds
+    )
+}
+
 func timeBlockExecutionSummary(
     taskID: UUID,
     entries: [TimeEntry],
