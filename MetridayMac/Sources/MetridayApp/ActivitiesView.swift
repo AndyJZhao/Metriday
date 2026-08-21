@@ -4301,22 +4301,24 @@ private struct ActivityCategoriesSheet: View {
         let priorityIndex = categoryStore.customCategories.firstIndex(where: { $0.id == category.id })
         let customCount = categoryStore.customCategories.count
         return HStack(spacing: 10) {
-            Circle()
-                .fill(categoryColor(for: category))
-                .frame(width: 10, height: 10)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(category.name)
-                    .font(.system(size: 12, weight: .semibold))
-                Text(detail)
-                    .font(.system(size: 10))
-                    .foregroundStyle(MetridayTheme.secondary)
-            }
-            Spacer()
             if category.isSystem {
+                categoryMainLabel(category, detail: detail)
+                Spacer(minLength: 0)
                 Text("Built-in")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(MetridayTheme.secondary)
             } else {
+                Button {
+                    creatingCategory = false
+                    editingCategory = category
+                    showingEditor = true
+                } label: {
+                    categoryMainLabel(category, detail: detail)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .accessibilityLabel("Edit \(category.name)")
                 HStack(spacing: 2) {
                     Button {
                         _ = categoryStore.move(category, by: -1)
@@ -4335,12 +4337,6 @@ private struct ActivityCategoriesSheet: View {
                     .disabled(priorityIndex == nil || priorityIndex == customCount - 1)
                     .help("Move category priority down")
                 }
-                Button("Edit") {
-                    creatingCategory = false
-                    editingCategory = category
-                    showingEditor = true
-                }
-                .buttonStyle(.borderless)
                 Button(role: .destructive) {
                     categoryStore.archive(category)
                 } label: {
@@ -4355,6 +4351,24 @@ private struct ActivityCategoriesSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(MetridayTheme.canvas)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func categoryMainLabel(
+        _ category: ActivityCategoryDefinition,
+        detail: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(categoryColor(for: category))
+                .frame(width: 10, height: 10)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(category.name)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(detail)
+                    .font(.system(size: 10))
+                    .foregroundStyle(MetridayTheme.secondary)
+            }
+        }
     }
 
     private func categoryColor(for category: ActivityCategoryDefinition) -> Color {
