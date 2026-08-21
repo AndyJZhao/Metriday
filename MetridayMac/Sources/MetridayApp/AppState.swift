@@ -1409,6 +1409,8 @@ final class AppState: ObservableObject {
             return .jsonObject([
                 "date": apiDayKey(date),
                 "data": calls.map(apiPhoneCall),
+                "database_available": phoneCallStore.databaseAvailable,
+                "status": phoneCallStore.statusMessage,
                 "hidden_addresses": Array(phoneCallStore.hiddenAddresses).sorted(),
                 "source": "macOS CallHistory",
                 "read_only": true
