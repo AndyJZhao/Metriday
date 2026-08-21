@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-private struct CalendarEventLinkArchive: Codable {
+struct CalendarEventLinkArchive: Codable {
     let version: Int
     let taskToEvent: [String: String]
 }
@@ -36,6 +36,32 @@ final class CalendarEventLinkStore: ObservableObject {
 
     func eventID(for taskID: UUID) -> String? {
         taskToEvent[taskID]
+    }
+
+    func exportArchiveData() throws -> Data {
+        let archive = CalendarEventLinkArchive(
+            version: 1,
+            taskToEvent: Dictionary(uniqueKeysWithValues: taskToEvent.map { ($0.uuidString, $1) })
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(archive)
+    }
+
+    /// Merges links after Markdown task IDs have been reconciled by sync.
+    @discardableResult
+    func mergeArchive(_ archive: CalendarEventLinkArchive, taskIDMap: [UUID: UUID] = [:]) -> Int {
+        var imported = 0
+        for (rawTaskID, eventID) in archive.taskToEvent {
+            guard let remoteTaskID = UUID(uuidString: rawTaskID) else { continue }
+            let localTaskID = taskIDMap[remoteTaskID] ?? remoteTaskID
+            if taskToEvent[localTaskID] == nil {
+                taskToEvent[localTaskID] = eventID
+                imported += 1
+            }
+        }
+        if imported > 0 { persist() }
+        return imported
     }
 
     private func persist() {

@@ -94,7 +94,8 @@ final class AppState: ObservableObject {
             screenTimeStore: screenTimeStore,
             webBlocker: blocker,
             exclusionStore: exclusionStore,
-            teamStore: teamStore
+            teamStore: teamStore,
+            calendarEventLinkStore: calendarEventLinkStore
         )
         activityMonitor.setDeviceName(syncStore.deviceName)
         syncStore.$deviceName

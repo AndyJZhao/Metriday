@@ -6,7 +6,7 @@ struct MarkdownPlanArchive: Codable {
     let files: [String: String]
 }
 
-private struct MarkdownTaskIdentityArchive: Codable {
+struct MarkdownTaskIdentityArchive: Codable {
     let version: Int
     let identities: [String: UUID]
 }
@@ -167,6 +167,33 @@ final class MarkdownStore: ObservableObject {
         return try encoder.encode(archive)
     }
 
+    func exportTaskIdentityArchiveData() throws -> Data {
+        let archive = MarkdownTaskIdentityArchive(version: 1, identities: taskIdentities)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(archive)
+    }
+
+    /// Merges a remote task identity index without replacing identities that
+    /// already exist locally. The returned map lets sync remap linked
+    /// Time Entries and Calendar Events from the remote task IDs.
+    @discardableResult
+    func mergeTaskIdentityArchiveData(_ data: Data) throws -> [UUID: UUID] {
+        let archive = try JSONDecoder().decode(MarkdownTaskIdentityArchive.self, from: data)
+        var idMap: [UUID: UUID] = [:]
+        for (key, remoteID) in archive.identities {
+            if let localID = taskIdentities[key] {
+                idMap[remoteID] = localID
+            } else {
+                taskIdentities[key] = remoteID
+                idMap[remoteID] = remoteID
+            }
+        }
+        persist()
+        _ = load(date: document.date, createIfMissing: false)
+        return idMap
+    }
+
     @discardableResult
     func importArchiveData(_ data: Data) throws -> Int {
         let archive = try JSONDecoder().decode(MarkdownPlanArchive.self, from: data)
@@ -183,6 +210,38 @@ final class MarkdownStore: ObservableObject {
                 atomically: true,
                 encoding: .utf8
             )
+            imported += 1
+        }
+        _ = load(date: document.date, createIfMissing: false)
+        return imported
+    }
+
+    /// Imports a remote plan without allowing an empty local daily file to
+    /// erase a populated Markdown document from another device.
+    @discardableResult
+    func mergeArchiveData(_ data: Data) throws -> Int {
+        let archive = try JSONDecoder().decode(MarkdownPlanArchive.self, from: data)
+        let calendarDirectory = rootDirectory.appendingPathComponent("Calendar", isDirectory: true)
+        try FileManager.default.createDirectory(at: calendarDirectory, withIntermediateDirectories: true)
+        var imported = 0
+        for (filename, value) in archive.files {
+            guard filename.range(
+                of: #"^\d{4}-\d{2}-\d{2}\.md$"#,
+                options: .regularExpression
+            ) != nil else { continue }
+            let destination = calendarDirectory.appendingPathComponent(filename)
+            let shouldImport: Bool
+            if let existing = try? String(contentsOf: destination, encoding: .utf8) {
+                let existingDocument = MarkdownCodec.parse(existing, date: document.date)
+                let incomingDocument = MarkdownCodec.parse(value, date: document.date)
+                shouldImport = existingDocument.tasks.isEmpty
+                    && existingDocument.notes.isEmpty
+                    && (!incomingDocument.tasks.isEmpty || !incomingDocument.notes.isEmpty)
+            } else {
+                shouldImport = true
+            }
+            guard shouldImport else { continue }
+            try value.write(to: destination, atomically: true, encoding: .utf8)
             imported += 1
         }
         _ = load(date: document.date, createIfMissing: false)

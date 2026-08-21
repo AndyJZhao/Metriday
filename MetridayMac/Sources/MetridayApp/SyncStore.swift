@@ -27,6 +27,9 @@ struct MetridaySyncArchive: Codable {
     let exclusionRules: [ActivityExclusionRule]?
     /// Optional keeps archives written before local team support readable.
     let teams: TeamArchive?
+    /// Optional keeps archives written before task/calendar identity sync readable.
+    let taskIdentities: MarkdownTaskIdentityArchive?
+    let calendarEventLinks: CalendarEventLinkArchive?
 }
 
 @MainActor
@@ -51,6 +54,7 @@ final class SyncStore: ObservableObject {
     private let webBlocker: WebBlockerService?
     private let exclusionStore: ExclusionStore?
     private let teamStore: TeamStore?
+    private let calendarEventLinkStore: CalendarEventLinkStore?
     private let markdownStore: MarkdownStore
     private let settingsURL: URL
     private let identityURL: URL
@@ -67,6 +71,7 @@ final class SyncStore: ObservableObject {
         webBlocker: WebBlockerService? = nil,
         exclusionStore: ExclusionStore? = nil,
         teamStore: TeamStore? = nil,
+        calendarEventLinkStore: CalendarEventLinkStore? = nil,
         rootDirectory: URL? = nil
     ) {
         let root = rootDirectory ?? Self.defaultRootDirectory()
@@ -79,6 +84,7 @@ final class SyncStore: ObservableObject {
         self.webBlocker = webBlocker
         self.exclusionStore = exclusionStore
         self.teamStore = teamStore
+        self.calendarEventLinkStore = calendarEventLinkStore
         self.markdownStore = markdownStore
         self.settingsURL = root.appendingPathComponent("SyncSettings.json")
         self.identityURL = root.appendingPathComponent("SyncIdentity.json")
@@ -177,7 +183,10 @@ final class SyncStore: ObservableObject {
             let categorySuffix = stats.importedCategories > 0
                 ? " · \(stats.importedCategories) categories"
                 : ""
-            statusMessage = "Synced \(archives.count) device\(devicePlural) · \(stats.importedEntries) new entries · \(stats.importedActivities) new activities\(screenTimeSuffix)\(filterSuffix)\(categorySuffix) · \(stats.importedPlans) plans · \(backupCount) backups"
+            let identitySuffix = stats.importedTaskIdentities > 0 || stats.importedCalendarLinks > 0
+                ? " · \(stats.importedTaskIdentities) task identities · \(stats.importedCalendarLinks) Calendar links"
+                : ""
+            statusMessage = "Synced \(archives.count) device\(devicePlural) · \(stats.importedEntries) new entries · \(stats.importedActivities) new activities\(screenTimeSuffix)\(filterSuffix)\(categorySuffix)\(identitySuffix) · \(stats.importedPlans) plans · \(backupCount) backups"
             return true
         } catch {
             statusMessage = "Sync failed · \(error.localizedDescription)"
@@ -227,6 +236,8 @@ final class SyncStore: ObservableObject {
         var importedFilters = 0
         var importedCategories = 0
         var importedPlans = 0
+        var importedTaskIdentities = 0
+        var importedCalendarLinks = 0
     }
 
     private func mergeArchives(_ archives: [MetridaySyncArchive]) throws -> MergeStats {
@@ -263,11 +274,29 @@ final class SyncStore: ObservableObject {
             projectMaps[archive.deviceID] = result.idMap
         }
 
+        var taskIDMaps: [String: [UUID: UUID]] = [:]
+        for archive in archives {
+            guard let taskIdentities = archive.taskIdentities else { continue }
+            let taskIDMap = try markdownStore.mergeTaskIdentityArchiveData(encode(taskIdentities))
+            taskIDMaps[archive.deviceID] = taskIDMap
+            stats.importedTaskIdentities += taskIDMap.count
+        }
+
+        for archive in archives {
+            stats.importedPlans += try markdownStore.mergeArchiveData(encode(archive.plans))
+        }
+
         for archive in archives {
             let projectMap = projectMaps[archive.deviceID] ?? [:]
-            stats.importedPlans += try markdownStore.importArchiveData(encode(archive.plans))
+            let taskIDMap = taskIDMaps[archive.deviceID] ?? [:]
             let mappedEntries = archive.timeEntries.entries.map { entry in
-                TimeEntry(
+                var customFields = entry.customFields
+                if let rawTaskID = customFields["metriday_plan_task_id"],
+                   let remoteTaskID = UUID(uuidString: rawTaskID),
+                   let localTaskID = taskIDMap[remoteTaskID] {
+                    customFields["metriday_plan_task_id"] = localTaskID.uuidString
+                }
+                return TimeEntry(
                     id: entry.id,
                     projectID: entry.projectID.flatMap { projectMap[$0] },
                     title: entry.title,
@@ -276,7 +305,7 @@ final class SyncStore: ObservableObject {
                     end: entry.end,
                     billingStatus: entry.billingStatus,
                     isManual: entry.isManual,
-                    customFields: entry.customFields
+                    customFields: customFields
                 )
             }
             let entryData = try encode(TimeEntryArchive(version: 1, entries: mappedEntries))
@@ -310,6 +339,12 @@ final class SyncStore: ObservableObject {
             if let exclusionRules = archive.exclusionRules, let exclusionStore {
                 exclusionStore.importRules(exclusionRules)
             }
+            if let calendarEventLinks = archive.calendarEventLinks, let calendarEventLinkStore {
+                stats.importedCalendarLinks += calendarEventLinkStore.mergeArchive(
+                    calendarEventLinks,
+                    taskIDMap: taskIDMap
+                )
+            }
         }
         return stats
     }
@@ -328,10 +363,23 @@ final class SyncStore: ObservableObject {
         let screenTime = try screenTimeStore.map {
             try decoder.decode(ActivityHistoryArchive.self, from: $0.exportArchiveData())
         }
-            let plans = try decoder.decode(MarkdownPlanArchive.self, from: markdownStore.exportArchiveData())
-            let teams = try teamStore.map {
-                try decoder.decode(TeamArchive.self, from: $0.exportArchiveData())
-            }
+        let plans = try decoder.decode(MarkdownPlanArchive.self, from: markdownStore.exportArchiveData())
+        let teams = try teamStore.map {
+            try decoder.decode(TeamArchive.self, from: $0.exportArchiveData())
+        }
+        let taskIdentities = try decoder.decode(
+            MarkdownTaskIdentityArchive.self,
+            from: markdownStore.exportTaskIdentityArchiveData()
+        )
+        let calendarEventLinks: CalendarEventLinkArchive?
+        if let calendarEventLinkStore {
+            calendarEventLinks = try decoder.decode(
+                CalendarEventLinkArchive.self,
+                from: calendarEventLinkStore.exportArchiveData()
+            )
+        } else {
+            calendarEventLinks = nil
+        }
         return MetridaySyncArchive(
             version: 1,
             deviceID: deviceID,
@@ -347,7 +395,9 @@ final class SyncStore: ObservableObject {
             webRules: webBlocker?.rules,
             excludedBundleIdentifiers: exclusionStore?.bundleIdentifiers,
             exclusionRules: exclusionStore?.rules,
-            teams: teams
+            teams: teams,
+            taskIdentities: taskIdentities,
+            calendarEventLinks: calendarEventLinks
         )
     }
 

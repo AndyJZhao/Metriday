@@ -1916,6 +1916,24 @@ Task { @MainActor in
         start: date.addingTimeInterval(10 * 60),
         end: date.addingTimeInterval(40 * 60)
     )
+    let deviceAMarkdown = MarkdownStore(date: date, rootDirectory: deviceARoot)
+    guard let deviceATaskID = deviceAMarkdown.addTask(title: "Shared Focus Block") else {
+        expect(false, "Sync device A should create a Markdown task")
+        return
+    }
+    deviceAMarkdown.schedule(id: deviceATaskID, start: 9 * 60, end: 10 * 60)
+    let deviceALinks = CalendarEventLinkStore(rootDirectory: deviceARoot)
+    deviceALinks.link(taskID: deviceATaskID, eventID: "calendar-event-sync")
+    _ = deviceATimeEntries.addEntry(
+        title: "Shared Focus Block",
+        projectID: nil,
+        start: date.addingTimeInterval(9 * 60 * 60),
+        end: date.addingTimeInterval(9 * 60 * 60 + 30 * 60),
+        customFields: [
+            "metriday_plan_task_id": deviceATaskID.uuidString,
+            "metriday_focus_session": "true"
+        ]
+    )
     _ = deviceAExclusions.addRule(
         field: .application,
         pattern: "Private Browser",
@@ -1939,10 +1957,11 @@ Task { @MainActor in
         categoryStore: deviceACategories,
         timeEntryStore: deviceATimeEntries,
         activityMonitor: deviceAActivity,
-        markdownStore: MarkdownStore(date: date, rootDirectory: deviceARoot),
+        markdownStore: deviceAMarkdown,
         screenTimeStore: deviceAScreenTime,
         exclusionStore: deviceAExclusions,
         teamStore: deviceATeams,
+        calendarEventLinkStore: deviceALinks,
         rootDirectory: deviceARoot.appendingPathComponent("Sync", isDirectory: true)
     )
     deviceASync.deviceName = "Mac A"
@@ -1972,16 +1991,19 @@ Task { @MainActor in
         databaseURL: deviceBRoot.appendingPathComponent("missing-knowledgeC.db"),
         archiveRootDirectory: deviceBRoot.appendingPathComponent("ScreenTime", isDirectory: true)
     )
+    let deviceBMarkdown = MarkdownStore(date: date, rootDirectory: deviceBRoot)
+    let deviceBLinks = CalendarEventLinkStore(rootDirectory: deviceBRoot)
     let deviceBSync = SyncStore(
         projectStore: deviceBProjects,
         filterStore: deviceBFilters,
         categoryStore: deviceBCategories,
         timeEntryStore: deviceBTimeEntries,
         activityMonitor: deviceBActivity,
-        markdownStore: MarkdownStore(date: date, rootDirectory: deviceBRoot),
+        markdownStore: deviceBMarkdown,
         screenTimeStore: deviceBScreenTime,
         exclusionStore: deviceBExclusions,
         teamStore: deviceBTeams,
+        calendarEventLinkStore: deviceBLinks,
         rootDirectory: deviceBRoot.appendingPathComponent("Sync", isDirectory: true)
     )
     deviceBSync.deviceName = "Mac B"
@@ -1995,6 +2017,9 @@ Task { @MainActor in
     expect(deviceBCategories.categories.contains { $0.name == "Shared Focused Work" && $0.color == .blue }, "Sync should merge activity categories and preserve focused color semantics")
     expect(deviceBExclusions.rules.contains { $0.pattern == "Private Browser" }, "Sync should merge activity exclusion rules")
     expect(deviceBScreenTime.segments(for: date).contains { $0.resource == "https://research.example" }, "Sync should merge archived Screen Time activity")
+    expect(deviceBMarkdown.tasks.contains { $0.id == deviceATaskID && $0.title == "Shared Focus Block" }, "Sync should preserve Markdown task identities")
+    expect(deviceBTimeEntries.entries.contains { $0.customFields["metriday_plan_task_id"] == deviceATaskID.uuidString }, "Sync should remap linked Time Entries to the shared Markdown task")
+    expect(deviceBLinks.eventID(for: deviceATaskID) == "calendar-event-sync", "Sync should preserve Calendar Event links")
     expect(deviceBSync.backupCount > 0, "Sync should expose retained backup count")
     expect(deviceBSync.restoreLatestBackup(), "Sync should restore the latest backup archive")
 
