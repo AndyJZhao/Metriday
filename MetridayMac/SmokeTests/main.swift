@@ -57,6 +57,33 @@ let executionSummary = timeBlockExecutionSummary(
 expect(executionSummary.durationSeconds == 45 * 60, "Linked Time Block execution should accumulate split intervals")
 expect(executionSummary.intervalCount == 2, "Linked Time Block execution should count split intervals")
 expect(executionSummary.statusLabel == "Actual 45m", "Completed Time Block execution should expose an actual label")
+let focusEstimateTask = PlanTask(
+    title: "Continue research",
+    startMinute: 9 * 60,
+    endMinute: 10 * 60
+)
+let focusEstimateEntries = [
+    TimeEntry(
+        title: "Continue research",
+        start: calendarEventDay.addingTimeInterval(9 * 60 * 60),
+        end: calendarEventDay.addingTimeInterval(9 * 60 * 60 + 45 * 60),
+        customFields: ["metriday_plan_task_id": focusEstimateTask.id.uuidString]
+    )
+]
+expect(
+    timeBlockFocusEstimateSeconds(task: focusEstimateTask, entries: focusEstimateEntries, date: calendarEventDay) == 15 * 60,
+    "Resuming Focus should count down only the remaining planned duration"
+)
+let completedFocusEntry = TimeEntry(
+    title: "Continue research",
+    start: calendarEventDay.addingTimeInterval(9 * 60 * 60),
+    end: calendarEventDay.addingTimeInterval(10 * 60 * 60),
+    customFields: ["metriday_plan_task_id": focusEstimateTask.id.uuidString]
+)
+expect(
+    timeBlockFocusEstimateSeconds(task: focusEstimateTask, entries: [completedFocusEntry], date: calendarEventDay) == nil,
+    "A completed planned duration should resume Focus without a misleading countdown"
+)
 let relevanceTask = PlanTask(title: "Write research report", tags: ["analysis"])
 let keywordActivity = ActivitySegment(
     appName: "Safari",

@@ -164,3 +164,26 @@ func timeBlockExecutionSummary(
         isRunning: isRunning
     )
 }
+
+/// Returns the countdown to use when Focus is resumed for a planned task.
+///
+/// A resumed Focus Session should continue from the task's accumulated
+/// execution instead of resetting to the full Markdown block duration. Once
+/// the planned duration has already been reached, the next session is open
+/// ended so the countdown does not pretend that the task has time remaining.
+func timeBlockFocusEstimateSeconds(
+    task: PlanTask,
+    entries: [TimeEntry],
+    date: Date
+) -> Int? {
+    guard task.isScheduled else { return nil }
+    let plannedSeconds = task.duration * 60
+    let executedSeconds = timeBlockExecutionSummary(
+        taskID: task.id,
+        entries: entries,
+        runningTimer: nil,
+        date: date
+    ).durationSeconds
+    guard executedSeconds < plannedSeconds else { return nil }
+    return max(60, plannedSeconds - executedSeconds)
+}

@@ -205,12 +205,18 @@ final class AppState: ObservableObject {
             task = currentTask
         }
         guard let task, task.isScheduled else { return false }
+        let taskDate = date ?? selectedDate
+        let estimatedDurationSeconds = timeBlockFocusEstimateSeconds(
+            task: task,
+            entries: timeEntryStore.entries,
+            date: taskDate
+        )
         selectedTaskID = task.id
         blocker.setFocusTitle(task.title)
         timeEntryStore.startTimer(
             title: task.title,
             projectID: nil,
-            estimatedDurationSeconds: task.duration * 60,
+            estimatedDurationSeconds: estimatedDurationSeconds,
             billingStatus: .billable,
             customFields: [
                 Self.focusSessionField: "true",
