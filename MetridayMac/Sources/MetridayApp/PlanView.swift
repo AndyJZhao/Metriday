@@ -1096,10 +1096,25 @@ struct CalendarTaskBlock: View {
         .opacity(task.isCompleted ? 0.58 : 1)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected ? MetridayTheme.accentDeep : MetridayTheme.accent.opacity(0.25), lineWidth: selected ? 2 : 1))
+        .overlay {
+            if let start = task.startMinute, let end = task.endMinute {
+                CalendarBlockInteraction(
+                    startMinute: start,
+                    endMinute: end,
+                    hourHeight: TimelineMetrics.hourHeight,
+                    onSelect: { appState.selectedTaskID = task.id },
+                    onMove: { store.move(id: task.id, start: $0) },
+                    onResizeStart: { store.resizeStart(id: task.id, start: $0) },
+                    onResizeEnd: { store.resize(id: task.id, end: $0) }
+                )
+                .accessibilityHidden(true)
+            }
+        }
         .overlay(alignment: .top) {
             resizeHandle(symbol: "arrow.up")
                 .padding(.horizontal, 8)
                 .padding(.top, 2)
+                .allowsHitTesting(false)
         }
         .overlay(alignment: .topTrailing) {
             if selected || isHovering || execution.isRunning {
@@ -1130,22 +1145,10 @@ struct CalendarTaskBlock: View {
             resizeHandle(symbol: "arrow.down")
                 .padding(.horizontal, 8)
                 .padding(.bottom, 3)
+                .allowsHitTesting(false)
         }
         .frame(height: TimelineMetrics.height(start: task.startMinute ?? 0, end: task.endMinute ?? 0))
         .contentShape(Rectangle())
-        .overlay {
-            if let start = task.startMinute, let end = task.endMinute {
-                CalendarBlockInteraction(
-                    startMinute: start,
-                    endMinute: end,
-                    hourHeight: TimelineMetrics.hourHeight,
-                    onSelect: { appState.selectedTaskID = task.id },
-                    onMove: { store.move(id: task.id, start: $0) },
-                    onResizeStart: { store.resizeStart(id: task.id, start: $0) },
-                    onResizeEnd: { store.resize(id: task.id, end: $0) }
-                )
-            }
-        }
         .overlay(alignment: .bottomTrailing) {
             if selected {
                 Menu {
