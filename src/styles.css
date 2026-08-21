@@ -1105,6 +1105,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .project-root-drop-zone { display: flex; align-items: center; gap: 7px; min-height: 32px; margin-top: 16px; padding: 0 10px; border: 1px dashed var(--border); border-radius: 7px; color: var(--muted); font-size: 10px; }
 .project-root-drop-zone.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .project-row { display: grid; grid-template-columns: 10px minmax(150px, 1fr) minmax(120px, 1fr) 110px 70px 130px; align-items: center; gap: 10px; min-height: 48px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
+.project-row-actionable { cursor: pointer; }
+.project-row-actionable:hover { background: #fafbff; }
+.project-row-actionable:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
 .project-row[draggable="true"] { cursor: grab; }
 .project-row[draggable="true"]:active { cursor: grabbing; }
 .project-edit-card { padding: 16px 0; border-bottom: 1px solid #eceef1; }
