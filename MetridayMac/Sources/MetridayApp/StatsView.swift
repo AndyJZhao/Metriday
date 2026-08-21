@@ -37,9 +37,25 @@ private enum StatsPeriod: String, CaseIterable, Identifiable {
     }
 }
 
+private final class StatsActivityCache: ObservableObject {
+    private(set) var segmentsByDate: [Date: [ActivitySegment]] = [:]
+
+    func segments(for date: Date) -> [ActivitySegment]? {
+        segmentsByDate[date]
+    }
+
+    func store(_ segments: [ActivitySegment], for date: Date) {
+        segmentsByDate[date] = segments
+    }
+
+    func invalidate() {
+        segmentsByDate.removeAll(keepingCapacity: true)
+    }
+}
+
 struct StatsView: View {
     @EnvironmentObject private var appState: AppState
-    @ObservedObject var monitor: AppActivityMonitor
+    let monitor: AppActivityMonitor
     @ObservedObject var filterStore: ActivityFilterStore
     @ObservedObject var categoryStore: ActivityCategoryStore
     @ObservedObject var screenTimeStore: ScreenTimeStore
@@ -53,6 +69,7 @@ struct StatsView: View {
     @State private var customStartDate: Date
     @State private var customEndDate: Date
     @State private var projectSelectionAnchor: UUID?
+    @StateObject private var activityCache = StatsActivityCache()
 
     init(
         monitor: AppActivityMonitor,
@@ -243,6 +260,15 @@ struct StatsView: View {
         .onAppear {
             projectSelectionAnchor = selectedProjectIDs.first
         }
+        .onReceive(categoryStore.objectWillChange) { _ in
+            activityCache.invalidate()
+        }
+        .onReceive(filterStore.objectWillChange) { _ in
+            activityCache.invalidate()
+        }
+        .onReceive(screenTimeStore.objectWillChange) { _ in
+            activityCache.invalidate()
+        }
     }
 
     private var projectScopePanel: some View {
@@ -344,6 +370,7 @@ struct StatsView: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("stats.project-scope.\(scope.identifier)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityRemoveTraits(isSelected ? [] : .isSelected)
     }
 
     private var selectedProjectIDs: Set<UUID> {
@@ -1219,11 +1246,18 @@ struct StatsView: View {
     }
 
     private func allActivitySegments(for date: Date) -> [ActivitySegment] {
-        categoryStore.applyingCategories(
-            to: monitor.segments(for: date) + screenTimeStore.segments(for: date),
+        let normalizedDate = calendar.startOfDay(for: date)
+        if let cached = activityCache.segments(for: normalizedDate) {
+            return cached
+        }
+
+        let resolved = categoryStore.applyingCategories(
+            to: monitor.segments(for: normalizedDate) + screenTimeStore.segments(for: normalizedDate),
             filterStore: filterStore,
-            date: date
+            date: normalizedDate
         ).filter(matchesSelectedDevice)
+        activityCache.store(resolved, for: normalizedDate)
+        return resolved
     }
 
     private func matchesSelectedDevice(_ segment: ActivitySegment) -> Bool {
