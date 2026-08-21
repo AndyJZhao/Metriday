@@ -2039,6 +2039,9 @@ Task { @MainActor in
     expect(store.task(draftID) != nil, "Removing time should preserve the task")
     expect(store.task(draftID)?.timeRange == nil, "Removing time should clear only the range")
 
+    let reloadedStore = MarkdownStore(date: date, rootDirectory: tempRoot)
+    expect(reloadedStore.task(draftID) != nil, "Markdown task identity should survive a reload")
+
     let newTaskID = UUID()
     expect(store.addTask(title: "Fresh draggable task", id: newTaskID) == newTaskID, "New editor task should be committed with its drag identity")
     store.schedule(id: newTaskID, start: 10 * 60, end: 11 * 60)

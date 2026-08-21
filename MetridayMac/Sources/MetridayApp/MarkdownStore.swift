@@ -6,6 +6,11 @@ struct MarkdownPlanArchive: Codable {
     let files: [String: String]
 }
 
+private struct MarkdownTaskIdentityArchive: Codable {
+    let version: Int
+    let identities: [String: UUID]
+}
+
 @MainActor
 final class MarkdownStore: ObservableObject {
     static let dayStart = 8 * 60
@@ -19,12 +24,14 @@ final class MarkdownStore: ObservableObject {
 
     @Published private(set) var fileURL: URL
     private let rootDirectory: URL
+    private var taskIdentities: [String: UUID]
 
     init(date: Date = .now, rootDirectory: URL? = nil) {
         let root = rootDirectory ?? Self.defaultRootDirectory()
         self.rootDirectory = root
         let initialFileURL = Self.fileURL(for: date, rootDirectory: root)
         self.fileURL = initialFileURL
+        var identities = Self.loadTaskIdentities(rootDirectory: root)
 
         let loadedMarkdown: String
         if let contents = try? String(contentsOf: initialFileURL, encoding: .utf8) {
@@ -32,13 +39,17 @@ final class MarkdownStore: ObservableObject {
         } else {
             loadedMarkdown = MarkdownCodec.serialize(MarkdownCodec.blank(for: date))
         }
-        let initialLineIndices = MarkdownCodec.taskLineIndices(in: loadedMarkdown)
-        let initialIDs = Dictionary(uniqueKeysWithValues: initialLineIndices.map { ($0, UUID()) })
+        let initialIDs = Self.assignTaskIDs(
+            in: loadedMarkdown,
+            date: date,
+            identities: &identities
+        )
         let loadedDocument = MarkdownCodec.parse(loadedMarkdown, date: date, taskIDsByLine: initialIDs)
         self.document = loadedDocument
         self.markdown = loadedMarkdown
         self.taskLineIDs = initialIDs
         self.lastUpdatedTaskID = loadedDocument.tasks.first?.id
+        self.taskIdentities = identities
         if let firstTask = loadedDocument.tasks.first,
            let range = firstTask.timeRange {
             self.statusMessage = "Markdown updated · \(range) added"
@@ -69,13 +80,18 @@ final class MarkdownStore: ObservableObject {
         guard existing != nil || createIfMissing else { return false }
 
         let raw = existing ?? MarkdownCodec.serialize(MarkdownCodec.blank(for: normalizedDate))
-        let lineIndices = MarkdownCodec.taskLineIndices(in: raw)
-        let ids = Dictionary(uniqueKeysWithValues: lineIndices.map { ($0, UUID()) })
+        var identities = Self.loadTaskIdentities(rootDirectory: rootDirectory)
+        let ids = Self.assignTaskIDs(
+            in: raw,
+            date: normalizedDate,
+            identities: &identities
+        )
 
         fileURL = destination
         markdown = raw
         taskLineIDs = ids
         document = MarkdownCodec.parse(raw, date: normalizedDate, taskIDsByLine: ids)
+        taskIdentities = identities
         lastUpdatedTaskID = document.tasks.first?.id
         statusMessage = didCreate ? "Daily Markdown created" : "Daily Markdown opened"
         persist()
@@ -323,6 +339,13 @@ final class MarkdownStore: ObservableObject {
             }
         }
 
+        for key in Self.taskIdentityKeys(in: raw, date: document.date) {
+            if let id = newIDs[key.line] {
+                taskIdentities[key.signature] = id
+                taskIdentities[key.lineKey] = id
+            }
+        }
+
         markdown = raw
         taskLineIDs = newIDs
         document = MarkdownCodec.parse(raw, date: document.date, taskIDsByLine: newIDs)
@@ -338,6 +361,9 @@ final class MarkdownStore: ObservableObject {
                 withIntermediateDirectories: true
             )
             try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
+            let archive = MarkdownTaskIdentityArchive(version: 1, identities: taskIdentities)
+            let data = try JSONEncoder().encode(archive)
+            try data.write(to: Self.taskIdentityURL(rootDirectory: rootDirectory), options: .atomic)
         } catch {
             statusMessage = "Could not save Markdown: \(error.localizedDescription)"
         }
@@ -359,5 +385,77 @@ final class MarkdownStore: ObservableObject {
         formatter.dateFormat = "yyyy-MM-dd"
         return rootDirectory.appendingPathComponent("Calendar", isDirectory: true)
             .appendingPathComponent("\(formatter.string(from: date)).md")
+    }
+
+    private struct TaskIdentityKey {
+        let line: Int
+        let signature: String
+        let lineKey: String
+    }
+
+    private static func taskIdentityKeys(in raw: String, date: Date) -> [TaskIdentityKey] {
+        let dateKey = dateKey(for: date)
+        let lines = raw.components(separatedBy: "\n")
+        var occurrences: [String: Int] = [:]
+        return MarkdownCodec.taskLineIndices(in: raw).compactMap { line in
+            guard line < lines.count else { return nil }
+            let normalized = lines[line]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .split(whereSeparator: { $0.isWhitespace })
+                .joined(separator: " ")
+            let occurrence = occurrences[normalized, default: 0]
+            occurrences[normalized] = occurrence + 1
+            return TaskIdentityKey(
+                line: line,
+                signature: "\(dateKey)|task:\(normalized)|occurrence:\(occurrence)",
+                lineKey: "\(dateKey)|line:\(line)"
+            )
+        }
+    }
+
+    private static func assignTaskIDs(
+        in raw: String,
+        date: Date,
+        identities: inout [String: UUID]
+    ) -> [Int: UUID] {
+        var assigned = Set<UUID>()
+        var result: [Int: UUID] = [:]
+        for key in taskIdentityKeys(in: raw, date: date) {
+            let id = identities[key.signature] ?? identities[key.lineKey] ?? UUID()
+            if assigned.contains(id) {
+                let replacement = UUID()
+                result[key.line] = replacement
+                identities[key.signature] = replacement
+                identities[key.lineKey] = replacement
+                assigned.insert(replacement)
+            } else {
+                result[key.line] = id
+                identities[key.signature] = id
+                identities[key.lineKey] = id
+                assigned.insert(id)
+            }
+        }
+        return result
+    }
+
+    private static func dateKey(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private static func taskIdentityURL(rootDirectory: URL) -> URL {
+        rootDirectory.appendingPathComponent("TaskIdentities.json")
+    }
+
+    private static func loadTaskIdentities(rootDirectory: URL) -> [String: UUID] {
+        let url = taskIdentityURL(rootDirectory: rootDirectory)
+        guard let data = try? Data(contentsOf: url),
+              let archive = try? JSONDecoder().decode(MarkdownTaskIdentityArchive.self, from: data) else {
+            return [:]
+        }
+        return archive.identities
     }
 }
