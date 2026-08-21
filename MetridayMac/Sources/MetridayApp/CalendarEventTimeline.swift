@@ -88,6 +88,7 @@ struct CalendarEventDetailSheet: View {
     let event: CalendarEventItem
     let projectID: UUID?
     @ObservedObject var timeEntryStore: TimeEntryStore
+    let onConvert: (() -> UUID?)?
 
     private var timeRange: String {
         let formatter = DateFormatter()
@@ -141,6 +142,11 @@ struct CalendarEventDetailSheet: View {
                         .buttonStyle(.borderless)
                 }
                 Spacer()
+                Button("Convert to Time Block") {
+                    guard onConvert?() != nil else { return }
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
                 Button("Record Time Entry") {
                     _ = timeEntryStore.addEntry(
                         title: event.title,

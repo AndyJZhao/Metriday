@@ -2042,6 +2042,11 @@ Task { @MainActor in
     let reloadedStore = MarkdownStore(date: date, rootDirectory: tempRoot)
     expect(reloadedStore.task(draftID) != nil, "Markdown task identity should survive a reload")
 
+    let eventLinkStore = CalendarEventLinkStore(rootDirectory: tempRoot)
+    eventLinkStore.link(taskID: draftID, eventID: "event-smoke")
+    let reloadedEventLinkStore = CalendarEventLinkStore(rootDirectory: tempRoot)
+    expect(reloadedEventLinkStore.eventID(for: draftID) == "event-smoke", "Calendar Event links should survive a reload")
+
     let newTaskID = UUID()
     expect(store.addTask(title: "Fresh draggable task", id: newTaskID) == newTaskID, "New editor task should be committed with its drag identity")
     store.schedule(id: newTaskID, start: 10 * 60, end: 11 * 60)

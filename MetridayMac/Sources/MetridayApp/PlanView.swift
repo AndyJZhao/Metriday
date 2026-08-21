@@ -557,7 +557,8 @@ struct PlanCalendarPane: View {
             CalendarEventDetailSheet(
                 event: event,
                 projectID: appState.suggestedProjectID(for: event),
-                timeEntryStore: appState.timeEntryStore
+                timeEntryStore: appState.timeEntryStore,
+                onConvert: { appState.convertCalendarEventToTimeBlock(event) }
             )
         }
     }

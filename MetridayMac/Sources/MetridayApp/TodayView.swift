@@ -57,7 +57,8 @@ struct TodayView: View {
             CalendarEventDetailSheet(
                 event: event,
                 projectID: appState.suggestedProjectID(for: event),
-                timeEntryStore: timeEntryStore
+                timeEntryStore: timeEntryStore,
+                onConvert: { appState.convertCalendarEventToTimeBlock(event) }
             )
         }
     }

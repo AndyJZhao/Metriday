@@ -322,6 +322,19 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .calendar-event-block > span { display: flex; min-width: 0; align-items: center; gap: 5px; }
 .calendar-event-block strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-event-block small { overflow: hidden; color: #8b794e; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-event-dialog-backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgba(28, 31, 41, 0.18); }
+.calendar-event-dialog { width: min(500px, 100%); padding: 24px; border: 1px solid #dfe1e7; border-radius: 13px; background: #fff; box-shadow: 0 18px 50px rgba(32, 38, 66, 0.22); color: var(--text); }
+.calendar-event-dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.calendar-event-dialog > header > div { display: grid; gap: 5px; min-width: 0; }
+.calendar-event-dialog > header span { color: #a16f10; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.calendar-event-dialog h2 { margin: 0; font-size: 21px; line-height: 1.2; }
+.calendar-event-dialog header p { margin: 0; color: var(--muted); font-size: 12px; }
+.calendar-event-dialog dl { display: grid; gap: 10px; margin: 20px 0; padding: 14px; border-radius: 10px; background: #fffaf0; }
+.calendar-event-dialog dl div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }
+.calendar-event-dialog dt { color: #8b794e; font-size: 11px; font-weight: 700; }
+.calendar-event-dialog dd { margin: 0; color: #4d422a; font-size: 12px; overflow-wrap: anywhere; }
+.calendar-event-dialog footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.calendar-event-dialog-message { flex: 1; min-width: 0; color: var(--muted); font-size: 11px; }
 .calendar-task-block { cursor: grab; }
 .calendar-task-block.accent { border-color: var(--accent); background: var(--accent); color: #fff; }
 .calendar-task-block.accent span { color: #eceeff; }

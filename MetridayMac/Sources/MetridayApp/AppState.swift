@@ -35,6 +35,7 @@ final class AppState: ObservableObject {
     let preferences: PreferencesStore
     let exclusionStore: ExclusionStore
     let calendarStore: CalendarEventStore
+    let calendarEventLinkStore: CalendarEventLinkStore
     let reminderStore: ReminderStore
     let phoneCallStore: PhoneCallStore
     let screenTimeStore: ScreenTimeStore
@@ -64,6 +65,7 @@ final class AppState: ObservableObject {
         self.preferences = initialPreferences
         self.exclusionStore = ExclusionStore()
         self.calendarStore = CalendarEventStore()
+        self.calendarEventLinkStore = CalendarEventLinkStore()
         self.reminderStore = ReminderStore()
         self.phoneCallStore = PhoneCallStore()
         self.screenTimeStore = ScreenTimeStore()
@@ -211,6 +213,32 @@ final class AppState: ObservableObject {
     @discardableResult
     func toggleFocusSession() -> Bool {
         focusSessionActive ? stopFocusSession() : startFocusSession()
+    }
+
+    /// Converts a read-only Calendar Event into a Markdown-backed Time Block
+    /// only after the user explicitly chooses that action.
+    @discardableResult
+    func convertCalendarEventToTimeBlock(_ event: CalendarEventItem) -> UUID? {
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: selectedDate)
+        let startMinute = calendar.dateComponents([.minute], from: dayStart, to: event.start).minute ?? MarkdownStore.dayStart
+        let endMinute = calendar.dateComponents([.minute], from: dayStart, to: event.end).minute ?? (startMinute + 60)
+        let start = max(MarkdownStore.dayStart, min(MarkdownStore.dayEnd - 30, startMinute))
+        let end = max(start + 30, min(MarkdownStore.dayEnd, endMinute))
+        let title = event.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, let taskID = markdownStore.addTask(title: title, tags: ["calendar"]) else {
+            return nil
+        }
+        markdownStore.schedule(
+            id: taskID,
+            start: start,
+            end: end,
+            message: "Calendar Event converted · \(TimeFormat.range(start: start, end: end))"
+        )
+        calendarEventLinkStore.link(taskID: taskID, eventID: event.id)
+        selectedTaskID = taskID
+        section = .plan
+        return taskID
     }
 
     func selectDate(_ date: Date) {
@@ -1523,6 +1551,32 @@ final class AppState: ObservableObject {
                 "data": calendarStore.events.map(apiCalendarEvent),
                 "authorized": calendarStore.isAuthorized,
                 "status": calendarStore.statusMessage
+            ])
+        }
+
+        if request.method == "POST",
+           path.hasPrefix("/v1/calendar-events/"),
+           path.hasSuffix("/convert") {
+            let components = path.split(separator: "/")
+            guard components.count == 4,
+                  let eventID = components.dropFirst(2).first.map(String.init) else {
+                return .error("Calendar event identifier is invalid", statusCode: 400)
+            }
+            let date = apiDate(from: request.query["date"]) ?? selectedDate
+            calendarStore.loadEvents(for: date)
+            guard let event = calendarStore.events.first(where: { $0.id == eventID }) else {
+                return .error("Calendar event not found", statusCode: 404)
+            }
+            if !Calendar.current.isDate(selectedDate, inSameDayAs: date) {
+                selectDate(date)
+            }
+            guard let taskID = convertCalendarEventToTimeBlock(event) else {
+                return .error("Calendar event could not be converted into a Time Block", statusCode: 400)
+            }
+            return .jsonObject([
+                "event_id": event.id,
+                "task_id": taskID.uuidString,
+                "plan": planAPIResponse(for: date)
             ])
         }
 

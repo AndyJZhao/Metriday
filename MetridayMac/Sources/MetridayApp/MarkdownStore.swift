@@ -190,13 +190,13 @@ final class MarkdownStore: ObservableObject {
     }
 
     @discardableResult
-    func addTask(title: String, id: UUID = UUID()) -> UUID? {
+    func addTask(title: String, tags: [String] = [], id: UUID = UUID()) -> UUID? {
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return nil }
         var lines = markdown.components(separatedBy: "\n")
         let notesIndex = lines.firstIndex { $0.trimmingCharacters(in: .whitespaces).lowercased() == "## notes" }
         let insertionIndex = notesIndex ?? lines.count
-        lines.insert(MarkdownCodec.serializeTask(PlanTask(id: id, title: clean)), at: insertionIndex)
+        lines.insert(MarkdownCodec.serializeTask(PlanTask(id: id, title: clean, tags: tags)), at: insertionIndex)
         applyRawMarkdown(
             lines.joined(separator: "\n"),
             preferredIDs: [insertionIndex: id],
