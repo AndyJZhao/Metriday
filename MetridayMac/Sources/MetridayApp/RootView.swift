@@ -14,7 +14,11 @@ struct RootView: View {
             Divider()
 
             VStack(spacing: 0) {
-                GlobalTopHeader(store: appState.markdownStore, monitor: appState.activityMonitor)
+                GlobalTopHeader(
+                    store: appState.markdownStore,
+                    monitor: appState.activityMonitor,
+                    timeEntryStore: appState.timeEntryStore
+                )
                     .zIndex(2)
                 Divider()
 
@@ -705,8 +709,10 @@ struct GlobalTopHeader: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var store: MarkdownStore
     @ObservedObject var monitor: AppActivityMonitor
+    @ObservedObject var timeEntryStore: TimeEntryStore
 
     var body: some View {
+        let sessionActive = appState.focusSessionActive
         HStack(spacing: 18) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(dateTitle)
@@ -777,23 +783,23 @@ struct GlobalTopHeader: View {
                         .minimumScaleFactor(0.78)
                     Text(blockSubtitle)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(appState.focusIsActive ? MetridayTheme.accent : MetridayTheme.secondary)
+                        .foregroundStyle(sessionActive ? MetridayTheme.accent : MetridayTheme.secondary)
                 }
                 .frame(width: 210, alignment: .leading)
 
                 Button {
-                    appState.focusIsActive.toggle()
+                    _ = appState.toggleFocusSession()
                 } label: {
                     Label(
-                        appState.focusIsActive ? "Pause focus" : "Resume focus",
-                        systemImage: appState.focusIsActive ? "pause.fill" : "play.fill"
+                        sessionActive ? "Pause focus" : "Resume focus",
+                        systemImage: sessionActive ? "pause.fill" : "play.fill"
                     )
                     .font(.system(size: 13, weight: .semibold))
                     .padding(.horizontal, 10)
                     .frame(height: 42)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(appState.currentTask == nil)
+                .disabled(!sessionActive && appState.currentTask == nil)
                 .accessibilityIdentifier("header.focus")
 
                 Divider().frame(height: 50)
@@ -844,7 +850,7 @@ struct GlobalTopHeader: View {
         guard let task = appState.currentTask, let range = task.timeRange else {
             return store.fileURL.lastPathComponent
         }
-        return "\(range)  ·  \(appState.focusIsActive ? "In progress" : "Ready")"
+        return "\(range)  ·  \(appState.focusSessionActive ? "In progress" : "Ready")"
     }
 }
 

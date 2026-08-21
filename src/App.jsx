@@ -267,6 +267,7 @@ function useMetridayAPI(dateKey, apiBase) {
     sync: null,
     rules: [],
     focusActive: false,
+    focusSessionActive: false,
     phoneCalls: { data: [], database_available: false, status: "Phone Calls integration not connected" },
     filters: [],
     categories: [],
@@ -357,6 +358,7 @@ function useMetridayAPI(dateKey, apiBase) {
         sync: value(4, null),
         rules: value(5, { data: [] })?.data || [],
         focusActive: Boolean(value(5, { focusActive: false })?.focusActive),
+        focusSessionActive: Boolean(status?.focusSessionActive),
         phoneCalls: value(6, { data: [], database_available: false, status: "Phone Calls integration not connected" }),
         weekly: value(7, []),
         insights: value(8, { data: [] })?.data || [],
@@ -436,6 +438,8 @@ function useMetridayAPI(dateKey, apiBase) {
     },
     startTimer: (title, projectID, options = {}) => mutate("/v1/timer/start", { title, projectID, ...options }),
     stopTimer: () => mutate("/v1/timer/stop"),
+    startFocusSession: () => mutate("/v1/focus/session/start"),
+    stopFocusSession: () => mutate("/v1/focus/session/stop"),
     setTimerEstimate: (minutes) => mutate("/v1/timer/estimate", { estimatedMinutes: Number(minutes) }),
     adjustTimer: (minutes) => mutate("/v1/timer/adjust", { minutes: Number(minutes) }),
     alignTimer: () => mutate("/v1/timer/adjust", { align_previous_entry: true }),
@@ -1500,22 +1504,24 @@ function Sidebar({ page, setPage, api, onOpenSettings }) {
 
 function WebGlobalHeader({ api, setPage, dateKey, setDateKey }) {
   const currentTask = api.status?.currentTask;
-  const focusActive = Boolean(api.focusActive);
+  const focusActive = Boolean(api.focusSessionActive);
+  const focusRuleActive = Boolean(api.focusActive);
   const currentTitle = currentTask?.title || "No scheduled block";
   const currentTaskRange = taskMinuteRange(currentTask);
   const currentRange = currentTaskRange
     ? formatRange(currentTaskRange.start, currentTaskRange.end)
     : "No scheduled time";
   const toggleFocus = async () => {
-    if (!api.connected || !currentTask) return;
+    if (!api.connected || (!currentTask && !focusActive)) return;
     try {
-      await api.setFocusActive(!focusActive);
+      if (focusActive) await api.stopFocusSession();
+      else await api.startFocusSession();
     } catch {
       // The page-level controls continue to reflect the native API on the next refresh.
     }
   };
   const openRules = () => setPage("rules");
-  return <header className="web-global-header"><div className="web-global-date"><strong>{planDateLabel(dateKey)}</strong><DateControls dateKey={dateKey} onChange={setDateKey} label="Choose selected date" /></div><div className="web-global-context"><div className="web-global-current"><span>Current block</span><strong>{currentTitle}</strong><small>{currentRange} · {focusActive ? "In progress" : currentTask ? "Ready" : "Waiting"}</small></div><button type="button" className={`primary-button web-global-focus ${focusActive ? "active" : ""}`} onClick={toggleFocus} disabled={!api.connected || !currentTask} title={api.connected && !currentTask ? "Schedule a current block to start Focus" : undefined}>{focusActive ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}{focusActive ? "Pause focus" : "Resume focus"}</button><TimerControls api={api} /><button type="button" className="web-global-rule" aria-label="Open Research Focus rules" onClick={openRules}><ShieldCheck size={30} color="#399a55" weight="duotone" /><div><strong>Research Focus</strong><span className="web-global-rule-status">{focusActive ? "Blocklist active" : "Blocklist ready"}</span><span className="web-global-rule-link">Adjust allowed sites</span></div></button></div></header>;
+  return <header className="web-global-header"><div className="web-global-date"><strong>{planDateLabel(dateKey)}</strong><DateControls dateKey={dateKey} onChange={setDateKey} label="Choose selected date" /></div><div className="web-global-context"><div className="web-global-current"><span>Current block</span><strong>{currentTitle}</strong><small>{currentRange} · {focusActive ? "In progress" : currentTask ? "Ready" : "Waiting"}</small></div><button type="button" className={`primary-button web-global-focus ${focusActive ? "active" : ""}`} onClick={toggleFocus} disabled={!api.connected || (!currentTask && !focusActive)} title={api.connected && !currentTask && !focusActive ? "Schedule a current block to start Focus" : undefined}>{focusActive ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}{focusActive ? "Pause focus" : "Resume focus"}</button><TimerControls api={api} /><button type="button" className="web-global-rule" aria-label="Open Research Focus rules" onClick={openRules}><ShieldCheck size={30} color="#399a55" weight="duotone" /><div><strong>Research Focus</strong><span className="web-global-rule-status">{focusRuleActive ? "Blocklist active" : "Blocklist ready"}</span><span className="web-global-rule-link">Adjust allowed sites</span></div></button></div></header>;
 }
 
 function IconButton({ label, children, onClick, className = "", disabled = false }) {

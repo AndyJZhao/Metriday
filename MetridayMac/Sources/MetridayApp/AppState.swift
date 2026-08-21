@@ -4,6 +4,8 @@ import Foundation
 
 @MainActor
 final class AppState: ObservableObject {
+    private static let focusSessionField = "metriday_focus_session"
+
     @Published var section: AppSection = .today
     @Published private(set) var selectedDate: Date
     @Published var activityScope: ActivityProjectScope = ActivityProjectScope(
@@ -168,6 +170,49 @@ final class AppState: ObservableObject {
         return scheduled.first
     }
 
+    /// A Focus Session is the user-facing bridge between the planned current
+    /// block, the local Timer entry, and the Focus website rules. The floating
+    /// companion surface is intentionally separate; this is the core session
+    /// lifecycle shared by Native and Web.
+    var focusSessionActive: Bool {
+        guard focusIsActive,
+              let timer = timeEntryStore.runningTimer else { return false }
+        return timer.customFields[Self.focusSessionField] == "true"
+    }
+
+    @discardableResult
+    func startFocusSession() -> Bool {
+        guard let task = currentTask else { return false }
+        selectedTaskID = task.id
+        timeEntryStore.startTimer(
+            title: task.title,
+            projectID: nil,
+            estimatedDurationSeconds: task.duration * 60,
+            billingStatus: .billable,
+            customFields: [
+                Self.focusSessionField: "true",
+                "metriday_plan_task_id": task.id.uuidString
+            ]
+        )
+        focusIsActive = true
+        return true
+    }
+
+    @discardableResult
+    func stopFocusSession() -> Bool {
+        let wasActive = focusSessionActive || focusIsActive
+        if focusSessionActive {
+            _ = timeEntryStore.stopTimer()
+        }
+        focusIsActive = false
+        return wasActive
+    }
+
+    @discardableResult
+    func toggleFocusSession() -> Bool {
+        focusSessionActive ? stopFocusSession() : startFocusSession()
+    }
+
     func selectDate(_ date: Date) {
         let normalized = Calendar.current.startOfDay(for: date)
         guard !Calendar.current.isDate(normalized, inSameDayAs: selectedDate) else { return }
@@ -263,7 +308,9 @@ final class AppState: ObservableObject {
                 "currentApplication": activityMonitor.currentApplication,
                 "currentWindowTitle": activityMonitor.currentWindowTitle,
                 "deviceName": syncStore.deviceName,
-                "api": localAPIServer.endpoint
+                "api": localAPIServer.endpoint,
+                "focusActive": focusIsActive,
+                "focusSessionActive": focusSessionActive
             ]
             if let task = currentTask {
                 response["currentTask"] = [
@@ -538,6 +585,31 @@ final class AppState: ObservableObject {
             }
             focusIsActive = active
             return .jsonObject(["active": focusIsActive, "status": blocker.status])
+        }
+
+        if request.method == "POST", path == "/v1/focus/session/start" {
+            guard startFocusSession(), let timer = timeEntryStore.runningTimer else {
+                return .error("Focus Session needs a scheduled current block", statusCode: 409)
+            }
+            return .jsonObject([
+                "active": focusIsActive,
+                "focusSessionActive": focusSessionActive,
+                "timerID": timer.id.uuidString,
+                "title": timer.title,
+                "startedAt": apiDate(timer.startedAt),
+                "estimatedDurationSeconds": timer.estimatedDurationSeconds.map { $0 as Any } ?? NSNull()
+            ], statusCode: 201)
+        }
+
+        if request.method == "POST", path == "/v1/focus/session/stop" {
+            guard stopFocusSession() else {
+                return .error("No Focus Session is running", statusCode: 409)
+            }
+            return .jsonObject([
+                "active": focusIsActive,
+                "focusSessionActive": focusSessionActive,
+                "stopped": true
+            ])
         }
 
         if request.method == "GET", path == "/v1/filters" {
@@ -1706,10 +1778,16 @@ final class AppState: ObservableObject {
         }
 
         if request.method == "POST", path == "/v1/timer/stop" {
+            let wasFocusSession = focusSessionActive
             guard let id = timeEntryStore.stopTimer() else {
                 return .error("No running timer", statusCode: 409)
             }
-            return .jsonObject(["id": id.uuidString, "stopped": true])
+            if wasFocusSession { focusIsActive = false }
+            return .jsonObject([
+                "id": id.uuidString,
+                "stopped": true,
+                "focusSessionActive": focusSessionActive
+            ])
         }
 
         if request.method == "POST", path == "/v1/timer/start" {
@@ -1721,6 +1799,7 @@ final class AppState: ObservableObject {
             let project = projectID(for: body["projectID"] as? String ?? body["project"] as? String)
             let notes = body["notes"] as? String ?? ""
             let customFields = validatedCustomFields(body["customFields"] ?? body["custom_fields"]) ?? [:]
+            let replacingFocusSession = focusSessionActive
             let billingStatus = entryBillingStatus(from: body["billingStatus"] as? String, projectID: project)
             let startedAt = (body["startedAt"] as? String).flatMap(parseCommandDate) ?? .now
             let estimatedDurationSeconds = (body["estimatedDurationSeconds"] as? Int)
@@ -1738,12 +1817,14 @@ final class AppState: ObservableObject {
             guard let timer = timeEntryStore.runningTimer else {
                 return .error("Timer could not be started", statusCode: 500)
             }
+            if replacingFocusSession { focusIsActive = false }
             return .jsonObject([
                 "id": timer.id.uuidString,
                 "title": timer.title,
                 "startedAt": apiDate(timer.startedAt),
                 "estimatedDurationSeconds": timer.estimatedDurationSeconds.map { $0 as Any } ?? NSNull(),
-                "billingStatus": entryBillingStatusRaw(timer.billingStatus)
+                "billingStatus": entryBillingStatusRaw(timer.billingStatus),
+                "focusSessionActive": focusSessionActive
             ], statusCode: 201)
         }
 
@@ -1871,6 +1952,8 @@ final class AppState: ObservableObject {
                     "PATCH /v1/rules/{id}",
                     "DELETE /v1/rules/{id}",
                     "POST /v1/focus",
+                    "POST /v1/focus/session/start",
+                    "POST /v1/focus/session/stop",
                     "GET /v1/time-entries?date=YYYY-MM-DD",
                     "POST /v1/time-entries",
                     "POST /v1/timer/start",

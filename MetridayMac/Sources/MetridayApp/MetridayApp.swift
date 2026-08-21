@@ -48,10 +48,11 @@ struct MetridayApp: App {
                     .keyboardShortcut("8", modifiers: [.command])
             }
             CommandMenu("Focus") {
-                Button(appState.focusIsActive ? "Pause Focus" : "Start Focus") {
-                    appState.focusIsActive.toggle()
+                Button(appState.focusSessionActive ? "Pause Focus" : "Start Focus") {
+                    _ = appState.toggleFocusSession()
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(!appState.focusSessionActive && appState.currentTask == nil)
             }
             CommandMenu("Tracking") {
                 Button(appState.activityMonitor.isTracking ? "Pause Tracking" : "Resume Tracking") {
