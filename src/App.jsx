@@ -2033,6 +2033,25 @@ function CalendarEventDialog({ event, onClose, onRecord, onConvert }) {
   return <div className="calendar-event-dialog-backdrop" role="presentation" onClick={onClose}><section className="calendar-event-dialog" role="dialog" aria-modal="true" aria-labelledby="calendar-event-dialog-title" onClick={(clickEvent) => clickEvent.stopPropagation()}><header><div><span>Calendar Event</span><h2 id="calendar-event-dialog-title">{event.title || "Untitled event"}</h2><p>{entryClock(event.start)}–{entryClock(event.end)} · {event.calendar || "Calendar"}</p></div><IconButton label="Close Calendar Event" onClick={onClose}><X size={17} /></IconButton></header><dl><div><dt>Calendar</dt><dd>{event.calendar || "Calendar"}</dd></div>{event.location ? <div><dt>Location</dt><dd>{event.location}</dd></div> : null}{event.notes ? <div><dt>Notes</dt><dd>{event.notes}</dd></div> : null}</dl><footer><span className="calendar-event-dialog-message" role={message ? "status" : undefined}>{message}</span><button type="button" className="secondary-button" onClick={() => run(onConvert)} disabled={busy}>Convert to Time Block</button><button type="button" className="primary-button" onClick={() => { onRecord(event); onClose(); }} disabled={busy}>Record Time Entry</button></footer></section></div>;
 }
 
+function timeBlockRelevanceReason(task, activity) {
+  const source = [task?.title, ...(Array.isArray(task?.tags) ? task.tags : [])]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const keywords = [...new Set(source.match(/[\p{L}\p{N}]{2,}/gu) || [])]
+    .filter((keyword) => !["a", "an", "and", "for", "from", "into", "of", "on", "or", "the", "to", "with"].includes(keyword));
+  const activityText = [activity?.appName, activity?.windowTitle, activity?.resource]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const keyword = keywords.find((candidate) => activityText.includes(candidate));
+  if (keyword) return `Task keyword “${keyword}” matched activity`;
+  const role = String(activity?.categoryRole || activity?.relevance || "").toLowerCase();
+  if (role === "focused" || role === "related") return "Focused category";
+  if (role === "distracting" || role === "distracted") return "Distracting category";
+  return "Overlapped planned time";
+}
+
 function WebTimeBlockDialog({ task, api, dateKey, onClose, onOpenPlan }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -2068,7 +2087,8 @@ function WebTimeBlockDialog({ task, api, dateKey, onClose, onOpenPlan }) {
       const categoryName = activity.categoryName || activity.categoryRole || "Other";
       const color = activityCategoryStyle({ color: activity.categoryColor, role: activity.categoryRole || activity.relevance }).color;
       const key = `${appName}|${detail}|${categoryName}`;
-      const row = grouped.get(key) || { key, appName, detail, categoryName, color, seconds: 0 };
+      const reason = timeBlockRelevanceReason(task, activity);
+      const row = grouped.get(key) || { key, appName, detail, categoryName: `${categoryName} · ${reason}`, color, seconds: 0 };
       row.seconds += overlapEnd - overlapStart;
       grouped.set(key, row);
     });

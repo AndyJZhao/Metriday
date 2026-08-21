@@ -61,6 +61,11 @@ struct TimeBlockDetailSheet: View {
                 filterStore: appState.filterStore,
                 date: selectedDate
             )
+            let reason = TimeBlockRelevance.explanation(
+                task: task,
+                activity: segment,
+                category: category
+            )
             let website = URL(string: segment.resource)?.host
             let detail = website ?? segment.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
             let key = "\(segment.appName)|\(detail)|\(category.id.uuidString)"
@@ -70,7 +75,8 @@ struct TimeBlockDetailSheet: View {
                 detail: detail,
                 seconds: 0,
                 categoryName: category.name,
-                color: color(for: category)
+                color: color(for: category),
+                reason: reason
             )
             grouped[key] = TimeBlockEvidence(
                 id: row.id,
@@ -78,7 +84,8 @@ struct TimeBlockDetailSheet: View {
                 detail: row.detail,
                 seconds: row.seconds + overlapEnd - overlapStart,
                 categoryName: row.categoryName,
-                color: row.color
+                color: row.color,
+                reason: row.reason
             )
         }
         return grouped.values.sorted { $0.seconds > $1.seconds }.prefix(8).map { $0 }
@@ -236,6 +243,10 @@ struct TimeBlockDetailSheet: View {
                                 .font(.system(size: 10))
                                 .foregroundStyle(MetridayTheme.secondary)
                                 .lineLimit(1)
+                            Text(row.reason)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(MetridayTheme.accentDeep)
+                                .lineLimit(1)
                         }
                         Spacer()
                         Text(formatDuration(seconds: row.seconds))
@@ -316,4 +327,5 @@ private struct TimeBlockEvidence: Identifiable {
     let seconds: Int
     let categoryName: String
     let color: Color
+    let reason: String
 }

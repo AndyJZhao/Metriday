@@ -1,5 +1,47 @@
 import Foundation
 
+enum TimeBlockRelevance {
+    private static let ignoredKeywords: Set<String> = [
+        "a", "an", "and", "for", "from", "into", "of", "on", "or", "the", "to", "with"
+    ]
+
+    static func explanation(
+        task: PlanTask,
+        activity: ActivitySegment,
+        category: ActivityCategoryDefinition
+    ) -> String {
+        let keywords = keywords(for: task)
+        let activityText = [activity.appName, activity.windowTitle, activity.resource]
+            .joined(separator: " ")
+            .lowercased()
+        if let keyword = keywords.first(where: { activityText.contains($0) }) {
+            return "Task keyword \u{201C}\(keyword)\u{201D} matched activity"
+        }
+
+        switch category.role {
+        case .focused:
+            return "Focused category"
+        case .distracting:
+            return "Distracting category"
+        case .other, .idle:
+            return "Overlapped planned time"
+        }
+    }
+
+    private static func keywords(for task: PlanTask) -> [String] {
+        let source = ([task.title] + task.tags)
+            .joined(separator: " ")
+            .lowercased()
+        let parts = source.components(separatedBy: CharacterSet.alphanumerics.inverted)
+        return parts
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count >= 2 && !ignoredKeywords.contains($0) }
+            .reduce(into: [String]()) { result, keyword in
+                if !result.contains(keyword) { result.append(keyword) }
+            }
+    }
+}
+
 struct TimeBlockExecutionSummary: Hashable {
     let durationSeconds: Int
     let intervalCount: Int

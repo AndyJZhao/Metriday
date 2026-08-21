@@ -57,6 +57,31 @@ let executionSummary = timeBlockExecutionSummary(
 expect(executionSummary.durationSeconds == 45 * 60, "Linked Time Block execution should accumulate split intervals")
 expect(executionSummary.intervalCount == 2, "Linked Time Block execution should count split intervals")
 expect(executionSummary.statusLabel == "Actual 45m", "Completed Time Block execution should expose an actual label")
+let relevanceTask = PlanTask(title: "Write research report", tags: ["analysis"])
+let keywordActivity = ActivitySegment(
+    appName: "Safari",
+    windowTitle: "Research report draft",
+    startMinute: 9,
+    endMinute: 10,
+    relevance: .other
+)
+let focusedCategory = ActivityCategoryDefinition(name: "Focused", role: .focused, isSystem: true)
+let distractingCategory = ActivityCategoryDefinition(name: "Distracting", role: .distracting, isSystem: true)
+expect(
+    TimeBlockRelevance.explanation(task: relevanceTask, activity: keywordActivity, category: focusedCategory).contains("research"),
+    "Time Block evidence should explain matching task keywords"
+)
+let distractingActivity = ActivitySegment(
+    appName: "Chrome",
+    windowTitle: "Unrelated tab",
+    startMinute: 9,
+    endMinute: 10,
+    relevance: .distracted
+)
+expect(
+    TimeBlockRelevance.explanation(task: relevanceTask, activity: distractingActivity, category: distractingCategory) == "Distracting category",
+    "Time Block evidence should explain distracting category matches"
+)
 let seeded = MarkdownCodec.seed(for: date)
 let markdown = MarkdownCodec.serialize(seeded)
 let parsed = MarkdownCodec.parse(markdown, date: date)
