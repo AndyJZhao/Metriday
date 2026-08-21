@@ -2373,12 +2373,19 @@ struct ActivitiesView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .simultaneousGesture(
+                            .gesture(
                                 TapGesture(count: 2)
-                                    .onEnded {
-                                        guard let activity = row.segments.first else { return }
-                                        prepareNewEntry(for: activity)
-                                        showingNewEntry = true
+                                    .exclusively(before: TapGesture())
+                                    .onEnded { result in
+                                        switch result {
+                                        case .first:
+                                            guard let activity = row.segments.first else { return }
+                                            prepareNewEntry(for: activity)
+                                            showingNewEntry = true
+                                        case .second:
+                                            guard let activity = row.segments.first else { return }
+                                            selectedActivity = activity
+                                        }
                                     }
                             )
                             .onDrag {
@@ -2569,11 +2576,17 @@ struct ActivitiesView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .simultaneousGesture(
+            .gesture(
                 TapGesture(count: 2)
-                    .onEnded {
-                        prepareNewEntry(startMinute: segment.startMinute, endMinute: segment.endMinute)
-                        showingNewEntry = true
+                    .exclusively(before: TapGesture())
+                    .onEnded { result in
+                        switch result {
+                        case .first:
+                            prepareNewEntry(startMinute: segment.startMinute, endMinute: segment.endMinute)
+                            showingNewEntry = true
+                        case .second:
+                            selectedActivity = segment
+                        }
                     }
             )
             .help("Click for details · double-click to create a time entry")
@@ -2953,9 +2966,17 @@ struct ActivitiesView: View {
             .padding(.trailing, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .simultaneousGesture(
+            .gesture(
                 TapGesture(count: 2)
-                    .onEnded { editingProject = project }
+                    .exclusively(before: TapGesture())
+                    .onEnded { result in
+                        switch result {
+                        case .first:
+                            editingProject = project
+                        case .second:
+                            selectProject(project.id)
+                        }
+                    }
             )
         }
         .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
@@ -6115,12 +6136,18 @@ private struct ActivityTimelinePanel: View {
                                     .frame(width: hitWidth, height: 18)
                             }
                             .buttonStyle(.plain)
-                            .simultaneousGesture(
+                            .gesture(
                                 TapGesture(count: 2)
-                                    .onEnded {
-                                        let start = max(0, segment.startMinute)
-                                        let end = min(1_440, max(start + 15, segment.endMinute))
-                                        onCreateTimeEntry(start, end)
+                                    .exclusively(before: TapGesture())
+                                    .onEnded { result in
+                                        switch result {
+                                        case .first:
+                                            let start = max(0, segment.startMinute)
+                                            let end = min(1_440, max(start + 15, segment.endMinute))
+                                            onCreateTimeEntry(start, end)
+                                        case .second:
+                                            onSelectActivity(segment)
+                                        }
                                     }
                             )
                             .accessibilityAddTraits(.isButton)
@@ -6411,12 +6438,18 @@ private struct ActivityTimelinePanel: View {
                                     .frame(width: hitWidth, height: 16, alignment: .leading)
                             }
                             .buttonStyle(.plain)
-                            .simultaneousGesture(
+                            .gesture(
                                 TapGesture(count: 2)
-                                    .onEnded {
-                                        let start = max(0, segment.startMinute)
-                                        let end = min(1_440, max(start + 15, segment.endMinute))
-                                        onCreateTimeEntry(start, end)
+                                    .exclusively(before: TapGesture())
+                                    .onEnded { result in
+                                        switch result {
+                                        case .first:
+                                            let start = max(0, segment.startMinute)
+                                            let end = min(1_440, max(start + 15, segment.endMinute))
+                                            onCreateTimeEntry(start, end)
+                                        case .second:
+                                            onSelectActivity(segment)
+                                        }
                                     }
                             )
                             .accessibilityAddTraits(.isButton)
