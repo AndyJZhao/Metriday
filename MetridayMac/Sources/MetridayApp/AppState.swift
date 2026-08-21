@@ -155,12 +155,12 @@ final class AppState: ObservableObject {
     }
 
     var currentTask: PlanTask? {
-        if let selectedTaskID, let selected = markdownStore.task(selectedTaskID), selected.startMinute != nil {
+        if let selectedTaskID, let selected = markdownStore.task(selectedTaskID), selected.isScheduled {
             return selected
         }
 
         let scheduled = markdownStore.tasks
-            .filter { $0.startMinute != nil && $0.endMinute != nil }
+            .filter(\.isScheduled)
             .sorted { ($0.startMinute ?? 0) < ($1.startMinute ?? 0) }
 
         if Calendar.current.isDateInToday(selectedDate) {
@@ -190,7 +190,7 @@ final class AppState: ObservableObject {
     @discardableResult
     func startFocusSession(taskID: UUID? = nil) -> Bool {
         let task = taskID.flatMap { markdownStore.task($0) } ?? currentTask
-        guard let task else { return false }
+        guard let task, task.isScheduled else { return false }
         selectedTaskID = task.id
         timeEntryStore.startTimer(
             title: task.title,

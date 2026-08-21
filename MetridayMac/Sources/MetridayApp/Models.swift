@@ -86,6 +86,11 @@ struct PlanTask: Identifiable, Hashable {
         return max(30, endMinute - startMinute)
     }
 
+    var isScheduled: Bool {
+        guard let startMinute, let endMinute else { return false }
+        return endMinute > startMinute
+    }
+
     var timeRange: String? {
         guard let startMinute, let endMinute else { return nil }
         return TimeFormat.range(start: startMinute, end: endMinute)

@@ -713,7 +713,7 @@ function formatRange(start, end) {
 function taskMinuteRange(task) {
   const start = Number(task?.startMinute ?? task?.start_minute);
   const end = Number(task?.endMinute ?? task?.end_minute);
-  return Number.isFinite(start) && Number.isFinite(end) ? { start, end } : null;
+  return Number.isFinite(start) && Number.isFinite(end) && end > start ? { start, end } : null;
 }
 
 function currentMinuteAndLabel() {
