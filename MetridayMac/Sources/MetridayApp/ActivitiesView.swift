@@ -5964,6 +5964,63 @@ private struct ActivityTimelinePanel: View {
     @State private var hoveredCalendarEventID: String?
     @State private var hoveredSuggestionID: String?
 
+    private struct ProjectTimelineSlice {
+        let projectID: UUID?
+        let start: Int
+        let end: Int
+    }
+
+    private struct ProjectTimelineRange: Identifiable {
+        let id: String
+        let projectID: UUID?
+        let start: Int
+        let end: Int
+    }
+
+    private var projectTimelineRanges: [ProjectTimelineRange] {
+        let slices = segments.compactMap { segment -> ProjectTimelineSlice? in
+            guard let range = timelineWindow.clippedRange(
+                startSecond: segment.startSecond,
+                endSecond: segment.endSecond
+            ) else { return nil }
+            return ProjectTimelineSlice(
+                projectID: segment.projectID,
+                start: range.start,
+                end: range.end
+            )
+        }
+        let grouped = Dictionary(grouping: slices) { slice in
+            slice.projectID?.uuidString ?? "unassigned"
+        }
+        var result: [ProjectTimelineRange] = []
+        for (key, projectSlices) in grouped {
+            let ordered = projectSlices.sorted { left, right in
+                left.start == right.start ? left.end < right.end : left.start < right.start
+            }
+            var merged: [(start: Int, end: Int)] = []
+            for slice in ordered {
+                if let last = merged.last, slice.start <= last.end + 1 {
+                    merged[merged.count - 1].end = max(last.end, slice.end)
+                } else {
+                    merged.append((start: slice.start, end: slice.end))
+                }
+            }
+            for (index, range) in merged.enumerated() {
+                result.append(
+                    ProjectTimelineRange(
+                        id: "\(key)-\(index)",
+                        projectID: projectSlices.first?.projectID,
+                        start: range.start,
+                        end: range.end
+                    )
+                )
+            }
+        }
+        return result.sorted { left, right in
+            left.start == right.start ? left.end < right.end : left.start < right.start
+        }
+    }
+
     private var timelineGaps: [(start: Int, end: Int)] {
         let ranges = segments.compactMap { segment -> (start: Int, end: Int)? in
             guard let range = timelineWindow.clippedRange(
@@ -6197,23 +6254,18 @@ private struct ActivityTimelinePanel: View {
                     }
                     }
 
-                    ForEach(segments) { segment in
-                        if let range = timelineWindow.clippedRange(
-                            startSecond: segment.startSecond,
-                            endSecond: segment.endSecond
-                        ) {
-                            let left = timelineWindow.x(for: range.start, width: proxy.size.width)
-                            let width = max(2, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
-                            let projectName = project(segment.projectID)?.name ?? "None"
-                            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                .fill(color(for: project(segment.projectID)?.color).opacity(0.62))
-                                .frame(width: width, height: 12)
-                                .position(x: left + width / 2, y: 108)
-                                .accessibilityElement(children: .ignore)
-                                .accessibilityLabel("Project \(projectName) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
-                                .accessibilityIdentifier("activities.timeline.project.\(segment.id.uuidString)")
-                                .help("Project: \(project(segment.projectID)?.name ?? "None")")
-                        }
+                    ForEach(projectTimelineRanges) { range in
+                        let left = timelineWindow.x(for: range.start, width: proxy.size.width)
+                        let width = max(2, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
+                        let projectName = project(range.projectID)?.name ?? "None"
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(color(for: project(range.projectID)?.color).opacity(0.62))
+                            .frame(width: width, height: 12)
+                            .position(x: left + width / 2, y: 108)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Project \(projectName) · \(TimeFormat.range(start: range.start, end: range.end))")
+                            .accessibilityIdentifier("activities.timeline.project.\(range.id)")
+                            .help("Project: \(projectName) · \(TimeFormat.range(start: range.start, end: range.end))")
                     }
 
                     ForEach(calendarEvents) { event in
