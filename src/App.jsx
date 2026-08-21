@@ -323,7 +323,7 @@ function useMetridayAPI(dateKey, apiBase) {
       const status = await request(`/v1/status?date=${date}`);
       const results = await Promise.allSettled([
         request(`/v1/activities?date=${date}`),
-        request(`/api/v1/time-entries?start_date_min=${date}&start_date_max=${date}`),
+        request(`/api/v1/time-entries?start_date_min=${offsetDateKey(date, -1)}&start_date_max=${date}`),
         request("/api/v1/projects"),
         request(`/v1/plans?date=${date}`),
         request("/v1/sync/status"),
@@ -352,7 +352,7 @@ function useMetridayAPI(dateKey, apiBase) {
         error: "",
         status,
         activities: value(0, []),
-        entries: value(1, { data: [] })?.data || [],
+        entries: (value(1, { data: [] })?.data || []).filter((entry) => Boolean(entrySecondsForDate(entry, date))),
         projects: value(2, { data: [] })?.data || [],
         plan: value(3, null),
         sync: value(4, null),
