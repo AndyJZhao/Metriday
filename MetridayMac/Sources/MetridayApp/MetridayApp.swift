@@ -47,6 +47,15 @@ struct MetridayApp: App {
                 Button("Rules") { appState.section = .rules }
                     .keyboardShortcut("8", modifiers: [.command])
             }
+            CommandMenu("View") {
+                Toggle(
+                    "Always Show Project Drop Zone",
+                    isOn: Binding(
+                        get: { appState.preferences.alwaysShowProjectDropZone },
+                        set: { appState.preferences.alwaysShowProjectDropZone = $0 }
+                    )
+                )
+            }
             CommandMenu("Focus") {
                 Button(appState.focusSessionActive ? "Pause Focus" : "Start Focus") {
                     _ = appState.toggleFocusSession()

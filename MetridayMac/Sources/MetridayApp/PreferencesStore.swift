@@ -39,6 +39,9 @@ final class PreferencesStore: ObservableObject {
     @Published var includeSubprojectsWhenSelectingProject: Bool {
         didSet { persist() }
     }
+    @Published var alwaysShowProjectDropZone: Bool {
+        didSet { persist() }
+    }
     @Published var allowLocalNetworkAPI: Bool {
         didSet { persist() }
     }
@@ -63,6 +66,7 @@ final class PreferencesStore: ObservableObject {
             self.reviewReminderIntervalMinutes = payload.reviewReminderIntervalMinutes
             self.callNotificationsEnabled = payload.callNotificationsEnabled
             self.includeSubprojectsWhenSelectingProject = payload.includeSubprojectsWhenSelectingProject
+            self.alwaysShowProjectDropZone = payload.alwaysShowProjectDropZone
             self.allowLocalNetworkAPI = payload.allowLocalNetworkAPI
         } else {
             self.idleThresholdSeconds = 120
@@ -77,6 +81,7 @@ final class PreferencesStore: ObservableObject {
             self.reviewReminderIntervalMinutes = 0
             self.callNotificationsEnabled = true
             self.includeSubprojectsWhenSelectingProject = true
+            self.alwaysShowProjectDropZone = true
             self.allowLocalNetworkAPI = false
             persist()
         }
@@ -122,6 +127,7 @@ final class PreferencesStore: ObservableObject {
                 reviewReminderIntervalMinutes: reviewReminderIntervalMinutes,
                 callNotificationsEnabled: callNotificationsEnabled,
                 includeSubprojectsWhenSelectingProject: includeSubprojectsWhenSelectingProject,
+                alwaysShowProjectDropZone: alwaysShowProjectDropZone,
                 allowLocalNetworkAPI: allowLocalNetworkAPI
             )
             let encoder = JSONEncoder()
@@ -153,6 +159,7 @@ final class PreferencesStore: ObservableObject {
         let reviewReminderIntervalMinutes: Int
         let callNotificationsEnabled: Bool
         let includeSubprojectsWhenSelectingProject: Bool
+        let alwaysShowProjectDropZone: Bool
         let allowLocalNetworkAPI: Bool
 
         init(
@@ -168,6 +175,7 @@ final class PreferencesStore: ObservableObject {
             reviewReminderIntervalMinutes: Int,
             callNotificationsEnabled: Bool,
             includeSubprojectsWhenSelectingProject: Bool,
+            alwaysShowProjectDropZone: Bool,
             allowLocalNetworkAPI: Bool
         ) {
             self.idleThresholdSeconds = idleThresholdSeconds
@@ -182,6 +190,7 @@ final class PreferencesStore: ObservableObject {
             self.reviewReminderIntervalMinutes = reviewReminderIntervalMinutes
             self.callNotificationsEnabled = callNotificationsEnabled
             self.includeSubprojectsWhenSelectingProject = includeSubprojectsWhenSelectingProject
+            self.alwaysShowProjectDropZone = alwaysShowProjectDropZone
             self.allowLocalNetworkAPI = allowLocalNetworkAPI
         }
 
@@ -199,6 +208,7 @@ final class PreferencesStore: ObservableObject {
             reviewReminderIntervalMinutes = max(0, min(24 * 60, try container.decodeIfPresent(Int.self, forKey: .reviewReminderIntervalMinutes) ?? 0))
             callNotificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .callNotificationsEnabled) ?? true
             includeSubprojectsWhenSelectingProject = try container.decodeIfPresent(Bool.self, forKey: .includeSubprojectsWhenSelectingProject) ?? true
+            alwaysShowProjectDropZone = try container.decodeIfPresent(Bool.self, forKey: .alwaysShowProjectDropZone) ?? true
             allowLocalNetworkAPI = try container.decodeIfPresent(Bool.self, forKey: .allowLocalNetworkAPI) ?? false
         }
     }

@@ -40,7 +40,7 @@ The left product navigation and top date/focus controls remain visible in every 
 
 ## Projects, activities, and time entries
 
-The Activities screen now exposes the Timing-style categorization workflow: activities can be assigned to local Projects, projects can store application/title/URL/path rules, and a rule can be created from an assigned activity. Chrome and Safari URLs are captured locally when their Automation permission is available; the UI displays the domain while the raw value remains in the local activity JSON.
+The Activities screen now exposes the Timing-style categorization workflow: activities can be assigned to local Projects, projects can store application/title/URL/path rules, and a rule can be created from an assigned activity. Chrome and Safari URLs are captured locally when their Automation permission is available; the UI displays the domain while the raw value remains in the local activity JSON. The Project Drop Zone is shown by default and can be hidden persistently from View → Always Show Project Drop Zone; when hidden, dragging a file, folder, or activity into the project sidebar temporarily reveals the target.
 
 Activity Categories follow RescueTime semantics: the App column keeps a light-gray identity tile, while the Category column owns the color. Focused categories are normalized to deep blue and Distracting categories to red; custom rules can target Application, Website, or Item (document/window) identity, and overlapping rules use the visible first-match priority order, which can be changed from the native Categories sheet or Web companion and travels through Timing Sync.
 

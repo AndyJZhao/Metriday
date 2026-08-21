@@ -1155,7 +1155,9 @@ struct ActivitiesView: View {
                         }
                     }
 
-                    projectDropZone
+                    if trackingPreferences.alwaysShowProjectDropZone || isProjectDropTargeted {
+                        projectDropZone
+                    }
 
                     Divider()
                         .padding(.vertical, 8)
@@ -1185,6 +1187,14 @@ struct ActivitiesView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 10)
             }
+            .onDrop(
+                of: [UTType.fileURL.identifier, UTType.plainText.identifier],
+                isTargeted: $isProjectDropTargeted,
+                perform: { providers in
+                    guard !trackingPreferences.alwaysShowProjectDropZone else { return false }
+                    return handleProjectDrop(providers)
+                }
+            )
             .frame(maxHeight: .infinity)
 
             Divider()

@@ -526,6 +526,9 @@ final class AppState: ObservableObject {
             if let value = body["include_subprojects_when_selecting_project"] as? Bool {
                 preferences.includeSubprojectsWhenSelectingProject = value
             }
+            if let value = body["always_show_project_drop_zone"] as? Bool {
+                preferences.alwaysShowProjectDropZone = value
+            }
             if let value = body["allow_local_network_api"] as? Bool {
                 preferences.allowLocalNetworkAPI = value
                 localAPIServer.setAllowsLAN(value)
@@ -2803,6 +2806,7 @@ final class AppState: ObservableObject {
             "review_reminder_notifications_authorized": reviewReminderService.notificationsAuthorized,
             "review_reminder_notification_status": reviewReminderService.notificationStatus,
             "include_subprojects_when_selecting_project": preferences.includeSubprojectsWhenSelectingProject,
+            "always_show_project_drop_zone": preferences.alwaysShowProjectDropZone,
             "allow_local_network_api": preferences.allowLocalNetworkAPI,
             "launch_at_login": loginItemManager.isEnabled,
             "launch_at_login_status": loginItemManager.statusMessage,
