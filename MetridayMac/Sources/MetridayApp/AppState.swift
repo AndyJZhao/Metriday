@@ -445,6 +445,8 @@ final class AppState: ObservableObject {
             let statusDate = apiDate(from: request.query["date"]) ?? selectedDate
             var response: [String: Any] = [
                 "tracking": activityMonitor.isTracking,
+                "trackingPausedUntil": activityMonitor.trackingPausedUntil.map(apiDate) ?? NSNull(),
+                "trackingManuallyPaused": activityMonitor.isManuallyPaused,
                 "section": section.rawValue,
                 "selectedDate": apiDate(selectedDate),
                 "statusDate": apiDate(statusDate),
@@ -1940,12 +1942,12 @@ final class AppState: ObservableObject {
         }
 
         if request.method == "POST", path == "/v1/tracking/pause" {
-            if activityMonitor.isTracking { activityMonitor.stop() }
+            activityMonitor.pauseTracking()
             markdownStore.statusMessage = "Tracking paused by local API"
-            return .jsonObject(["tracking": false])
+            return .jsonObject(["tracking": false, "trackingPaused": true])
         }
         if request.method == "POST", path == "/v1/tracking/resume" {
-            if !activityMonitor.isTracking { activityMonitor.start() }
+            activityMonitor.resumeTracking()
             markdownStore.statusMessage = "Tracking resumed by local API"
             return .jsonObject(["tracking": true])
         }
@@ -3362,10 +3364,10 @@ final class AppState: ObservableObject {
 
         switch (group, action) {
         case ("tracking", "pause"):
-            if activityMonitor.isTracking { activityMonitor.stop() }
+            activityMonitor.pauseTracking()
             markdownStore.statusMessage = "Tracking paused by URL command"
         case ("tracking", "resume"):
-            if !activityMonitor.isTracking { activityMonitor.start() }
+            activityMonitor.resumeTracking()
             markdownStore.statusMessage = "Tracking resumed by URL command"
         case ("tracking", "toggle"):
             activityMonitor.toggleTracking()

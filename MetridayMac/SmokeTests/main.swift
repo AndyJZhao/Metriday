@@ -1542,6 +1542,22 @@ Task { @MainActor in
         historicalActivityStore.load(date: date).first?.projectID == researchProjectID,
         "Reapplying rules should preserve manually assigned unmatched activities"
     )
+    let timedPauseUntil = Date().addingTimeInterval(15 * 60)
+    monitor.pauseTracking(until: timedPauseUntil)
+    expect(!monitor.isTracking, "Timed tracking pause should stop active monitoring")
+    expect(
+        monitor.trackingPausedUntil.map { $0 > Date() } == true,
+        "Timed tracking pause should retain its future resume deadline"
+    )
+    monitor.resumeTracking()
+    expect(
+        monitor.trackingPausedUntil == nil && !monitor.isManuallyPaused,
+        "Resuming tracking should clear timed and manual pause state"
+    )
+    monitor.pauseTracking()
+    expect(monitor.isManuallyPaused, "Indefinite tracking pause should persist manual pause state")
+    monitor.resumeTracking()
+    expect(!monitor.isManuallyPaused, "Manual tracking pause should be resumable")
 
     let overlapDay = Calendar.current.startOfDay(for: date)
     let overlapActivity = ActivitySegment(

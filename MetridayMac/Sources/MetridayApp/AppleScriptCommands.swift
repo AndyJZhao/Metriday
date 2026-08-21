@@ -67,7 +67,7 @@ final class MetridayPauseTrackingCommand: NSScriptCommand {
                 scriptError("Metriday is not ready")
                 return nil
             }
-            if state.activityMonitor.isTracking { state.activityMonitor.stop() }
+            state.activityMonitor.pauseTracking()
             return true
         }
     }
@@ -80,7 +80,7 @@ final class MetridayResumeTrackingCommand: NSScriptCommand {
                 scriptError("Metriday is not ready")
                 return nil
             }
-            if !state.activityMonitor.isTracking { state.activityMonitor.start() }
+            state.activityMonitor.resumeTracking()
             return true
         }
     }

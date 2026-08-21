@@ -79,9 +79,9 @@ struct SettingsSheet: View {
                 get: { monitor.isTracking },
                 set: { enabled in
                     if enabled {
-                        monitor.start()
+                        monitor.resumeTracking()
                     } else {
-                        monitor.stop()
+                        monitor.pauseTracking()
                     }
                 }
             ))

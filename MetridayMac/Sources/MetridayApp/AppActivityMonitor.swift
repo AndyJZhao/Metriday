@@ -6,12 +6,17 @@ import Foundation
 
 @MainActor
 final class AppActivityMonitor: ObservableObject {
+    private static let trackingPauseUntilKey = "Metriday.trackingPauseUntil"
+    private static let trackingManuallyPausedKey = "Metriday.trackingManuallyPaused"
+
     @Published private(set) var currentApplication = "Waiting for activity"
     @Published private(set) var currentBundleIdentifier = ""
     @Published private(set) var currentWindowTitle = ""
     @Published private(set) var observedSegments: [ActivitySegment] = []
     @Published private(set) var isTracking = false
     @Published private(set) var isIdle = false
+    @Published private(set) var trackingPausedUntil: Date?
+    @Published private(set) var isManuallyPaused = false
     @Published private(set) var accessibilityTrusted = false
     @Published private(set) var lastSampleAt: Date?
     @Published private(set) var pendingIdleInterval: IdleInterval?
@@ -29,6 +34,7 @@ final class AppActivityMonitor: ObservableObject {
     private let sampleInterval: TimeInterval = 1
 
     private var timer: Timer?
+    private var resumeTimer: Timer?
     private var trackedDate: Date
     private var visibleDate: Date
     private var activeWrapAtMinute: Int
@@ -67,6 +73,12 @@ final class AppActivityMonitor: ObservableObject {
         self.observedSegments = dailySegments
         self.pendingIdleInterval = nil
         self.pendingCallInterval = nil
+        let storedPauseUntil = UserDefaults.standard.object(forKey: Self.trackingPauseUntilKey) as? Date
+        self.trackingPausedUntil = storedPauseUntil.flatMap { $0 > .now ? $0 : nil }
+        self.isManuallyPaused = UserDefaults.standard.bool(forKey: Self.trackingManuallyPausedKey)
+        if storedPauseUntil != nil, self.trackingPausedUntil == nil {
+            UserDefaults.standard.removeObject(forKey: Self.trackingPauseUntilKey)
+        }
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
             .sink { [weak self] _ in
                 Task { @MainActor in
@@ -139,6 +151,19 @@ final class AppActivityMonitor: ObservableObject {
 
     func start() {
         guard !isTracking else { return }
+        if isManuallyPaused {
+            currentApplication = "Tracking paused"
+            return
+        }
+        if let trackingPausedUntil {
+            guard trackingPausedUntil > .now else {
+                clearTrackingPause()
+                return start()
+            }
+            scheduleTrackingResume(at: trackingPausedUntil)
+            currentApplication = "Tracking paused"
+            return
+        }
         isTracking = true
         refreshAccessibilityStatus()
         sample()
@@ -167,6 +192,58 @@ final class AppActivityMonitor: ObservableObject {
         refreshObservedSegments()
     }
 
+    /// Pauses automatic app tracking until the user explicitly resumes it.
+    /// This state survives relaunches so a deliberate pause is not undone by
+    /// the start-on-launch preference.
+    func pauseTracking() {
+        clearTrackingPause()
+        isManuallyPaused = true
+        UserDefaults.standard.set(true, forKey: Self.trackingManuallyPausedKey)
+        if isTracking { stop() }
+        currentApplication = "Tracking paused"
+    }
+
+    /// Pauses automatic app tracking for a bounded interval. The deadline is
+    /// persisted and resumed automatically even if Metriday is relaunched.
+    func pauseTracking(until date: Date) {
+        guard date > .now else {
+            resumeTracking()
+            return
+        }
+        isManuallyPaused = false
+        UserDefaults.standard.set(false, forKey: Self.trackingManuallyPausedKey)
+        trackingPausedUntil = date
+        UserDefaults.standard.set(date, forKey: Self.trackingPauseUntilKey)
+        if isTracking { stop() }
+        scheduleTrackingResume(at: date)
+        currentApplication = "Tracking paused"
+    }
+
+    /// Clears a manual or timed pause and resumes app tracking immediately.
+    func resumeTracking() {
+        clearTrackingPause()
+        isManuallyPaused = false
+        UserDefaults.standard.set(false, forKey: Self.trackingManuallyPausedKey)
+        start()
+    }
+
+    private func clearTrackingPause() {
+        resumeTimer?.invalidate()
+        resumeTimer = nil
+        trackingPausedUntil = nil
+        UserDefaults.standard.removeObject(forKey: Self.trackingPauseUntilKey)
+    }
+
+    private func scheduleTrackingResume(at date: Date) {
+        resumeTimer?.invalidate()
+        let delay = max(0.1, date.timeIntervalSinceNow)
+        resumeTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.resumeTracking()
+            }
+        }
+    }
+
     private func pauseForSleep() {
         shouldResumeAfterWake = isTracking
         guard isTracking else { return }
@@ -192,9 +269,9 @@ final class AppActivityMonitor: ObservableObject {
 
     func toggleTracking() {
         if isTracking {
-            stop()
+            pauseTracking()
         } else {
-            start()
+            resumeTracking()
         }
     }
 

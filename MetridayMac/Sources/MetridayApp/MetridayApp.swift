@@ -104,17 +104,19 @@ private struct MenuBarStatusLabel: View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let timer = appState.timeEntryStore.runningTimer
             let isFocus = timer?.customFields["metriday_focus_session"] == "true"
+            let isPaused = !appState.activityMonitor.isTracking
+                && (appState.activityMonitor.isManuallyPaused || appState.activityMonitor.trackingPausedUntil != nil)
             Label {
-                Text(statusLabel(timer: timer, isFocus: isFocus, now: context.date))
+                Text(statusLabel(timer: timer, isFocus: isFocus, isPaused: isPaused, now: context.date))
             } icon: {
-                Image(systemName: isFocus ? "target" : "timer")
+                Image(systemName: isPaused ? "pause.circle" : (isFocus ? "target" : "timer"))
             }
-            .accessibilityLabel(statusLabel(timer: timer, isFocus: isFocus, now: context.date))
+            .accessibilityLabel(statusLabel(timer: timer, isFocus: isFocus, isPaused: isPaused, now: context.date))
         }
     }
 
-    private func statusLabel(timer: RunningTimer?, isFocus: Bool, now: Date) -> String {
-        guard let timer else { return "Metriday" }
+    private func statusLabel(timer: RunningTimer?, isFocus: Bool, isPaused: Bool, now: Date) -> String {
+        guard let timer else { return isPaused ? "Paused" : "Metriday" }
         let prefix = isFocus ? "Focus" : "Timer"
         guard let estimate = timer.estimatedDurationSeconds else { return prefix }
         let remaining = max(0, estimate - Int(now.timeIntervalSince(timer.startedAt)))
@@ -180,8 +182,38 @@ private struct MenuBarStatusView: View {
                 }
             }
             Divider()
-            Button("Pause / Resume Tracking") {
-                appState.activityMonitor.toggleTracking()
+            if appState.activityMonitor.isTracking {
+                Menu("Pause Tracking") {
+                    Button("Pause Tracking") {
+                        appState.activityMonitor.pauseTracking()
+                    }
+                    Divider()
+                    Button("For 15 minutes") {
+                        appState.activityMonitor.pauseTracking(until: Date().addingTimeInterval(15 * 60))
+                    }
+                    Button("For 1 hour") {
+                        appState.activityMonitor.pauseTracking(until: Date().addingTimeInterval(60 * 60))
+                    }
+                    Button("For 4 hours") {
+                        appState.activityMonitor.pauseTracking(until: Date().addingTimeInterval(4 * 60 * 60))
+                    }
+                    Button("Until tomorrow") {
+                        appState.activityMonitor.pauseTracking(until: startOfTomorrow())
+                    }
+                }
+            } else {
+                Button("Resume Tracking") {
+                    appState.activityMonitor.resumeTracking()
+                }
+                if appState.activityMonitor.isManuallyPaused {
+                    Text("Paused until resumed")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if let pauseUntil = appState.activityMonitor.trackingPausedUntil {
+                    Text("Paused until \(pauseUntil.formatted(date: .omitted, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Button("Open Metriday") {
@@ -212,5 +244,13 @@ private struct MenuBarStatusView: View {
         guard let estimate = timer.estimatedDurationSeconds else { return "Running" }
         let remaining = max(0, estimate - Int(Date().timeIntervalSince(timer.startedAt)))
         return "\(durationLabel(remaining)) remaining"
+    }
+
+    private func startOfTomorrow() -> Date {
+        Calendar.current.date(
+            byAdding: .day,
+            value: 1,
+            to: Calendar.current.startOfDay(for: .now)
+        ) ?? Date().addingTimeInterval(24 * 60 * 60)
     }
 }
