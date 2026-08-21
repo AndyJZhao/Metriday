@@ -162,6 +162,8 @@ Review also includes a deterministic Smart Activity Summary. It groups the same 
 
 The macOS menu bar label stays visible while the app is running: it shows `Focus mm:ss` for an estimated Focus Session, `Timer mm:ss` for an estimated ordinary Timer, or the plain Metriday icon when no timer is active. Opening the menu keeps the current timer title, remaining estimate, Focus Session control, recent-timer resume actions, tracking control, and main-window action together. This is the persistent menu-bar status surface; the separate floating Focus companion remains deferred.
 
+The main Global Header mirrors that live Focus state without requiring the menu bar: the current Markdown block shows its planned range and a second-level `left` countdown while Focus is running, then changes to `Over by` after the estimate expires. An open-ended Focus Session remains labeled `In progress`.
+
 The running timer controls support Timing-style ±1/±5/±15-minute start corrections, alignment to the previous entry boundary, estimate check-ins, and visible remaining time. The same estimate operations are available through the local API.
 
 Local automation commands use the `metriday://` URL scheme: `metriday://tracking/pause`, `metriday://tracking/resume`, `metriday://timer/start?title=Deep%20work&project=Research`, `metriday://timer/stop`, `metriday://entry/add?title=Meeting&minutes=30`, and `metriday://phone-calls/hide?address=555-0100&hidden=false`. Entry commands also accept ISO-8601 `start`/`end`, `notes`, `projectID`, and `billingStatus` query parameters.

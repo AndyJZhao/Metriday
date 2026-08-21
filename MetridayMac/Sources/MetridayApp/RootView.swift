@@ -785,9 +785,11 @@ struct GlobalTopHeader: View {
                         .font(.system(size: 17, weight: .bold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
-                    Text(blockSubtitle)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(sessionActive ? MetridayTheme.accent : MetridayTheme.secondary)
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text(blockSubtitle(at: context.date))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(sessionActive ? MetridayTheme.accent : MetridayTheme.secondary)
+                    }
                 }
                 .frame(width: 210, alignment: .leading)
 
@@ -852,11 +854,30 @@ struct GlobalTopHeader: View {
         return formatter.string(from: appState.selectedDate)
     }
 
-    private var blockSubtitle: String {
+    private func blockSubtitle(at now: Date) -> String {
         guard let task = appState.currentTask, let range = task.timeRange else {
             return store.fileURL.lastPathComponent
         }
-        return "\(range)  ·  \(appState.focusSessionActive ? "In progress" : "Ready")"
+        guard appState.focusSessionActive else {
+            return "\(range)  ·  Ready"
+        }
+        guard let timer = timeEntryStore.runningTimer,
+              let estimate = timer.estimatedDurationSeconds else {
+            return "\(range)  ·  In progress"
+        }
+        let remaining = estimate - Int(now.timeIntervalSince(timer.startedAt))
+        if remaining >= 0 {
+            return "\(range)  ·  In progress · (clockLabel(remaining)) left"
+        }
+        return "\(range)  ·  In progress · Over by (clockLabel(-remaining))"
+    }
+
+    private func clockLabel(_ seconds: Int) -> String {
+        let clamped = max(0, seconds)
+        if clamped >= 60 * 60 {
+            return String(format: "%d:%02d:%02d", clamped / 3_600, (clamped / 60) % 60, clamped % 60)
+        }
+        return String(format: "%02d:%02d", clamped / 60, clamped % 60)
     }
 }
 
