@@ -859,6 +859,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-category-form button:disabled { cursor: not-allowed; opacity: 0.5; }
 .web-category-list { margin-top: 16px; border-top: 1px solid var(--border); }
 .web-category-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) 78px 66px; align-items: center; gap: 10px; min-height: 48px; border-bottom: 1px solid #eceef1; color: #4a4f5a; font-size: 12px; }
+.web-category-row.actionable { cursor: pointer; }
+.web-category-row.actionable:hover { background: #fafbff; }
+.web-category-row.actionable:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
 .web-category-row > div { display: flex; flex-direction: column; min-width: 0; gap: 3px; }
 .web-category-row strong { overflow: hidden; color: #282b32; text-overflow: ellipsis; white-space: nowrap; }
 .web-category-row small { color: var(--muted); }
