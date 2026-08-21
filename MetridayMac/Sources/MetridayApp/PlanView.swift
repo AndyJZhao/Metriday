@@ -757,6 +757,11 @@ struct PlanCalendarPane: View {
                     }
                     .accessibilityAddTraits(index > 0 ? .isButton : [])
                     .accessibilityLabel(index > 0 ? "Open plan for \(shortDay(date))" : "Selected day timeline")
+                    .accessibilityAction(named: "Open plan") {
+                        if index > 0 {
+                            appState.selectDate(date)
+                        }
+                    }
                     .dropDestination(for: String.self) { identifiers, location in
                         guard index == 0,
                               let identifier = identifiers.first,

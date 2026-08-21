@@ -1149,6 +1149,10 @@ struct ActivitiesView: View {
             }
         }
         .help("Drop files, folders, or activities here to create a project")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("Create project from files, folders, or activities")
+        .accessibilityHint("Click to choose files or drop items here")
+        .accessibilityAction { chooseProjectDropItems() }
         .accessibilityIdentifier("activities.project-drop-zone")
     }
 
