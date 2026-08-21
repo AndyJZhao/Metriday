@@ -5664,6 +5664,31 @@ private struct RunningTimerStatus: View {
                         .foregroundStyle(remaining >= 0 ? MetridayTheme.secondary : MetridayTheme.danger)
                 }
 
+                Button("−5m") {
+                    adjustStart(direction: -1)
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: 10, weight: .medium))
+                .help("Move timer start earlier by 5 minutes · hold ⌥ for 1 minute or ⌘ for 15 minutes")
+                .accessibilityLabel("Move timer start earlier")
+
+                Button("+5m") {
+                    adjustStart(direction: 1)
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: 10, weight: .medium))
+                .help("Move timer start later by 5 minutes · hold ⌥ for 1 minute or ⌘ for 15 minutes")
+                .accessibilityLabel("Move timer start later")
+
+                Button {
+                    _ = store.moveRunningTimerStartToPreviousEntryBoundary()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                }
+                .buttonStyle(.borderless)
+                .help("Align timer start to the previous time entry")
+                .accessibilityLabel("Align timer start to previous entry")
+
                 Menu {
                     Section("Adjust start") {
                         Button("15 minutes earlier") { store.adjustRunningTimerStart(by: -15 * 60) }
@@ -5690,6 +5715,19 @@ private struct RunningTimerStatus: View {
                 .accessibilityIdentifier("activities.timer-adjust")
             }
         }
+    }
+
+    private func adjustStart(direction: Int) {
+        let flags = NSEvent.modifierFlags
+        let minutes: Int
+        if flags.contains(.command) {
+            minutes = 15
+        } else if flags.contains(.option) {
+            minutes = 1
+        } else {
+            minutes = 5
+        }
+        store.adjustRunningTimerStart(by: TimeInterval(direction * minutes * 60))
     }
 
     private func formatMinutes(_ seconds: Int) -> String {

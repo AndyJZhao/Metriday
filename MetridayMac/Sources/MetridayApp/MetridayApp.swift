@@ -213,10 +213,13 @@ private struct MenuBarStatusView: View {
             }
             HStack(spacing: 8) {
                 Button("−5m") {
-                    appState.timeEntryStore.adjustRunningTimerStart(by: -300)
+                    adjustTimerStart(direction: -1)
                 }
                 Button("+5m") {
-                    appState.timeEntryStore.adjustRunningTimerStart(by: 300)
+                    adjustTimerStart(direction: 1)
+                }
+                Button("Prev") {
+                    _ = appState.timeEntryStore.moveRunningTimerStartToPreviousEntryBoundary()
                 }
             }
             Divider()
@@ -267,6 +270,21 @@ private struct MenuBarStatusView: View {
             }
         }
         .padding(8)
+    }
+
+    private func adjustTimerStart(direction: Int) {
+        let flags = NSEvent.modifierFlags
+        let minutes: Int
+        if flags.contains(.command) {
+            minutes = 15
+        } else if flags.contains(.option) {
+            minutes = 1
+        } else {
+            minutes = 5
+        }
+        appState.timeEntryStore.adjustRunningTimerStart(
+            by: TimeInterval(direction * minutes * 60)
+        )
     }
 
     private func projectLabel(for projectID: UUID?) -> String {
