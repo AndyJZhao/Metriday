@@ -212,6 +212,7 @@ struct ActivitiesView: View {
     @State private var showingNewProject = false
     @State private var showingNewEntry = false
     @State private var showingTimerStart = false
+    @State private var timerStartProjectID: UUID?
     @State private var showingEntryOMatic = false
     @State private var newProjectName = ""
     @State private var newProjectParentID: UUID?
@@ -353,7 +354,7 @@ struct ActivitiesView: View {
         .sheet(isPresented: $showingTimerStart) {
             TimerStartSheet(
                 projects: projectStore.activeProjects,
-                initialProjectID: selectedProjectID,
+                initialProjectID: timerStartProjectID ?? selectedProjectID,
                 recentEntries: timeEntryStore.recentTimerEntries(),
                 recentCalendarEvents: calendarStore.events,
                 suggestedProjectID: { event in appState.suggestedProjectID(for: event) }
@@ -366,6 +367,11 @@ struct ActivitiesView: View {
                     billingStatus: billingStatus
                 )
                 showingTimerStart = false
+            }
+        }
+        .onChange(of: showingTimerStart) { _, isPresented in
+            if !isPresented {
+                timerStartProjectID = nil
             }
         }
         .sheet(isPresented: $showingEntryOMatic) {
@@ -630,6 +636,7 @@ struct ActivitiesView: View {
 
             Button {
                 if timeEntryStore.runningTimer == nil {
+                    timerStartProjectID = nil
                     showingTimerStart = true
                 } else {
                     _ = appState.stopTimer()
@@ -2834,6 +2841,11 @@ struct ActivitiesView: View {
             Button("Edit Project") {
                 editingProject = project
             }
+            Button("Start Timer") {
+                timerStartProjectID = project.id
+                showingTimerStart = true
+            }
+            .disabled(timeEntryStore.runningTimer != nil)
             Divider()
             Button("Order Subprojects Alphabetically") {
                 projectStore.orderSubprojectsAlphabetically(of: project)

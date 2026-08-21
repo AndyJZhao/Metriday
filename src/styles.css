@@ -430,6 +430,11 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .activity-project-tree-row { display: flex; align-items: center; min-width: 0; }
 .activity-project-tree-row.drop-target { border-radius: 7px; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .activity-project-tree-row .activity-project-filter { flex: 1; min-width: 0; }
+.activity-project-tree-actions { display: inline-flex; flex: 0 0 auto; align-items: center; }
+.activity-project-tree-actions .icon-button { width: 26px; height: 30px; color: var(--muted); opacity: 0; }
+.activity-project-tree-row:hover .activity-project-tree-actions .icon-button,
+.activity-project-tree-actions .icon-button:focus-visible { opacity: 1; }
+.activity-project-tree-actions .icon-button:hover { color: var(--accent); background: var(--accent-soft); }
 .activity-project-disclosure, .activity-project-disclosure-placeholder { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 28px; flex: 0 0 22px; border: 0; background: transparent; color: var(--muted); }
 .activity-project-disclosure { padding: 0; cursor: pointer; }
 .activity-project-disclosure:hover { color: var(--accent); }
