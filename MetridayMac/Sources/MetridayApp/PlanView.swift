@@ -496,6 +496,7 @@ struct PlanCalendarPane: View {
     @State private var isSystemDropTargeted = false
     @State private var now = Date()
     @State private var selectedCalendarEvent: CalendarEventItem?
+    @State private var selectedTimeBlock: PlanTask?
 
     private var visibleDates: [Date] {
         (0..<4).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: appState.selectedDate) }
@@ -560,6 +561,9 @@ struct PlanCalendarPane: View {
                 timeEntryStore: appState.timeEntryStore,
                 onConvert: { appState.convertCalendarEventToTimeBlock(event) }
             )
+        }
+        .sheet(item: $selectedTimeBlock) { task in
+            TimeBlockDetailSheet(task: task, selectedDate: appState.selectedDate)
         }
     }
 
@@ -715,7 +719,12 @@ struct PlanCalendarPane: View {
                             }
 
                             ForEach(store.tasks.filter { $0.startMinute != nil }) { task in
-                                CalendarTaskBlock(store: store, task: task, selected: appState.selectedTaskID == task.id)
+                                CalendarTaskBlock(
+                                    store: store,
+                                    task: task,
+                                    selected: appState.selectedTaskID == task.id,
+                                    onOpenDetails: { selectedTimeBlock = task }
+                                )
                                     .padding(.horizontal, 4)
                             }
 
@@ -998,6 +1007,7 @@ struct CalendarTaskBlock: View {
     @ObservedObject var store: MarkdownStore
     let task: PlanTask
     let selected: Bool
+    let onOpenDetails: () -> Void
     @State private var isHovering = false
 
     private var execution: TimeBlockExecutionSummary {
@@ -1060,6 +1070,8 @@ struct CalendarTaskBlock: View {
         .overlay(alignment: .bottomTrailing) {
             if selected {
                 Menu {
+                    Button("Open Time Block") { onOpenDetails() }
+                    Divider()
                     Button(task.isCompleted ? "Mark incomplete" : "Mark complete") { store.toggleCompleted(id: task.id) }
                     Button("Remove time", role: .destructive) { store.unschedule(id: task.id) }
                 } label: {

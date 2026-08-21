@@ -12,6 +12,7 @@ struct TodayView: View {
     @State private var selectedActivity: ActivitySegment?
     @State private var selectedTimeEntry: TimeEntry?
     @State private var selectedCalendarEvent: CalendarEventItem?
+    @State private var selectedTimeBlock: PlanTask?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -61,6 +62,9 @@ struct TodayView: View {
                 onConvert: { appState.convertCalendarEventToTimeBlock(event) }
             )
         }
+        .sheet(item: $selectedTimeBlock) { task in
+            TimeBlockDetailSheet(task: task, selectedDate: appState.selectedDate)
+        }
     }
 
     private var plannedColumn: some View {
@@ -93,8 +97,7 @@ struct TodayView: View {
                         .padding(.horizontal, 10)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            appState.section = .plan
-                            appState.selectedTaskID = task.id
+                            selectedTimeBlock = task
                         }
                         .accessibilityAddTraits(.isButton)
                         .accessibilityLabel("Plan \(task.title), \(TimeFormat.range(start: start, end: end))\(executionAccessibilitySuffix(for: task))")

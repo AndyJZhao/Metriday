@@ -335,6 +335,26 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .calendar-event-dialog dd { margin: 0; color: #4d422a; font-size: 12px; overflow-wrap: anywhere; }
 .calendar-event-dialog footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .calendar-event-dialog-message { flex: 1; min-width: 0; color: var(--muted); font-size: 11px; }
+.time-block-dialog { width: min(560px, 100%); }
+.time-block-dialog-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0 16px; padding: 14px; border-radius: 10px; background: #f7f8fb; }
+.time-block-dialog-summary > div:not(.time-block-dialog-progress) { display: grid; gap: 4px; }
+.time-block-dialog-summary span { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.time-block-dialog-summary strong { font-size: 15px; }
+.time-block-dialog-progress { grid-column: 1 / -1; height: 6px; overflow: hidden; border-radius: 999px; background: #dfe2ec; }
+.time-block-dialog-progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.time-block-dialog-summary p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 11px; }
+.time-block-dialog-scroll { display: grid; gap: 18px; max-height: 330px; overflow: auto; padding-right: 4px; }
+.time-block-dialog-scroll section { display: grid; gap: 8px; }
+.time-block-dialog-scroll h3 { margin: 0; font-size: 13px; }
+.time-block-dialog-help, .time-block-dialog-empty { margin: 0; color: var(--muted); font-size: 11px; }
+.time-block-dialog-list { display: grid; gap: 4px; }
+.time-block-dialog-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 38px; padding: 6px 8px; border-radius: 7px; background: #fafbfc; }
+.time-block-dialog-row > div { display: grid; gap: 2px; min-width: 0; }
+.time-block-dialog-row strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.time-block-dialog-row small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.time-block-dialog-row b { color: var(--muted); font-size: 11px; font-weight: 650; }
+.time-block-dialog-marker { display: grid; place-items: center; color: var(--accent); }
+.time-block-dialog-color { width: 7px; height: 26px; border-radius: 4px; }
 .calendar-task-block { cursor: grab; }
 .calendar-task-block.accent { border-color: var(--accent); background: var(--accent); color: #fff; }
 .calendar-task-block.accent span { color: #eceeff; }

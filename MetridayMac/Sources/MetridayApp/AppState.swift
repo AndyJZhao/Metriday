@@ -183,8 +183,9 @@ final class AppState: ObservableObject {
     }
 
     @discardableResult
-    func startFocusSession() -> Bool {
-        guard let task = currentTask else { return false }
+    func startFocusSession(taskID: UUID? = nil) -> Bool {
+        let task = taskID.flatMap { markdownStore.task($0) } ?? currentTask
+        guard let task else { return false }
         selectedTaskID = task.id
         timeEntryStore.startTimer(
             title: task.title,
@@ -617,7 +618,8 @@ final class AppState: ObservableObject {
         }
 
         if request.method == "POST", path == "/v1/focus/session/start" {
-            guard startFocusSession(), let timer = timeEntryStore.runningTimer else {
+            let taskID = request.query["task_id"].flatMap(UUID.init(uuidString:))
+            guard startFocusSession(taskID: taskID), let timer = timeEntryStore.runningTimer else {
                 return .error("Focus Session needs a scheduled current block", statusCode: 409)
             }
             return .jsonObject([
