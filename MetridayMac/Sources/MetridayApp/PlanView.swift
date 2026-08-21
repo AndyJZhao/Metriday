@@ -794,6 +794,7 @@ struct PlanCalendarPane: View {
                             appState.selectDate(date)
                         }
                     }
+                    .accessibilityElement(children: .contain)
                     .accessibilityAddTraits(index > 0 ? .isButton : [])
                     .accessibilityLabel(index > 0 ? "Open plan for \(shortDay(date))" : "Selected day timeline")
                     .accessibilityAction(named: "Open plan") {

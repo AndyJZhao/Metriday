@@ -6265,14 +6265,6 @@ private struct ActivityTimelinePanel: View {
                                         hoveredSuggestionID = nil
                                     }
                                 }
-                                .contextMenu {
-                                    Button("Edit Time Entry") {
-                                        onEditTimeEntry(entry)
-                                    }
-                                    Button("Delete Time Entry", role: .destructive) {
-                                        onDeleteTimeEntry(entry)
-                                    }
-                                }
                                 .help("Recorded time · \(entry.title)")
                                 .overlay {
                                     TimelineEntryInteraction(
@@ -6291,6 +6283,15 @@ private struct ActivityTimelinePanel: View {
                                         }
                                     )
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .accessibilityHidden(true)
+                                }
+                                .contextMenu {
+                                    Button("Edit Time Entry") {
+                                        onEditTimeEntry(entry)
+                                    }
+                                    Button("Delete Time Entry", role: .destructive) {
+                                        onDeleteTimeEntry(entry)
+                                    }
                                 }
                         }
                     }
@@ -6553,14 +6554,6 @@ private struct ActivityTimelinePanel: View {
                                 .accessibilityLabel("Recorded time · \(entry.title)")
                                 .accessibilityIdentifier("activities.vertical-timeline.time-entry.\(entry.id.uuidString)")
                                 .accessibilityHint("Click to edit; drag the body to move it or drag either edge to resize")
-                                .contextMenu {
-                                    Button("Edit Time Entry") {
-                                        onEditTimeEntry(entry)
-                                    }
-                                    Button("Delete Time Entry", role: .destructive) {
-                                        onDeleteTimeEntry(entry)
-                                    }
-                                }
                                 .help("Recorded time · \(entry.title)")
                                 .overlay {
                                     TimelineEntryInteraction(
@@ -6579,6 +6572,15 @@ private struct ActivityTimelinePanel: View {
                                         }
                                     )
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .accessibilityHidden(true)
+                                }
+                                .contextMenu {
+                                    Button("Edit Time Entry") {
+                                        onEditTimeEntry(entry)
+                                    }
+                                    Button("Delete Time Entry", role: .destructive) {
+                                        onDeleteTimeEntry(entry)
+                                    }
                                 }
                         }
                     }
