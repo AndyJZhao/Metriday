@@ -202,7 +202,7 @@ struct TimeBlockDetailSheet: View {
 
     private var activityQualityView: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("Focus quality · (activityQuality.focusedPercentage)% focused")
+            Text("Focus quality · \(activityQuality.focusedPercentage)% focused")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(MetridayTheme.graphite)
             HStack(spacing: 12) {
