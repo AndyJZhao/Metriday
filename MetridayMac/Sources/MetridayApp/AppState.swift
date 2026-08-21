@@ -48,6 +48,7 @@ final class AppState: ObservableObject {
     let activityMonitor: AppActivityMonitor
     let reviewReminderService: ReviewReminderService
     let blocker: WebBlockerService
+    private var globalShortcutMonitor: GlobalShortcutMonitor?
     private var workspaceCancellables = Set<AnyCancellable>()
 
     init() {
@@ -168,6 +169,9 @@ final class AppState: ObservableObject {
             self.activityMonitor.start()
         }
         self.reviewReminderService.start()
+        self.globalShortcutMonitor = GlobalShortcutMonitor { [weak self] in
+            self?.quickStartTimer()
+        }
     }
 
     var currentTask: PlanTask? {
