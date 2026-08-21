@@ -326,7 +326,7 @@ struct TimeBlockDetailSheet: View {
                 Label(isFocused ? "Pause Focus" : "Start Focus", systemImage: isFocused ? "pause.fill" : "play.fill")
             }
             .buttonStyle(.borderedProminent)
-            .disabled(anotherFocusSessionIsActive || task.startMinute == nil || task.endMinute == nil)
+            .disabled(anotherFocusSessionIsActive || !task.isScheduled)
 
             Spacer()
             Button("Remove time", role: .destructive) {

@@ -188,8 +188,11 @@ final class AppState: ObservableObject {
     func startFocusSession(taskID: UUID? = nil, date: Date? = nil) -> Bool {
         let task: PlanTask?
         if let taskID {
-            task = date.flatMap { markdownStore.task(taskID, on: $0) }
-                ?? markdownStore.task(taskID)
+            if let date {
+                task = markdownStore.task(taskID, on: date)
+            } else {
+                task = markdownStore.task(taskID)
+            }
         } else {
             task = currentTask
         }

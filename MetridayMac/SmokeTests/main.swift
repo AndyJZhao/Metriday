@@ -2181,8 +2181,13 @@ Task { @MainActor in
     expect(store.markdown.contains("## Focus"), "A new day should start with an editable Markdown template")
     expect(store.tasks.isEmpty, "A newly created day must not copy tasks from another date")
 
-    _ = store.addTask(title: "Task on next day")
+    guard let nextDayTaskID = store.addTask(title: "Task on next day") else {
+        expect(false, "A task should be insertable on a second Markdown date")
+        return
+    }
     expect(store.markdown.contains("Task on next day"), "The newly created daily Markdown should be editable")
+    expect(store.task(draftID, on: nextDate) == nil, "A date-scoped task lookup must not fall back to another day")
+    expect(store.task(nextDayTaskID, on: date) == nil, "A task identity must remain scoped to its Markdown date")
     expect(!store.load(date: date), "Returning to an existing date should open instead of recreate it")
     expect(store.markdown == originalMarkdown, "Switching dates must preserve each day's Markdown independently")
 
