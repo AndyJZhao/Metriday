@@ -6121,23 +6121,50 @@ private struct ActivityTimelinePanel: View {
 
             if orientation == .horizontal {
             GeometryReader { proxy in
+                let laneLabelWidth: CGFloat = 66
+                let chartWidth = max(1, proxy.size.width - laneLabelWidth)
+                let timelineX: (Int) -> CGFloat = { minute in
+                    laneLabelWidth + timelineWindow.x(for: minute, width: chartWidth)
+                }
                 ZStack(alignment: .topLeading) {
+                    Text("MACOS")
+                        .font(.system(size: 8, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .frame(width: laneLabelWidth, alignment: .leading)
+                        .position(x: laneLabelWidth / 2, y: 53)
+                        .accessibilityHidden(true)
+                    Text("PROJECT")
+                        .font(.system(size: 8, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .frame(width: laneLabelWidth, alignment: .leading)
+                        .position(x: laneLabelWidth / 2, y: 108)
+                        .accessibilityHidden(true)
+                    Text("CALENDAR")
+                        .font(.system(size: 8, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .frame(width: laneLabelWidth, alignment: .leading)
+                        .position(x: laneLabelWidth / 2, y: 136)
+                        .accessibilityHidden(true)
+                    Text("TIME ENTRIES")
+                        .font(.system(size: 8, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .frame(width: laneLabelWidth, alignment: .leading)
+                        .position(x: laneLabelWidth / 2, y: 154)
+                        .accessibilityHidden(true)
+
                     ForEach(timelineWindow.tickMinutes, id: \.self) { minute in
                         Rectangle()
                             .fill(MetridayTheme.line.opacity(minute % 360 == 0 ? 0.9 : 0.45))
                             .frame(width: 1, height: 174)
                             .position(
-                                x: timelineWindow.x(for: minute, width: proxy.size.width),
+                                x: timelineX(minute),
                                 y: 87
                             )
                     }
 
                     TimelineView(.periodic(from: MetridayTimeline.anchor, by: 30)) { context in
                         if let second = currentTimeSecond(at: context.date) {
-                            let x = timelineWindow.x(
-                                for: timelineWindow.absoluteMinute(for: second),
-                                width: proxy.size.width
-                            )
+                            let x = timelineX(timelineWindow.absoluteMinute(for: second))
                             VStack(spacing: 0) {
                                 Circle()
                                     .fill(MetridayTheme.accentDeep)
@@ -6169,7 +6196,7 @@ private struct ActivityTimelinePanel: View {
                         }
                         .buttonStyle(.plain)
                         .position(
-                            x: timelineWindow.x(for: (gap.start + gap.end) / 2, width: proxy.size.width),
+                            x: timelineX((gap.start + gap.end) / 2),
                             y: 53
                         )
                         .accessibilityLabel("Create time entry for \(TimeFormat.range(start: gap.start, end: gap.end))")
@@ -6179,8 +6206,8 @@ private struct ActivityTimelinePanel: View {
 
                     ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
                         if let range = timelineWindow.clippedRange(startSecond: segment.startSecond, endSecond: segment.endSecond) {
-                        let left = timelineWindow.x(for: range.start, width: proxy.size.width)
-                        let width = max(3, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
+                        let left = timelineX(range.start)
+                        let width = max(3, timelineX(range.end) - left)
                         let hitWidth = max(12, width)
                         ZStack(alignment: .trailing) {
                             Button {
@@ -6255,8 +6282,8 @@ private struct ActivityTimelinePanel: View {
                     }
 
                     ForEach(projectTimelineRanges) { range in
-                        let left = timelineWindow.x(for: range.start, width: proxy.size.width)
-                        let width = max(2, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
+                        let left = timelineX(range.start)
+                        let width = max(2, timelineX(range.end) - left)
                         let projectName = project(range.projectID)?.name ?? "None"
                         RoundedRectangle(cornerRadius: 2, style: .continuous)
                             .fill(color(for: project(range.projectID)?.color).opacity(0.62))
@@ -6286,8 +6313,8 @@ private struct ActivityTimelinePanel: View {
                             )
                         )
                         if let range = timelineWindow.clippedRange(startSecond: startSecond, endSecond: endSecond) {
-                        let left = timelineWindow.x(for: range.start, width: proxy.size.width)
-                        let width = max(4, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
+                        let left = timelineX(range.start)
+                        let width = max(4, timelineX(range.end) - left)
                         let hitWidth = max(12, width)
                         Button {
                             onRecordCalendarEvent(event, NSEvent.modifierFlags.contains(.option))
@@ -6332,8 +6359,8 @@ private struct ActivityTimelinePanel: View {
                     ForEach(timeEntries) { entry in
                         if let entryRange = clippedRange(for: entry),
                            let range = timelineWindow.clippedRange(startSecond: entryRange.start, endSecond: entryRange.end) {
-                            let left = timelineWindow.x(for: range.start, width: proxy.size.width)
-                            let width = max(4, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
+                            let left = timelineX(range.start)
+                            let width = max(4, timelineX(range.end) - left)
                             let hitWidth = max(12, width)
                             Button {
                                 onEditTimeEntry(entry)
@@ -6367,7 +6394,7 @@ private struct ActivityTimelinePanel: View {
                                 .help("Recorded time · \(entry.title)")
                                 .overlay {
                                     TimelineEntryInteraction(
-                                        pixelsPerMinute: proxy.size.width / CGFloat(timelineWindow.spanMinutes),
+                                        pixelsPerMinute: chartWidth / CGFloat(timelineWindow.spanMinutes),
                                         onSelect: {
                                             onEditTimeEntry(entry)
                                         },
@@ -6396,8 +6423,8 @@ private struct ActivityTimelinePanel: View {
                     }
 
                     if let start = selectionStart, let end = selectionEnd {
-                        let left = timelineWindow.x(for: start, width: proxy.size.width)
-                        let width = max(2, timelineWindow.x(for: end, width: proxy.size.width) - left)
+                        let left = timelineX(start)
+                        let width = max(2, timelineX(end) - left)
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(MetridayTheme.accent.opacity(0.14))
                             .overlay(
@@ -6417,6 +6444,7 @@ private struct ActivityTimelinePanel: View {
                         }
                     }
                     .padding(.top, 178)
+                    .padding(.leading, laneLabelWidth)
 
                     if let detail = hoveredTimelineDetail {
                         TimelineHoverBanner(detail: detail)
@@ -6429,7 +6457,11 @@ private struct ActivityTimelinePanel: View {
                 .gesture(
                     DragGesture(minimumDistance: 4)
                         .onChanged { value in
-                            let minute = timelineWindow.minute(at: value.location.x, width: proxy.size.width)
+                            guard value.location.x >= laneLabelWidth else { return }
+                            let minute = timelineWindow.minute(
+                                at: value.location.x - laneLabelWidth,
+                                width: chartWidth
+                            )
                             if dragAnchorMinute == nil {
                                 dragAnchorMinute = minute
                             }
