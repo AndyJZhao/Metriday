@@ -330,7 +330,8 @@ final class AppState: ObservableObject {
                     "billingStatus": entryBillingStatusRaw(timer.billingStatus),
                     "durationSeconds": timeEntryStore.runningDurationSeconds,
                     "estimatedDurationSeconds": timer.estimatedDurationSeconds.map { $0 as Any } ?? NSNull(),
-                    "remainingSeconds": timeEntryStore.runningTimerRemainingSeconds.map { $0 as Any } ?? NSNull()
+                    "remainingSeconds": timeEntryStore.runningTimerRemainingSeconds.map { $0 as Any } ?? NSNull(),
+                    "customFields": timer.customFields
                 ]
             } else {
                 response["timer"] = NSNull()

@@ -81,7 +81,13 @@ struct TodayView: View {
                             start: start,
                             end: end,
                             symbol: symbol(for: task),
-                            isCurrent: appState.currentTask?.id == task.id
+                            isCurrent: appState.currentTask?.id == task.id,
+                            actual: timeBlockExecutionSummary(
+                                taskID: task.id,
+                                entries: timeEntryStore.materializedEntries(),
+                                runningTimer: timeEntryStore.runningTimer,
+                                date: appState.selectedDate
+                            )
                         )
                         .padding(.horizontal, 10)
                         .contentShape(Rectangle())
@@ -90,7 +96,7 @@ struct TodayView: View {
                             appState.selectedTaskID = task.id
                         }
                         .accessibilityAddTraits(.isButton)
-                        .accessibilityLabel("Plan \(task.title), \(TimeFormat.range(start: start, end: end))")
+                        .accessibilityLabel("Plan \(task.title), \(TimeFormat.range(start: start, end: end))\(executionAccessibilitySuffix(for: task))")
                     }
                 }
                 if Calendar.current.isDateInToday(appState.selectedDate) {
@@ -114,6 +120,16 @@ struct TodayView: View {
         if title.contains("write") || title.contains("draft") { return "square.and.pencil" }
         if title.contains("experiment") || title.contains("research") { return "flask" }
         return "checkmark.circle"
+    }
+
+    private func executionAccessibilitySuffix(for task: PlanTask) -> String {
+        let summary = timeBlockExecutionSummary(
+            taskID: task.id,
+            entries: timeEntryStore.materializedEntries(),
+            runningTimer: timeEntryStore.runningTimer,
+            date: appState.selectedDate
+        )
+        return summary.hasExecution ? ", \(summary.statusLabel)" : ""
     }
 
     private var actualColumn: some View {

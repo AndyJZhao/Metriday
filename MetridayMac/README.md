@@ -140,6 +140,8 @@ The selected-day Plan timeline shows a live current-time marker during the visib
 
 Read-only EventKit Calendar Events are also mirrored into the selected-day Plan and Today timelines with a distinct amber dashed treatment. Selecting an event opens its calendar, location, notes, and exact range; `Record Time Entry` is always explicit, preserves the Calendar Event identifier in local custom fields, and never creates Markdown or starts a Timer automatically. The Web Plan and Today timelines expose the same event treatment and record-time path through the local API.
 
+Plan and Today Time Blocks now expose planned-vs-actual execution feedback. Focus Sessions and manually recorded entries linked through `metriday_plan_task_id` are aggregated by Markdown task, including split intervals after pause/resume; completed work shows `Actual …`, while the linked running Timer shows `In progress …`. Native and Web surfaces use the same summary without turning Calendar Events into automatic Timer work.
+
 ## Website blocking MVP
 
 While a focus session is active, Metriday can inspect the frontmost Safari or Chrome tab through macOS Automation and redirect blocklisted domains to a local focus page. The app asks for Automation permission when this feature is first used.

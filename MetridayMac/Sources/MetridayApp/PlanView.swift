@@ -999,6 +999,15 @@ struct CalendarTaskBlock: View {
     let selected: Bool
     @State private var isHovering = false
 
+    private var execution: TimeBlockExecutionSummary {
+        timeBlockExecutionSummary(
+            taskID: task.id,
+            entries: appState.timeEntryStore.materializedEntries(),
+            runningTimer: appState.timeEntryStore.runningTimer,
+            date: appState.selectedDate
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(task.timeRange ?? "")
@@ -1007,6 +1016,12 @@ struct CalendarTaskBlock: View {
             Text(task.title)
                 .font(.system(size: 10, weight: .semibold))
                 .lineLimit(3)
+            if execution.hasExecution {
+                Text(execution.statusLabel)
+                    .font(.system(size: 9, weight: .semibold))
+                    .lineLimit(1)
+                    .opacity(0.86)
+            }
             Spacer(minLength: 1)
         }
         .foregroundStyle(task.tone == .accent ? .white : Color(red: 0.20, green: 0.23, blue: 0.42))
@@ -1061,7 +1076,7 @@ struct CalendarTaskBlock: View {
         .onHover { isHovering = $0 }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isButton)
-        .accessibilityLabel("Time Block \(task.title), \(task.timeRange ?? "unscheduled")")
+        .accessibilityLabel("Time Block \(task.title), \(task.timeRange ?? "unscheduled")\(execution.hasExecution ? ", \(execution.statusLabel)" : "")")
         .accessibilityHint("Select the block; drag the body to move it or its edges to resize it")
         .accessibilityAction { appState.selectedTaskID = task.id }
         .accessibilityIdentifier("calendar.task.\(task.id.uuidString)")

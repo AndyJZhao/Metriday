@@ -139,8 +139,10 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .planned-block span { display: flex; flex-direction: column; min-width: 0; }
 .planned-block strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .planned-block small { margin-top: 4px; color: #6f7598; font-size: 12px; }
+.planned-block .planned-actual-summary { color: #5369ef; font-size: 11px; font-weight: 650; }
 .planned-block.current { border-color: var(--accent); background: var(--accent); color: #fff; }
 .planned-block.current small { color: #e7e9ff; }
+.planned-block.current .planned-actual-summary { color: #fff; }
 .planned-empty { position: absolute; top: 18px; right: 18px; left: 18px; padding: 14px 12px; border: 1px dashed #d8dce6; border-radius: 8px; color: var(--muted); font-size: 12px; text-align: center; }
 .actual-block { position: absolute; right: 4px; left: 4px; z-index: 2; overflow: visible; border: 1px solid #e2e3e7; border-radius: 7px; background: #f7f7f8; }
 .actual-block[role="button"] { cursor: pointer; }
@@ -327,6 +329,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .calendar-task-block.selected { box-shadow: 0 0 0 3px rgba(78, 95, 242, 0.18); }
 .calendar-task-block.completed .block-content { opacity: 0.6; text-decoration: line-through; }
 .block-content { display: flex; flex: 1; min-width: 0; flex-direction: column; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: grab; }
+.block-content .block-actual-summary { margin-top: 4px; color: #5369ef; font-size: 10px; font-weight: 650; }
+.calendar-task-block.accent .block-content .block-actual-summary { color: #fff; }
 .block-actions { position: absolute; top: calc(100% + 5px); left: 0; z-index: 5; display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 3px 10px rgba(34, 38, 56, 0.12); }
 .block-actions .icon-button { width: 27px; height: 27px; color: #555b6c; }
 .resize-handle { position: absolute; right: 0; bottom: 0; left: 0; height: 9px; padding: 0; border: 0; background: transparent; cursor: ns-resize; }

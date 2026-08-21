@@ -33,6 +33,30 @@ let calendarTimelineItems = calendarEventTimelineItems(events: [calendarEvent], 
 expect(calendarTimelineItems.count == 1, "Calendar events should produce one visible timeline item")
 expect(calendarTimelineItems[0].startMinute == TimelineMetrics.startMinute, "Calendar event timeline should clip before the visible workday")
 expect(calendarTimelineItems[0].endMinute == TimelineMetrics.startMinute + 75, "Calendar event timeline should preserve its clipped end")
+let executionTaskID = UUID()
+let executionEntries = [
+    TimeEntry(
+        title: "Research sync",
+        start: calendarEventDay.addingTimeInterval(9 * 60 * 60),
+        end: calendarEventDay.addingTimeInterval(9 * 60 * 60 + 30 * 60),
+        customFields: ["metriday_plan_task_id": executionTaskID.uuidString]
+    ),
+    TimeEntry(
+        title: "Research sync",
+        start: calendarEventDay.addingTimeInterval(10 * 60 * 60),
+        end: calendarEventDay.addingTimeInterval(10 * 60 * 60 + 15 * 60),
+        customFields: ["metriday_plan_task_id": executionTaskID.uuidString]
+    )
+]
+let executionSummary = timeBlockExecutionSummary(
+    taskID: executionTaskID,
+    entries: executionEntries,
+    runningTimer: nil,
+    date: calendarEventDay
+)
+expect(executionSummary.durationSeconds == 45 * 60, "Linked Time Block execution should accumulate split intervals")
+expect(executionSummary.intervalCount == 2, "Linked Time Block execution should count split intervals")
+expect(executionSummary.statusLabel == "Actual 45m", "Completed Time Block execution should expose an actual label")
 let seeded = MarkdownCodec.seed(for: date)
 let markdown = MarkdownCodec.serialize(seeded)
 let parsed = MarkdownCodec.parse(markdown, date: date)

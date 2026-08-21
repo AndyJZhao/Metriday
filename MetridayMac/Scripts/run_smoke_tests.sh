@@ -12,6 +12,7 @@ swiftc \
   "$project_dir/Sources/MetridayApp/ProjectTracking.swift" \
   "$project_dir/Sources/MetridayApp/TeamStore.swift" \
   "$project_dir/Sources/MetridayApp/TimeEntryStore.swift" \
+  "$project_dir/Sources/MetridayApp/TimeBlockExecution.swift" \
   "$project_dir/Sources/MetridayApp/PreferencesStore.swift" \
   "$project_dir/Sources/MetridayApp/CalendarEventStore.swift" \
   "$project_dir/Sources/MetridayApp/Theme.swift" \

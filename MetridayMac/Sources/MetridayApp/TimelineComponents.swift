@@ -71,6 +71,7 @@ struct StaticTimelineBlock: View {
     let end: Int
     var symbol = "doc.text"
     var isCurrent = false
+    var actual: TimeBlockExecutionSummary = .empty
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -79,6 +80,11 @@ struct StaticTimelineBlock: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                 Text(TimeFormat.range(start: start, end: end)).font(.system(size: 11)).opacity(0.76)
+                if actual.hasExecution {
+                    Text(actual.statusLabel)
+                        .font(.system(size: 10, weight: .semibold))
+                        .opacity(0.86)
+                }
             }
             Spacer()
         }
