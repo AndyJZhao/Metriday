@@ -301,6 +301,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .continuous-hour-axis .hour-labels { right: 0; width: 58px; }
 .continuous-hour-axis .hour-labels span { right: 10px; }
 .plan-calendar-canvas, .continuous-day-canvas { position: relative; min-width: 0; height: calc(12 * var(--hour-height)); min-height: calc(12 * var(--hour-height)); overflow: visible; border-right: 1px solid #eef0f3; }
+.plan-now-marker { position: absolute; z-index: 8; right: 0; left: 0; height: 1px; border-top: 1px solid rgba(78, 95, 242, 0.72); pointer-events: none; }
+.plan-now-marker span { position: absolute; top: -4px; left: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .plan-calendar-canvas.ready-to-schedule { background: #fbfbff; }
 .continuous-day-canvas.adjacent { cursor: pointer; background: #fcfcfd; }
 .continuous-day-canvas.adjacent:hover { background: #f8f8fb; }

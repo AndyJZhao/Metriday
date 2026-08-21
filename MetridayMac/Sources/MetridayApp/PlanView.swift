@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 struct PlanView: View {
@@ -493,6 +494,7 @@ struct PlanCalendarPane: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var store: MarkdownStore
     @State private var isSystemDropTargeted = false
+    @State private var now = Date()
 
     private var visibleDates: [Date] {
         (0..<4).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: appState.selectedDate) }
@@ -547,6 +549,17 @@ struct PlanCalendarPane: View {
                     .padding(.bottom, 42)
             }
         }
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { value in
+            now = value
+        }
+    }
+
+    private var currentTimeMinute: Int? {
+        guard Calendar.current.isDateInToday(appState.selectedDate) else { return nil }
+        let components = Calendar.current.dateComponents([.hour, .minute], from: now)
+        let minute = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+        guard minute >= TimelineMetrics.startMinute, minute <= TimelineMetrics.endMinute else { return nil }
+        return minute
     }
 
     private var dropInstruction: String {
@@ -688,6 +701,11 @@ struct PlanCalendarPane: View {
                                 CalendarTaskBlock(store: store, task: task, selected: appState.selectedTaskID == task.id)
                                     .padding(.horizontal, 4)
                             }
+
+                            if let markerMinute = currentTimeMinute {
+                                PlanCurrentTimeMarker(minute: markerMinute)
+                                    .zIndex(8)
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -761,6 +779,27 @@ struct PlanCalendarPane: View {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "EEE d"
         return formatter.string(from: date)
+    }
+}
+
+private struct PlanCurrentTimeMarker: View {
+    let minute: Int
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Circle()
+                .fill(MetridayTheme.accent)
+                .frame(width: 8, height: 8)
+                .offset(x: -4)
+            Rectangle()
+                .fill(MetridayTheme.accent.opacity(0.72))
+                .frame(height: 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .offset(y: TimelineMetrics.y(for: minute) - 4)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Current time")
     }
 }
 

@@ -118,6 +118,8 @@ The Settings sheet also maintains activity exclusion rules at ~/Library/Applicat
 
 The left pane is a native continuous Markdown editor with NotePlan-style live preview. Inactive lines render as headings, bold/italic text, quotes, lists, links, inline code, and clickable task checkboxes instead of exposing source delimiters; the active line reveals only the Markdown syntax needed for editing. Return continues task, bullet, and numbered-list prefixes. The file is still saved exactly as plain Markdown, task lines expose a six-dot gutter handle as soon as they match `- [ ] Task`, and calendar actions only rewrite the corresponding task line.
 
+The selected-day Plan timeline shows a live current-time marker during the visible 08:00–20:00 window. It refreshes every 30 seconds, uses the same blue-violet accent as other time navigation, and is display-only so it never intercepts task selection, resizing, or drag/drop.
+
 ## Website blocking MVP
 
 While a focus session is active, Metriday can inspect the frontmost Safari or Chrome tab through macOS Automation and redirect blocklisted domains to a local focus page. The app asks for Automation permission when this feature is first used.
