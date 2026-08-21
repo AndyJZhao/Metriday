@@ -184,6 +184,13 @@ final class AppState: ObservableObject {
     }
 
     @discardableResult
+    func setFocusActive(_ active: Bool) -> Bool {
+        guard active || !focusSessionActive else { return false }
+        focusIsActive = active
+        return true
+    }
+
+    @discardableResult
     func startFocusSession(taskID: UUID? = nil, date: Date? = nil) -> Bool {
         let task: PlanTask?
         if let taskID {
@@ -664,10 +671,9 @@ final class AppState: ObservableObject {
             guard let active = apiBody(request)?["active"] as? Bool else {
                 return .error("Focus body needs an active boolean", statusCode: 400)
             }
-            if !active, focusSessionActive {
+            guard setFocusActive(active) else {
                 return .error("Stop the Focus Session before disabling Focus protection", statusCode: 409)
             }
-            focusIsActive = active
             return .jsonObject(["active": focusIsActive, "status": blocker.status])
         }
 

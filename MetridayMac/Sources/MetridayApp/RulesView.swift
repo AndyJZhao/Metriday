@@ -30,7 +30,7 @@ struct RulesView: View {
                         Spacer()
                         Toggle("Active", isOn: Binding(
                             get: { appState.focusIsActive },
-                            set: { appState.focusIsActive = $0 }
+                            set: { _ = appState.setFocusActive($0) }
                         ))
                         .toggleStyle(.switch)
                         .disabled(appState.currentTask == nil)
