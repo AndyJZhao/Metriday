@@ -575,6 +575,19 @@ try? FileManager.default.removeItem(at: activityRoot)
 
 Task { @MainActor in
     let tempRoot = FileManager.default.temporaryDirectory.appendingPathComponent("MetridaySmoke-\(UUID().uuidString)")
+    let calendarLinkRoot = tempRoot.appendingPathComponent("CalendarLinks", isDirectory: true)
+    let calendarLinks = CalendarEventLinkStore(rootDirectory: calendarLinkRoot)
+    let firstLinkedTaskID = UUID()
+    let secondLinkedTaskID = UUID()
+    calendarLinks.link(taskID: firstLinkedTaskID, eventID: "event-smoke")
+    expect(calendarLinks.taskID(for: "event-smoke") == firstLinkedTaskID, "Calendar links should resolve an event back to its Time Block")
+    calendarLinks.link(taskID: secondLinkedTaskID, eventID: "event-smoke")
+    expect(calendarLinks.taskID(for: "event-smoke") == secondLinkedTaskID, "Relinking an event should replace the previous Time Block link")
+    expect(calendarLinks.eventID(for: firstLinkedTaskID) == nil, "Calendar event links should stay one-to-one")
+    expect(
+        calendarLinks.mergeArchive(CalendarEventLinkArchive(version: 1, taskToEvent: [UUID().uuidString: "event-smoke"])) == 0,
+        "Calendar link sync should not attach one event to a second Time Block"
+    )
     let timeEntryStore = TimeEntryStore(rootDirectory: tempRoot.appendingPathComponent("BulkTimeEntries", isDirectory: true))
     let firstBulkEntryID = timeEntryStore.addEntry(
         title: "Bulk status one",

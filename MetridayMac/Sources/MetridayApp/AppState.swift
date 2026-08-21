@@ -281,7 +281,10 @@ final class AppState: ObservableObject {
             task = currentTask
         }
         guard let task, task.isScheduled else { return false }
-        let taskDate = date ?? selectedDate
+        let taskDate = Calendar.current.startOfDay(for: date ?? selectedDate)
+        if !Calendar.current.isDate(taskDate, inSameDayAs: selectedDate) {
+            selectDate(taskDate)
+        }
         let estimatedDurationSeconds = timeBlockFocusEstimateSeconds(
             task: task,
             entries: timeEntryStore.entries,
@@ -434,9 +437,22 @@ final class AppState: ObservableObject {
     /// Converts a read-only Calendar Event into a Markdown-backed Time Block
     /// only after the user explicitly chooses that action.
     @discardableResult
-    func convertCalendarEventToTimeBlock(_ event: CalendarEventItem) -> UUID? {
+    func convertCalendarEventToTimeBlock(_ event: CalendarEventItem, date: Date? = nil) -> UUID? {
+        if let existingTaskID = calendarEventLinkStore.taskID(for: event.id),
+           let located = markdownStore.locateTask(existingTaskID) {
+            if !Calendar.current.isDate(located.date, inSameDayAs: selectedDate) {
+                selectDate(located.date)
+            }
+            selectedTaskID = existingTaskID
+            section = .plan
+            markdownStore.statusMessage = "Calendar Event already linked to this Time Block"
+            return existingTaskID
+        }
         let calendar = Calendar.current
-        let dayStart = calendar.startOfDay(for: selectedDate)
+        let dayStart = calendar.startOfDay(for: date ?? event.start)
+        if !calendar.isDate(dayStart, inSameDayAs: selectedDate) {
+            selectDate(dayStart)
+        }
         let startMinute = calendar.dateComponents([.minute], from: dayStart, to: event.start).minute ?? MarkdownStore.dayStart
         let endMinute = calendar.dateComponents([.minute], from: dayStart, to: event.end).minute ?? (startMinute + 60)
         let start = max(MarkdownStore.dayStart, min(MarkdownStore.dayEnd - 30, startMinute))
@@ -1901,7 +1917,7 @@ final class AppState: ObservableObject {
             if !Calendar.current.isDate(selectedDate, inSameDayAs: date) {
                 selectDate(date)
             }
-            guard let taskID = convertCalendarEventToTimeBlock(event) else {
+            guard let taskID = convertCalendarEventToTimeBlock(event, date: date) else {
                 return .error("Calendar event could not be converted into a Time Block", statusCode: 400)
             }
             return .jsonObject([

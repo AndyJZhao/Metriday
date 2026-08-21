@@ -151,6 +151,32 @@ final class MarkdownStore: ObservableObject {
         planDocument(for: date).tasks.first { $0.id == id }
     }
 
+    /// Finds a task identity across daily Markdown files. This is used only
+    /// for explicit Calendar Event conversion, where a stable external event
+    /// link must remain idempotent even after the event moves to another day.
+    func locateTask(_ id: UUID) -> (date: Date, task: PlanTask)? {
+        if let task = document.tasks.first(where: { $0.id == id }) {
+            return (document.date, task)
+        }
+        let calendarDirectory = rootDirectory.appendingPathComponent("Calendar", isDirectory: true)
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: calendarDirectory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        for file in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where file.pathExtension.lowercased() == "md" {
+            guard let date = formatter.date(from: file.deletingPathExtension().lastPathComponent) else { continue }
+            if let task = planDocument(for: date).tasks.first(where: { $0.id == id }) {
+                return (Calendar.current.startOfDay(for: date), task)
+            }
+        }
+        return nil
+    }
+
     @discardableResult
     func replaceMarkdown(_ raw: String, for date: Date) -> Bool {
         let normalizedDate = Calendar.current.startOfDay(for: date)

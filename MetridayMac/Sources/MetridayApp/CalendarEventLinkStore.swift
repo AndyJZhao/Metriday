@@ -30,12 +30,20 @@ final class CalendarEventLinkStore: ObservableObject {
     }
 
     func link(taskID: UUID, eventID: String) {
+        taskToEvent = taskToEvent.filter { $0.key == taskID || $0.value != eventID }
         taskToEvent[taskID] = eventID
         persist()
     }
 
     func eventID(for taskID: UUID) -> String? {
         taskToEvent[taskID]
+    }
+
+    /// Returns the existing Markdown task for an external event, if the user
+    /// has already converted that event. Calendar conversion is intentionally
+    /// idempotent so refreshes or repeated clicks cannot create duplicates.
+    func taskID(for eventID: String) -> UUID? {
+        taskToEvent.first(where: { $0.value == eventID })?.key
     }
 
     func exportArchiveData() throws -> Data {
@@ -55,7 +63,8 @@ final class CalendarEventLinkStore: ObservableObject {
         for (rawTaskID, eventID) in archive.taskToEvent {
             guard let remoteTaskID = UUID(uuidString: rawTaskID) else { continue }
             let localTaskID = taskIDMap[remoteTaskID] ?? remoteTaskID
-            if taskToEvent[localTaskID] == nil {
+            if taskToEvent[localTaskID] == nil,
+               !taskToEvent.values.contains(eventID) {
                 taskToEvent[localTaskID] = eventID
                 imported += 1
             }

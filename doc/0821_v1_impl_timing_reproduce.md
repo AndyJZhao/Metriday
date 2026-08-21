@@ -116,7 +116,7 @@
 
 - App foreground tracking：默认本地可用。
 - Apple Screen Time `knowledgeC.db`：read-only、可选；Full Disk Access 后导入 iPhone/iPad-style App/Web usage，归档到 `ScreenTime`，权限或 schema 不可用时降级到 archive。
-- Calendar EventKit：只读显示、Event change refresh、详情、Record Time Entry、Convert to Time Block。
+- Calendar EventKit：只读显示、Event change refresh、详情、Record Time Entry、幂等的 Convert to Time Block；一个外部 event identifier 只关联一个 Markdown Time Block。
 - Reminders：权限后可提供 completed tasks 和 title suggestions。
 - Phone Calls：本地 Call History 只在授权后读取，状态含 `database_available`，可隐藏号码。
 - 未归属活动可以作为底层采样或待分类证据，但不增加第三类用户时间对象。
