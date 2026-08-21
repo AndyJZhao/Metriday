@@ -6068,10 +6068,10 @@ private struct ActivityTimelinePanel: View {
                     ForEach(timelineWindow.tickMinutes, id: \.self) { minute in
                         Rectangle()
                             .fill(MetridayTheme.line.opacity(minute % 360 == 0 ? 0.9 : 0.45))
-                            .frame(width: 1, height: 106)
+                            .frame(width: 1, height: 174)
                             .position(
                                 x: timelineWindow.x(for: minute, width: proxy.size.width),
-                                y: 53
+                                y: 87
                             )
                     }
 
@@ -6087,10 +6087,10 @@ private struct ActivityTimelinePanel: View {
                                     .frame(width: 8, height: 8)
                                 Rectangle()
                                     .fill(MetridayTheme.accentDeep)
-                                    .frame(width: 2, height: 104)
+                                    .frame(width: 2, height: 172)
                             }
-                            .frame(width: 8, height: 112, alignment: .top)
-                            .position(x: x, y: 56)
+                            .frame(width: 8, height: 180, alignment: .top)
+                            .position(x: x, y: 90)
                             .allowsHitTesting(false)
                             .accessibilityHidden(true)
                         }
@@ -6195,7 +6195,26 @@ private struct ActivityTimelinePanel: View {
                                 y: 24 + CGFloat(index % 4) * 22
                             )
                     }
+                    }
+
+                    ForEach(segments) { segment in
+                        if let range = timelineWindow.clippedRange(
+                            startSecond: segment.startSecond,
+                            endSecond: segment.endSecond
+                        ) {
+                            let left = timelineWindow.x(for: range.start, width: proxy.size.width)
+                            let width = max(2, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
+                            let projectName = project(segment.projectID)?.name ?? "None"
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(color(for: project(segment.projectID)?.color).opacity(0.62))
+                                .frame(width: width, height: 12)
+                                .position(x: left + width / 2, y: 108)
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel("Project \(projectName) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
+                                .accessibilityIdentifier("activities.timeline.project.\(segment.id.uuidString)")
+                                .help("Project: \(project(segment.projectID)?.name ?? "None")")
                         }
+                    }
 
                     ForEach(calendarEvents) { event in
                         let startSecond = TrackingDay.axisSeconds(
@@ -6237,7 +6256,7 @@ private struct ActivityTimelinePanel: View {
                         }
                             .buttonStyle(.plain)
                             .frame(width: hitWidth, height: 12)
-                            .position(x: left + width / 2, y: 96)
+                            .position(x: left + width / 2, y: 136)
                             .contentShape(Rectangle())
                             .accessibilityLabel("Calendar event · \(event.title)")
                             .accessibilityIdentifier("activities.timeline.calendar.\(event.id)")
@@ -6280,7 +6299,7 @@ private struct ActivityTimelinePanel: View {
                             }
                                 .buttonStyle(.plain)
                                 .frame(width: hitWidth, height: 12)
-                                .position(x: left + width / 2, y: 114)
+                                .position(x: left + width / 2, y: 154)
                                 .contentShape(Rectangle())
                                 .accessibilityLabel("Recorded time · \(entry.title)")
                                 .accessibilityIdentifier("activities.timeline.time-entry.\(entry.id.uuidString)")
@@ -6333,8 +6352,8 @@ private struct ActivityTimelinePanel: View {
                                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                                     .stroke(MetridayTheme.accent, lineWidth: 1)
                             )
-                            .frame(width: width, height: 100)
-                            .position(x: left + width / 2, y: 53)
+                            .frame(width: width, height: 168)
+                            .position(x: left + width / 2, y: 88)
                     }
 
                     HStack(spacing: 0) {
@@ -6345,7 +6364,7 @@ private struct ActivityTimelinePanel: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
-                    .padding(.top, 134)
+                    .padding(.top, 178)
 
                     if let detail = hoveredTimelineDetail {
                         TimelineHoverBanner(detail: detail)
@@ -6381,7 +6400,7 @@ private struct ActivityTimelinePanel: View {
                     }
                 }
             }
-            .frame(height: 156)
+            .frame(height: 204)
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
             } else {
