@@ -712,9 +712,27 @@ struct PlanCalendarPane: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .contentShape(Rectangle())
+                .accessibilityLabel("Open plan for \(fullDayLabel(date))")
+                .accessibilityIdentifier("timeline.day.\(timelineDateID(date))")
             }
         }
         .frame(height: 48)
+    }
+
+    private func fullDayLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter.string(from: date)
+    }
+
+    private func timelineDateID(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 
     private var timeline: some View {
