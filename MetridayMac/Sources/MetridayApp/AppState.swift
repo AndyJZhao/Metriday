@@ -105,6 +105,7 @@ final class AppState: ObservableObject {
             }
             .store(in: &workspaceCancellables)
         self.integrationStore = IntegrationStore()
+        blocker.setFocusTitle(timeEntryStore.runningTimer?.title)
         // A running Focus Timer is persisted by TimeEntryStore. Restore the
         // companion blocklist state so relaunching Metriday does not leave the
         // session timer and website protection out of sync.
@@ -186,6 +187,7 @@ final class AppState: ObservableObject {
     @discardableResult
     func setFocusActive(_ active: Bool) -> Bool {
         guard active || !focusSessionActive else { return false }
+        blocker.setFocusTitle(active ? currentTask?.title : nil)
         focusIsActive = active
         return true
     }
@@ -204,6 +206,7 @@ final class AppState: ObservableObject {
         }
         guard let task, task.isScheduled else { return false }
         selectedTaskID = task.id
+        blocker.setFocusTitle(task.title)
         timeEntryStore.startTimer(
             title: task.title,
             projectID: nil,
@@ -224,6 +227,7 @@ final class AppState: ObservableObject {
         if focusSessionActive {
             _ = timeEntryStore.stopTimer()
         }
+        blocker.setFocusTitle(nil)
         focusIsActive = false
         return wasActive
     }
@@ -235,7 +239,10 @@ final class AppState: ObservableObject {
     func stopTimer() -> UUID? {
         let wasFocusSession = focusSessionActive
         let id = timeEntryStore.stopTimer()
-        if wasFocusSession { focusIsActive = false }
+        if wasFocusSession {
+            blocker.setFocusTitle(nil)
+            focusIsActive = false
+        }
         return id
     }
 
@@ -347,7 +354,10 @@ final class AppState: ObservableObject {
             billingStatus: billingStatus,
             customFields: customFields
         )
-        if replacingFocusSession { focusIsActive = false }
+        if replacingFocusSession {
+            blocker.setFocusTitle(nil)
+            focusIsActive = false
+        }
     }
 
     private func handle(localAPI request: LocalAPIRequest) -> LocalAPIResponse {

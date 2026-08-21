@@ -10,6 +10,7 @@ final class WebBlockerService: ObservableObject {
     @Published private(set) var status = "Blocklist ready"
     @Published private(set) var lastBlockedDomain: String?
     @Published private(set) var rules: [WebRule]
+    private var focusTitle = "your current Focus block"
 
     private var timer: Timer?
     private let defaultsKey = "metriday.web-rules.v1"
@@ -72,6 +73,11 @@ final class WebBlockerService: ObservableObject {
         status = "Imported \(importedRules.count) focus rules"
     }
 
+    func setFocusTitle(_ title: String?) {
+        let normalized = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        focusTitle = normalized.isEmpty ? "your current Focus block" : normalized
+    }
+
     private func startMonitoring() {
         guard timer == nil else { return }
         status = "Research Focus active · Safari and Chrome monitored"
@@ -119,8 +125,10 @@ final class WebBlockerService: ObservableObject {
     }
 
     private func redirect(browser: String, blockedHost: String) {
+        let escapedHost = htmlEscaped(blockedHost)
+        let escapedTitle = htmlEscaped(focusTitle)
         let page = """
-        <html><head><meta name='viewport' content='width=device-width'><style>body{font-family:-apple-system;background:#f7f8fc;color:#20222a;display:grid;place-items:center;height:100vh;margin:0}.card{max-width:560px;padding:48px;border:1px solid #dfe2ea;border-radius:24px;background:white;text-align:center}h1{font-size:32px;margin:16px}.shield{font-size:46px;color:#4f63ef}p{color:#656b78;line-height:1.6}</style></head><body><div class='card'><div class='shield'>Focus</div><h1>Research Focus is active</h1><p>\(blockedHost) is blocked during this time block. Return to GeneZip rebuttal experiment.</p></div></body></html>
+        <html><head><meta name='viewport' content='width=device-width'><style>body{font-family:-apple-system;background:#f7f8fc;color:#20222a;display:grid;place-items:center;height:100vh;margin:0}.card{max-width:560px;padding:48px;border:1px solid #dfe2ea;border-radius:24px;background:white;text-align:center}h1{font-size:32px;margin:16px}.shield{font-size:46px;color:#4f63ef}p{color:#656b78;line-height:1.6}</style></head><body><div class='card'><div class='shield'>Focus</div><h1>Research Focus is active</h1><p>\(escapedHost) is blocked during this time block. Return to \(escapedTitle).</p></div></body></html>
         """
         guard let encoded = page.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { return }
         let blockedURL = "data:text/html;charset=utf-8,\(encoded)"
@@ -139,6 +147,15 @@ final class WebBlockerService: ObservableObject {
             lastBlockedDomain = Self.normalizedDomain(blockedHost)
             status = "Blocked \(blockedHost) · Research Focus active"
         }
+    }
+
+    private func htmlEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
     }
 
     private func persist() {
