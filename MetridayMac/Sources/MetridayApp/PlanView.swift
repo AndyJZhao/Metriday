@@ -1062,6 +1062,16 @@ struct CalendarTaskBlock: View {
         )
     }
 
+    private var isFocused: Bool {
+        guard appState.focusSessionActive else { return false }
+        return appState.timeEntryStore.runningTimer?.customFields["metriday_plan_task_id"]?.lowercased()
+            == task.id.uuidString.lowercased()
+    }
+
+    private var anotherFocusSessionIsActive: Bool {
+        appState.focusSessionActive && !isFocused
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(task.timeRange ?? "")
@@ -1089,6 +1099,31 @@ struct CalendarTaskBlock: View {
             resizeHandle(symbol: "arrow.up")
                 .padding(.horizontal, 8)
                 .padding(.top, 2)
+        }
+        .overlay(alignment: .topTrailing) {
+            if selected || isHovering || execution.isRunning {
+                Button {
+                    appState.selectedTaskID = task.id
+                    if isFocused {
+                        _ = appState.stopFocusSession()
+                    } else {
+                        _ = appState.startFocusSession(taskID: task.id, date: appState.selectedDate)
+                    }
+                } label: {
+                    Image(systemName: isFocused ? "pause.fill" : "play.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(task.tone == .accent ? MetridayTheme.accentDeep : MetridayTheme.accent)
+                        .frame(width: 22, height: 22)
+                        .background(.white.opacity(task.tone == .accent ? 0.92 : 0.82))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(anotherFocusSessionIsActive)
+                .help(isFocused ? "Pause Focus" : anotherFocusSessionIsActive ? "Another Focus Session is running" : "Start Focus")
+                .accessibilityLabel(isFocused ? "Pause Focus for \(task.title)" : "Start Focus for \(task.title)")
+                .padding(.top, 5)
+                .padding(.trailing, 6)
+            }
         }
         .overlay(alignment: .bottom) {
             resizeHandle(symbol: "arrow.down")
