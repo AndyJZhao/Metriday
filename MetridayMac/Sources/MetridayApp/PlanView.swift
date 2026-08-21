@@ -584,6 +584,16 @@ struct PlanCalendarPane: View {
         }
     }
 
+    private var pendingCalendarConflicts: [CalendarEventTimelineItem] {
+        guard let pending = appState.pendingTimelineDrop else { return [] }
+        return calendarEventTimelineItems(
+            events: appState.calendarStore.events,
+            date: appState.selectedDate
+        ).filter { event in
+            max(pending.startMinute, event.startMinute) < min(pending.endMinute, event.endMinute)
+        }
+    }
+
     private var timeBlockChoice: some View {
         VStack(spacing: 0) {
             HStack {
@@ -602,6 +612,34 @@ struct PlanCalendarPane: View {
             .frame(height: 34)
 
             Divider()
+
+            if !pendingCalendarConflicts.isEmpty {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("Overlaps Calendar Event", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(MetridayTheme.warning)
+                    ForEach(pendingCalendarConflicts.prefix(2)) { conflict in
+                        Text("\(conflict.event.title) · \(TimeFormat.range(start: conflict.startMinute, end: conflict.endMinute))")
+                            .font(.system(size: 10))
+                            .foregroundStyle(MetridayTheme.secondary)
+                            .lineLimit(2)
+                    }
+                    if pendingCalendarConflicts.count > 2 {
+                        Text("+\(pendingCalendarConflicts.count - 2) more")
+                            .font(.system(size: 10))
+                            .foregroundStyle(MetridayTheme.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(MetridayTheme.warning.opacity(0.10))
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(MetridayTheme.warning)
+                        .frame(width: 3)
+                }
+            }
 
             Button(action: appState.confirmPendingTimeBlock) {
                 HStack(spacing: 9) {
