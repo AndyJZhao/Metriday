@@ -326,6 +326,7 @@ final class AppState: ObservableObject {
 
     func startTimer(reusing entry: TimeEntry) {
         guard timeEntryStore.runningTimer == nil else { return }
+        let isFocusSession = entry.customFields[Self.focusSessionField] == "true"
         startTimer(
             title: entry.title,
             projectID: entry.projectID,
@@ -333,6 +334,13 @@ final class AppState: ObservableObject {
             billingStatus: entry.billingStatus,
             customFields: entry.customFields
         )
+        guard isFocusSession, timeEntryStore.runningTimer != nil else { return }
+        if let rawTaskID = entry.customFields["metriday_plan_task_id"],
+           let taskID = UUID(uuidString: rawTaskID) {
+            selectedTaskID = taskID
+        }
+        blocker.setFocusTitle(entry.title)
+        focusIsActive = true
     }
 
     func startTimer(
