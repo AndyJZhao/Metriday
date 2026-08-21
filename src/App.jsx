@@ -1761,9 +1761,22 @@ function PlannedTrack({ tasks, connected, onSelect, onSelectTask, calendarEvents
  );
 }
 
+function actualBlockLabel(block) {
+  if (block?.label) return block.label;
+  const labels = [...new Set((block?.rows || []).map((row) => row?.label).filter(Boolean))];
+  if (labels.length > 0) return labels.join(" · ");
+  return block?.kind === "idle" ? "Idle" : "Activity";
+}
+
+function actualBlockDetail(block) {
+  if (block?.detail) return block.detail;
+  if (Number.isFinite(block?.start) && Number.isFinite(block?.end)) return formatRange(block.start, block.end);
+  return "Activity interval";
+}
+
 function ActualRows({ block }) {
   if (block.end - block.start < 30) return <div className="actual-compact" aria-hidden="true" />;
-  if (!block.rows) return <div className="actual-simple"><strong>{Math.round(block.end - block.start)}m</strong><span><b>{block.label}</b><small>{block.detail}</small></span></div>;
+  if (!block.rows) return <div className="actual-simple"><strong>{Math.round(block.end - block.start)}m</strong><span><b>{actualBlockLabel(block)}</b><small>{actualBlockDetail(block)}</small></span></div>;
   return <div className="actual-row-list">{block.rows.map((row, index) => { const Icon = row.icon; return (
     <div key={`${block.id}-${index}`} className={`actual-row ${row.kind || block.kind}`}><strong>{row.minutes || (index === 0 ? block.minutes : "")}</strong><span className="activity-icon">{Icon ? <Icon size={20} weight="duotone" /> : null}</span><b>{row.label}</b><small>{row.time}</small></div>
   ); })}</div>;
@@ -1774,7 +1787,7 @@ function ActualHoverCard({ block, onRecord }) {
   const [message, setMessage] = useState("");
   const categoryLabel = block.categoryLabel || (block.kind === "focused" ? "Focused" : block.kind === "distracting" ? "Distracting" : block.kind === "idle" ? "Idle" : "Other");
   const categoryStyle = activityCategoryStyle({ color: block.categoryColor || categoryRoleColor(block.kind) });
-  const appLabel = block.rows?.[0]?.label || block.label;
+  const appLabel = block.rows?.[0]?.label || actualBlockLabel(block);
   const startSecond = Number.isFinite(block.startSecond) ? block.startSecond : block.start * 60;
   const endSecond = Number.isFinite(block.endSecond) ? block.endSecond : block.end * 60;
   const record = async () => {
@@ -1809,7 +1822,7 @@ function ActualTrack({ activities, connected, onRecord, onSelect, projects = [],
  return (
    <section className="today-track actual-track" aria-label="Actual activity timeline">
      <div className="track-heading"><div><strong>Actual</strong><span>{connected ? tracking ? "Live from Metriday" : "Tracking paused" : "What actually happened"}</span></div>{connected ? <div className="track-actions">{!accessibilityTrusted ? <button type="button" className="track-action" onClick={() => api?.requestSourceAccess?.("accessibility")} aria-label="Request Accessibility access" title="Allow Accessibility access to read window titles"><LockSimple size={12} /></button> : null}<button type="button" className="track-action" onClick={() => api?.toggleTracking?.().catch(() => {})} aria-label={tracking ? "Pause activity tracking" : "Resume activity tracking"}>{tracking ? <Pause size={13} weight="fill" /> : <Play size={13} weight="fill" />}{tracking ? "Pause" : "Track"}</button></div> : null}</div>
-      <div className="track-canvas"><GridLines />{blocks.map((block) => { const activity = selectActivity(block); return <div key={block.id} className={`actual-block ${block.kind} ${hoveredBlockId === block.id ? "hovered" : ""}`} style={{ ...actualBlockStyle(block), ...activityBlockStyle(block.categoryColor || categoryRoleColor(block.kind)) }} title={`${block.label} · ${block.detail}`} role={activity ? "button" : undefined} aria-label={activity ? `Open activity ${block.label} ${block.detail}` : undefined} tabIndex={activity ? 0 : undefined} onMouseEnter={() => setHoveredBlockId(block.id)} onMouseLeave={() => setHoveredBlockId(null)} onClick={(event) => { if (event.target.closest("button")) return; if (activity) onSelect?.(activity); }} onKeyDown={(event) => { if (activity && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onSelect?.(activity); } }}><ActualRows block={block} />{hoveredBlockId === block.id ? <ActualHoverCard block={block} onRecord={connected ? onRecord : null} /> : null}</div>; })}</div>
+     <div className="track-canvas"><GridLines />{blocks.map((block) => { const activity = selectActivity(block); const label = actualBlockLabel(block); const detail = actualBlockDetail(block); return <div key={block.id} className={`actual-block ${block.kind} ${hoveredBlockId === block.id ? "hovered" : ""}`} style={{ ...actualBlockStyle(block), ...activityBlockStyle(block.categoryColor || categoryRoleColor(block.kind)) }} title={`${label} · ${detail}`} role={activity ? "button" : undefined} aria-label={activity ? `Open activity ${label} ${detail}` : undefined} tabIndex={activity ? 0 : undefined} onMouseEnter={() => setHoveredBlockId(block.id)} onMouseLeave={() => setHoveredBlockId(null)} onClick={(event) => { if (event.target.closest("button")) return; if (activity) onSelect?.(activity); }} onKeyDown={(event) => { if (activity && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onSelect?.(activity); } }}><ActualRows block={block} />{hoveredBlockId === block.id ? <ActualHoverCard block={block} onRecord={connected ? onRecord : null} /> : null}</div>; })}</div>
    </section>
  );
 }
