@@ -220,6 +220,10 @@ private struct MenuBarStatusView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            Button("Ask About Recent Idle Time") {
+                _ = appState.requestIdleReview()
+            }
+            .disabled(!appState.activityMonitor.hasReviewableIdleInterval)
 
             Button("Open Metriday") {
                 NSApp.activate(ignoringOtherApps: true)

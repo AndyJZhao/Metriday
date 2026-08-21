@@ -186,6 +186,14 @@ final class AppState: ObservableObject {
         NSApp.windows.first(where: { $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
     }
 
+    @discardableResult
+    func requestIdleReview() -> Bool {
+        guard activityMonitor.requestLatestIdleInterval() else { return false }
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first(where: { $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
+        return true
+    }
+
     func currentTask(for date: Date) -> PlanTask? {
         let normalized = Calendar.current.startOfDay(for: date)
         let tasks: [PlanTask]

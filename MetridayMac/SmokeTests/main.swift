@@ -1562,6 +1562,24 @@ Task { @MainActor in
     expect(monitor.isManuallyPaused, "Indefinite tracking pause should persist manual pause state")
     monitor.resumeTracking()
     expect(!monitor.isManuallyPaused, "Manual tracking pause should be resumable")
+    let idleSegment = ActivitySegment(
+        appName: "Idle",
+        bundleIdentifier: "com.metriday.idle",
+        windowTitle: "No keyboard or pointer activity",
+        startMinute: 16 * 60,
+        endMinute: 16 * 60 + 20,
+        relevance: .idle
+    )
+    try! historicalActivityStore.save([idleSegment], date: date)
+    expect(
+        monitor.requestLatestIdleInterval(for: date),
+        "Menu-bar idle review should find the latest recorded Idle segment"
+    )
+    expect(
+        monitor.pendingIdleInterval?.durationSeconds == 20 * 60,
+        "Menu-bar idle review should preserve the recorded Idle duration"
+    )
+    monitor.dismissPendingIdleInterval()
 
     let overlapDay = Calendar.current.startOfDay(for: date)
     let overlapActivity = ActivitySegment(

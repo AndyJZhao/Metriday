@@ -451,6 +451,38 @@ final class AppActivityMonitor: ObservableObject {
         pendingIdleInterval = nil
     }
 
+    /// Presents the most recent recorded Idle interval through the same
+    /// editor used after activity resumes. This powers the menu-bar
+    /// "Ask for activity" action without creating a second time-entry flow.
+    @discardableResult
+    func requestLatestIdleInterval(for date: Date? = nil) -> Bool {
+        if pendingIdleInterval != nil { return true }
+        let targetDate = calendar.startOfDay(for: date ?? .now)
+        let idleSegments = segments(for: targetDate)
+            .filter { $0.relevance == .idle && $0.endSecond > $0.startSecond }
+        guard let latest = idleSegments.max(by: { $0.endSecond < $1.endSecond }) else {
+            return false
+        }
+        let start = TrackingDay.date(
+            forAxisSeconds: latest.startSecond,
+            logicalDayLabel: targetDate,
+            wrapAtMinute: activeWrapAtMinute
+        )
+        let end = TrackingDay.date(
+            forAxisSeconds: latest.endSecond,
+            logicalDayLabel: targetDate,
+            wrapAtMinute: activeWrapAtMinute
+        )
+        guard end > start else { return false }
+        pendingIdleInterval = IdleInterval(start: start, end: end)
+        return true
+    }
+
+    var hasReviewableIdleInterval: Bool {
+        pendingIdleInterval != nil
+            || segments(for: .now).contains { $0.relevance == .idle && $0.endSecond > $0.startSecond }
+    }
+
     func dismissPendingCallInterval() {
         pendingCallInterval = nil
     }
