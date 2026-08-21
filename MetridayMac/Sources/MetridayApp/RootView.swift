@@ -803,24 +803,29 @@ struct GlobalTopHeader: View {
 
                 Divider().frame(height: 50)
 
-                HStack(spacing: 10) {
-                    Image(systemName: "shield.lefthalf.filled")
-                        .font(.system(size: 30))
-                        .foregroundStyle(MetridayTheme.success)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Research Focus").font(.system(size: 13, weight: .semibold))
-                        Text(appState.focusIsActive ? "Blocklist active" : "Blocklist ready")
-                            .font(.system(size: 11))
-                            .foregroundStyle(MetridayTheme.secondary)
-                        Button("Adjust allowed sites") { appState.section = .rules }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 11))
-                            .foregroundStyle(MetridayTheme.accent)
+                Button {
+                    appState.section = .rules
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "shield.lefthalf.filled")
+                            .font(.system(size: 30))
+                            .foregroundStyle(MetridayTheme.success)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Research Focus").font(.system(size: 13, weight: .semibold))
+                            Text(appState.focusIsActive ? "Blocklist active" : "Blocklist ready")
+                                .font(.system(size: 11))
+                                .foregroundStyle(MetridayTheme.secondary)
+                            Text("Adjust allowed sites")
+                                .font(.system(size: 11))
+                                .foregroundStyle(MetridayTheme.accent)
+                        }
+                        Spacer(minLength: 0)
                     }
                 }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
-                .onTapGesture { appState.section = .rules }
-                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("header.research-focus")
                 .accessibilityLabel("Research Focus; open Rules")
             }
             .padding(.horizontal, 12)

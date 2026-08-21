@@ -1515,12 +1515,7 @@ function WebGlobalHeader({ api, setPage, dateKey, setDateKey }) {
     }
   };
   const openRules = () => setPage("rules");
-  const handleRulesKeyDown = (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    openRules();
-  };
-  return <header className="web-global-header"><div className="web-global-date"><strong>{planDateLabel(dateKey)}</strong><DateControls dateKey={dateKey} onChange={setDateKey} label="Choose selected date" /></div><div className="web-global-context"><div className="web-global-current"><span>Current block</span><strong>{currentTitle}</strong><small>{currentRange} · {focusActive ? "In progress" : currentTask ? "Ready" : "Waiting"}</small></div><button type="button" className={`primary-button web-global-focus ${focusActive ? "active" : ""}`} onClick={toggleFocus} disabled={!api.connected || !currentTask} title={api.connected && !currentTask ? "Schedule a current block to start Focus" : undefined}>{focusActive ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}{focusActive ? "Pause focus" : "Resume focus"}</button><TimerControls api={api} /><div className="web-global-rule" role="button" tabIndex={0} aria-label="Open Research Focus rules" onClick={openRules} onKeyDown={handleRulesKeyDown}><ShieldCheck size={30} color="#399a55" weight="duotone" /><div><strong>Research Focus</strong><span>{focusActive ? "Blocklist active" : "Blocklist ready"}</span><button type="button" onClick={(event) => { event.stopPropagation(); openRules(); }}>Adjust allowed sites</button></div></div></div></header>;
+  return <header className="web-global-header"><div className="web-global-date"><strong>{planDateLabel(dateKey)}</strong><DateControls dateKey={dateKey} onChange={setDateKey} label="Choose selected date" /></div><div className="web-global-context"><div className="web-global-current"><span>Current block</span><strong>{currentTitle}</strong><small>{currentRange} · {focusActive ? "In progress" : currentTask ? "Ready" : "Waiting"}</small></div><button type="button" className={`primary-button web-global-focus ${focusActive ? "active" : ""}`} onClick={toggleFocus} disabled={!api.connected || !currentTask} title={api.connected && !currentTask ? "Schedule a current block to start Focus" : undefined}>{focusActive ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}{focusActive ? "Pause focus" : "Resume focus"}</button><TimerControls api={api} /><button type="button" className="web-global-rule" aria-label="Open Research Focus rules" onClick={openRules}><ShieldCheck size={30} color="#399a55" weight="duotone" /><div><strong>Research Focus</strong><span className="web-global-rule-status">{focusActive ? "Blocklist active" : "Blocklist ready"}</span><span className="web-global-rule-link">Adjust allowed sites</span></div></button></div></header>;
 }
 
 function IconButton({ label, children, onClick, className = "", disabled = false }) {
@@ -1644,7 +1639,7 @@ function TodayHeader({ focusRunning, setFocusRunning, setPage, api, dateKey, set
       <div className="current-session">
         <div className="session-copy"><span>Current block</span><strong>{currentTitle}</strong><p>{currentRange} <b>·</b> <em>{focusRunning ? "In progress" : currentTask || !api.connected ? "Paused" : "Waiting"}</em></p></div>
         <div className="session-actions"><button type="button" className="primary-button" onClick={async () => { if (api.connected) { if (focusRunning) await api.stopTimer(); else await api.startTimer(currentTask?.title || "Focused work"); } else setFocusRunning((value) => !value); }}>{focusRunning ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}{focusActionLabel}</button><TimerControls api={api} /></div>
-        <div className="focus-rule"><ShieldCheck size={38} color="#39a65a" weight="duotone" /><div><strong>Research Focus</strong><span>{api.connected ? currentApplication : "Blocklist active"}</span><button type="button" onClick={() => setPage("rules")}>Adjust allowed sites</button></div></div>
+        <button type="button" className="focus-rule" aria-label="Open Research Focus rules" onClick={() => setPage("rules")}><ShieldCheck size={38} color="#39a65a" weight="duotone" /><span><strong>Research Focus</strong><span>{api.connected ? currentApplication : "Blocklist active"}</span><em>Adjust allowed sites</em></span></button>
       </div>
     </header>
   );

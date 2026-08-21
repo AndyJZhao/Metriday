@@ -97,6 +97,8 @@ Completed Reminders are an optional read-only EventKit integration. After Remind
 
 Calendar event, completed reminder, and phone-call rows expose their full primary content area as the Record action; compact trailing edit, delete, and hide controls retain their own independent hit targets.
 
+Research Focus status panels use one full-width Rules navigation action in both Native and Web; the former nested “Adjust allowed sites” controls are presentation text inside that primary hit target, so mouse, keyboard, and accessibility activation stay consistent.
+
 When the monitor sees a supported call app (FaceTime, Zoom, Teams, Slack, or WhatsApp) or a clearly labeled browser meeting window (Google Meet, Zoom Meeting, Teams, or Slack Huddle), it offers a local “Record call time?” prompt after a call lasting at least one minute. The prompt is editable and can be saved or skipped; no entry is created automatically.
 
 Phone Calls is a separate read-only integration for the macOS CallHistory database used by iPhone/FaceTime continuity. After Full Disk Access is granted, calls appear as a selected-day Activities panel with a Record action; contact names are intentionally not read, and point-in-time calls use a one-minute editable range when recorded. The row context menu can hide calls from a specific number; this preference is local, excludes the number from the timeline and local API, and never changes Apple's source database.

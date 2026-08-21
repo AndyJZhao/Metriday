@@ -55,12 +55,12 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .web-global-focus { min-height: 38px; padding: 0 12px; font-size: 12px; }
 .web-global-focus:disabled { cursor: not-allowed; opacity: 0.5; }
 .web-global-focus.active { border: 1px solid #cbd1ff; background: #fff; color: var(--accent); }
-.web-global-rule { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 10px 8px 16px; border-left: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.web-global-rule { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 8px 10px 8px 16px; border: 0; border-left: 1px solid var(--border); border-radius: 8px; background: transparent; cursor: pointer; font: inherit; text-align: left; }
 .web-global-rule:hover, .web-global-rule:focus-visible { background: var(--accent-soft); outline: none; }
 .web-global-rule > div { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
 .web-global-rule strong { color: #343943; font-size: 12px; }
-.web-global-rule span { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.web-global-rule button { align-self: flex-start; margin-top: 2px; padding: 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 10px; }
+.web-global-rule-status { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.web-global-rule-link { align-self: flex-start; margin-top: 2px; color: var(--accent); font-size: 10px; }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #666b77; cursor: pointer; }
 .icon-button:hover { background: #f0f1f4; color: #282a30; }
 .action-menu { position: relative; display: inline-flex; }
@@ -111,11 +111,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .timer-check-in button:hover { border-color: #c99840; background: #fff4d9; }
 .timer-check-in button.danger { color: var(--danger); }
 .timer-check-in button.quiet { border-color: transparent; background: transparent; color: var(--muted); }
-.focus-rule { display: flex; align-items: center; gap: 10px; min-width: 0; padding-left: 18px; border-left: 1px solid var(--border); }
+.focus-rule { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 0 0 0 18px; border: 0; border-left: 1px solid var(--border); background: transparent; color: inherit; cursor: pointer; font: inherit; text-align: left; }
 .focus-rule > div { display: flex; flex-direction: column; min-width: 0; }
 .focus-rule strong { font-size: 14px; }
 .focus-rule span { color: var(--muted); font-size: 13px; }
-.focus-rule button { align-self: flex-start; margin-top: 4px; padding: 0; border: 0; background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; }
+.focus-rule > span { display: flex; flex-direction: column; min-width: 0; }
+.focus-rule em { margin-top: 4px; color: var(--accent); font-size: 12px; font-style: normal; }
+.focus-rule:hover, .focus-rule:focus-visible { outline: none; }
 .today-comparison { position: relative; display: grid; grid-template-columns: 76px minmax(350px, 0.92fr) minmax(440px, 1.2fr); min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .timeline-label-column { position: relative; border-right: 1px solid #eef0f3; }
 .timeline-label-column .hour-labels { top: 56px; }
