@@ -179,8 +179,7 @@ final class AppState: ObservableObject {
     /// companion surface is intentionally separate; this is the core session
     /// lifecycle shared by Native and Web.
     var focusSessionActive: Bool {
-        guard focusIsActive,
-              let timer = timeEntryStore.runningTimer else { return false }
+        guard let timer = timeEntryStore.runningTimer else { return false }
         return timer.customFields[Self.focusSessionField] == "true"
     }
 
@@ -664,6 +663,9 @@ final class AppState: ObservableObject {
         if request.method == "POST", path == "/v1/focus" {
             guard let active = apiBody(request)?["active"] as? Bool else {
                 return .error("Focus body needs an active boolean", statusCode: 400)
+            }
+            if !active, focusSessionActive {
+                return .error("Stop the Focus Session before disabling Focus protection", statusCode: 409)
             }
             focusIsActive = active
             return .jsonObject(["active": focusIsActive, "status": blocker.status])
