@@ -871,17 +871,10 @@ struct PageDateHeader: View {
             Spacer()
             if showsDateControls {
                 ZStack(alignment: .leading) {
-                    Button {
-                        appState.goToToday()
-                    } label: {
-                        Rectangle()
-                            .fill(.clear)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .accessibilityLabel("Today")
-                    .accessibilityIdentifier("\(title.lowercased()).date-today-banner")
+                    Color.clear
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .onTapGesture { appState.goToToday() }
+                        .accessibilityHidden(true)
 
                     HStack(spacing: 7) {
                         Button {
@@ -957,6 +950,7 @@ struct PageDateHeader: View {
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Date range")
+                .accessibilityAction(named: "Go to Today") { appState.goToToday() }
                 .accessibilityIdentifier("\(title.lowercased()).date-range")
             }
         }
