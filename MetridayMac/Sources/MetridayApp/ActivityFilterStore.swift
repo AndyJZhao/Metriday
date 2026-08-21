@@ -5,6 +5,7 @@ enum ActivityFilterField: String, CaseIterable, Codable, Identifiable {
     case application
     case bundleIdentifier
     case windowTitle
+    case item
     case resource
     case domain
     case fullURL
@@ -20,6 +21,7 @@ enum ActivityFilterField: String, CaseIterable, Codable, Identifiable {
         case .application: return "Application"
         case .bundleIdentifier: return "Bundle identifier"
         case .windowTitle: return "Window title"
+        case .item: return "Item (document/window)"
         case .resource: return "URL or path"
         case .domain: return "Domain"
         case .fullURL: return "Full website URL"
@@ -252,6 +254,8 @@ final class ActivityFilterStore: ObservableObject {
             candidate = activity.bundleIdentifier
         case .windowTitle:
             candidate = activity.windowTitle
+        case .item:
+            candidate = itemValue(for: activity)
         case .resource:
             candidate = activity.resource
         case .domain:
@@ -314,6 +318,24 @@ final class ActivityFilterStore: ObservableObject {
             supportsDayGroups: rule.field == .dayOfWeek,
             supportsKeywordTokens: rule.field == .keyword
         )
+    }
+
+    /// Item is the user-facing document/page identity. Prefer a local path
+    /// when one is available; for web activity, prefer the page/window title
+    /// so Item rules remain distinct from Domain and Full URL rules.
+    private func itemValue(for activity: ActivitySegment) -> String {
+        let resource = activity.resource.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isWebsite = URL(string: resource)?.host != nil
+        if !resource.isEmpty, !isWebsite {
+            return resource
+        }
+
+        let title = activity.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.isEmpty,
+           title.caseInsensitiveCompare(activity.appName.trimmingCharacters(in: .whitespacesAndNewlines)) != .orderedSame {
+            return title
+        }
+        return resource
     }
 
     private func matchesAtom(

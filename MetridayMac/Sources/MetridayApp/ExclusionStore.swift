@@ -5,6 +5,7 @@ enum ActivityExclusionField: String, CaseIterable, Codable, Identifiable {
     case application
     case bundleIdentifier
     case windowTitle
+    case item
     case resource
     case domain
     case fullURL
@@ -17,6 +18,7 @@ enum ActivityExclusionField: String, CaseIterable, Codable, Identifiable {
         case .application: return "Application"
         case .bundleIdentifier: return "Bundle identifier"
         case .windowTitle: return "Window title"
+        case .item: return "Item (document/window)"
         case .resource: return "URL or path"
         case .domain: return "Domain"
         case .fullURL: return "Full website URL"
@@ -213,11 +215,27 @@ final class ExclusionStore: ObservableObject {
         case .application: value = appName
         case .bundleIdentifier: value = bundleIdentifier
         case .windowTitle: value = windowTitle
+        case .item: value = itemValue(windowTitle: windowTitle, resource: resource, appName: appName)
         case .resource, .fullURL: value = resource
         case .domain: value = URL(string: resource)?.host ?? resource
         case .device: value = deviceName
         }
         return compare(value: value, rule: rule)
+    }
+
+    private func itemValue(windowTitle: String, resource: String, appName: String) -> String {
+        let trimmedResource = resource.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isWebsite = URL(string: trimmedResource)?.host != nil
+        if !trimmedResource.isEmpty, !isWebsite {
+            return trimmedResource
+        }
+
+        let trimmedTitle = windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedTitle.isEmpty,
+           trimmedTitle.caseInsensitiveCompare(appName.trimmingCharacters(in: .whitespacesAndNewlines)) != .orderedSame {
+            return trimmedTitle
+        }
+        return trimmedResource
     }
 
     private func compare(value: String, rule: ActivityExclusionRule) -> Bool {

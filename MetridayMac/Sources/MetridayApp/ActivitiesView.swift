@@ -4552,7 +4552,7 @@ private struct ActivityCategoryEditorSheet: View {
                 }
             }
 
-            Text("Rules are evaluated before the built-in Focused, Distracting, Other, and Idle fallbacks. Use Application, Domain, URL, Window title, or Keyword to classify a source.")
+            Text("Rules are evaluated before the built-in Focused, Distracting, Other, and Idle fallbacks. Use Application, Website, Item, Window title, or Keyword to classify a source.")
                 .font(.system(size: 10))
                 .foregroundStyle(MetridayTheme.secondary)
                 .fixedSize(horizontal: false, vertical: true)
