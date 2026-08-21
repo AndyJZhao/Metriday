@@ -4307,6 +4307,10 @@ function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onS
     { key: "keywords", title: "Keywords", Icon: FileText, segments: activities.filter((activity) => keywordNames(activity).length > 0), rows: groupedRows(activities, keywordNames) },
   ];
   const openDetails = (event, activity) => {
+    if (event.target.closest(".activity-row-action")) return;
+    onSelect?.(activity);
+  };
+  const openRowDetails = (event, activity) => {
     if (event.target.closest("button")) return;
     onSelect?.(activity);
   };
@@ -4315,6 +4319,10 @@ function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onS
     event.preventDefault();
     event.stopPropagation();
     onCreateTimeEntry?.(activity);
+  };
+  const createRowTimeEntry = (event, activity) => {
+    if (event.target.closest("button")) return;
+    createTimeEntry(event, activity);
   };
   const handleKeyDown = (event, activity) => {
     if (event.target.closest(".activity-row-action")) return;
@@ -4336,7 +4344,7 @@ function WebActivityCategoryCards({ activities, dateKey, displayPreferences, onS
   return <div className="activity-category-card-grid">
     {cards.map(({ key, title, Icon, segments, rows }) => <section className="activity-category-card" key={key} aria-label={title}>
       <header className="activity-category-card-heading"><span><Icon size={17} /><strong>{title}</strong></span><small>{formatDurationSeconds(segments.reduce((total, activity) => total + durationFor(activity), 0))}</small></header>
-      {rows.length ? <div className="activity-category-card-rows" aria-label={`${title} activity items`}>{rows.map((row) => { const rowIDs = row.activities.map((activity) => resourceID(activity.id)).filter(Boolean); const selectedCount = rowIDs.filter((id) => selectedActivityIDs.has(id)).length; const selected = rowIDs.length > 0 && selectedCount === rowIDs.length; const AppIcon = activityIcon(row.activities[0] || {}); return <div className={`activity-category-card-row ${selected ? "selected" : ""}`} key={row.name} draggable onDragStart={(event) => dragStart(event, row)} title="Drag to a project to assign this activity">
+      {rows.length ? <div className="activity-category-card-rows" aria-label={`${title} activity items`}>{rows.map((row) => { const rowIDs = row.activities.map((activity) => resourceID(activity.id)).filter(Boolean); const selectedCount = rowIDs.filter((id) => selectedActivityIDs.has(id)).length; const selected = rowIDs.length > 0 && selectedCount === rowIDs.length; const AppIcon = activityIcon(row.activities[0] || {}); return <div className={`activity-category-card-row ${selected ? "selected" : ""}`} key={row.name} draggable onDragStart={(event) => dragStart(event, row)} onClick={(event) => openRowDetails(event, row.activities[0])} onDoubleClick={(event) => createRowTimeEntry(event, row.activities[0])} onContextMenu={(event) => { if (event.target.closest("button")) return; onContextMenu?.(event, row.activities[0]); }} title="Drag to a project to assign this activity">
         {onToggleActivitySelection ? <button type="button" className={`activity-category-card-select activity-row-action ${selected ? "selected" : ""}`} aria-label={selected ? `Deselect ${row.name}` : `Select ${row.name}`} aria-pressed={selected} onClick={(event) => toggleRowSelection(event, row)}><CheckCircle size={15} weight={selected ? "fill" : "regular"} /></button> : <span className="activity-category-card-select-placeholder" aria-hidden="true" />}
         <button type="button" className="activity-category-card-row-main" onClick={(event) => openDetails(event, row.activities[0])} onDoubleClick={(event) => createTimeEntry(event, row.activities[0])} onContextMenu={(event) => onContextMenu?.(event, row.activities[0])} onKeyDown={(event) => handleKeyDown(event, row.activities[0])} aria-label={`Open ${row.name} in ${title}`}><span className="activity-category-card-icon"><AppIcon size={15} weight="duotone" /></span><span className={`activity-category-card-dot ${row.category.key}`} style={{ background: activityCategoryStyle(row.category).color }} title={row.category.label} aria-label={row.category.label} /><strong>{row.name}</strong><span>{formatDurationSeconds(row.seconds)}</span>
         </button>
