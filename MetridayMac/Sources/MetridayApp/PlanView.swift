@@ -1043,6 +1043,11 @@ struct CalendarTaskBlock: View {
         }
         .offset(y: TimelineMetrics.y(for: task.startMinute ?? TimelineMetrics.startMinute))
         .onHover { isHovering = $0 }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("Time Block \(task.title), \(task.timeRange ?? "unscheduled")")
+        .accessibilityHint("Select the block; drag the body to move it or its edges to resize it")
+        .accessibilityAction { appState.selectedTaskID = task.id }
         .accessibilityIdentifier("calendar.task.\(task.id.uuidString)")
     }
 
