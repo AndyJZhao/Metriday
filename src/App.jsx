@@ -2569,6 +2569,11 @@ function descendantProjectIDs(projects, projectID) {
   return ids;
 }
 
+function projectIDsFromScope(scopeID) {
+  if (scopeID === "all" || scopeID === "unassigned" || !scopeID) return [];
+  return [...new Set(String(scopeID).split(",").map(resourceID).filter(Boolean))];
+}
+
 const projectDragType = "application/x-metriday-project";
 
 function draggedProjectID(event) {
@@ -4756,7 +4761,8 @@ function WebActivityFiltersMenu({ open, filters, categories = [], projectFilterI
     : null;
   const customCategories = categories.filter((category) => !category.is_system && !category.is_archived);
   const categoryLabel = selectedCustomCategory?.name || (categoryFilter === "all" ? "Filters" : categoryFilter[0].toUpperCase() + categoryFilter.slice(1));
-  const title = savedFilter?.name || (projectFilterID === "unassigned" ? "Unassigned" : builtin?.label || categoryLabel);
+  const selectedProjectIDs = projectIDsFromScope(projectFilterID);
+  const title = savedFilter?.name || (projectFilterID === "unassigned" ? "Unassigned" : selectedProjectIDs.length > 0 ? `${selectedProjectIDs.length} Projects` : builtin?.label || categoryLabel);
   const selectAll = () => { onProjectFilter("all"); onSavedFilter("all"); onCategoryFilter("all"); };
   const selectProject = () => { onProjectFilter("unassigned"); onSavedFilter("all"); onCategoryFilter("all"); };
   const selectBuiltin = (value) => { onProjectFilter("all"); onSavedFilter("all"); onCategoryFilter("builtin:" + value); };
@@ -4771,6 +4777,7 @@ function WebActivityProjectSidebar({ projects, filters, activities, projectFilte
   const [dropProjectID, setDropProjectID] = useState(null);
   const [dropMessage, setDropMessage] = useState("");
   const projectClickTimer = useRef(null);
+  const projectSelectionAnchor = useRef(null);
   useEffect(() => () => { if (projectClickTimer.current) window.clearTimeout(projectClickTimer.current); }, []);
   const activeActivities = activities.filter((activity) => activityCategory(activity).key !== "idle");
   const secondsFor = (items) => items.reduce((total, activity) => total + Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0)), 0);
@@ -4779,10 +4786,43 @@ function WebActivityProjectSidebar({ projects, filters, activities, projectFilte
     return activeActivities.filter((activity) => projectIDs.has(resourceID(activity.projectID)));
   };
   const sidebarButton = (active, onClick, icon, title, detail, style = {}, onDoubleClick, dragProject, onDragStart) => <button type="button" className={`activity-project-filter ${active ? "active" : ""}`} style={style} onClick={onClick} onDoubleClick={onDoubleClick} draggable={Boolean(dragProject)} onDragStart={dragProject ? (event) => onDragStart?.(event, dragProject) : undefined} title={dragProject ? "Drag this project onto another project to make it a subproject" : undefined}><span className="activity-project-filter-icon">{icon}</span><span><strong>{title}</strong><small>{detail}</small></span></button>;
-  const selectProject = (project) => {
+  const selectedProjectIDs = projectIDsFromScope(projectFilterID);
+  const orderedProjectIDs = [];
+  const appendProjectIDs = (parentID = "") => {
+    projects
+      .filter((project) => projectParentID(project) === parentID)
+      .sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")))
+      .forEach((project) => {
+        const id = resourceID(project.id);
+        orderedProjectIDs.push(id);
+        appendProjectIDs(id);
+      });
+  };
+  appendProjectIDs();
+  const selectProject = (project, event) => {
     if (projectClickTimer.current) window.clearTimeout(projectClickTimer.current);
+    const projectID = resourceID(project.id);
+    const useCommand = Boolean(event?.metaKey);
+    const useShift = Boolean(event?.shiftKey);
     projectClickTimer.current = window.setTimeout(() => {
-      onProjectFilter(resourceID(project.id));
+      let nextSelection = new Set(selectedProjectIDs);
+      if (useShift && projectSelectionAnchor.current) {
+        const anchorIndex = orderedProjectIDs.indexOf(projectSelectionAnchor.current);
+        const projectIndex = orderedProjectIDs.indexOf(projectID);
+        if (anchorIndex >= 0 && projectIndex >= 0) {
+          const start = Math.min(anchorIndex, projectIndex);
+          const end = Math.max(anchorIndex, projectIndex);
+          const range = orderedProjectIDs.slice(start, end + 1);
+          nextSelection = useCommand ? new Set([...nextSelection, ...range]) : new Set(range);
+        }
+      } else if (useCommand) {
+        if (nextSelection.has(projectID)) nextSelection.delete(projectID);
+        else nextSelection.add(projectID);
+      } else {
+        nextSelection = new Set([projectID]);
+      }
+      projectSelectionAnchor.current = projectID;
+      onProjectFilter(nextSelection.size ? [...nextSelection].join(",") : "all");
       projectClickTimer.current = null;
     }, 220);
   };
@@ -4819,7 +4859,8 @@ function WebActivityProjectSidebar({ projects, filters, activities, projectFilte
       setDropMessage("Drop an App / Category activity row here.");
       return;
     }
-    const parentProjectID = projects.some((project) => resourceID(project.id) === projectFilterID) ? projectFilterID : null;
+    const parentProjectIDs = projectIDsFromScope(projectFilterID);
+    const parentProjectID = parentProjectIDs.length === 1 && projects.some((project) => resourceID(project.id) === parentProjectIDs[0]) ? parentProjectIDs[0] : null;
     try {
       await createProject(activityIDs, { parentProjectID, separateItems: event.metaKey, createActivityRules: event.altKey });
       setDropMessage(`${event.metaKey ? activityIDs.length : 1} project${event.metaKey && activityIDs.length !== 1 ? "s" : ""} created.`);
@@ -4862,9 +4903,9 @@ function WebActivityProjectSidebar({ projects, filters, activities, projectFilte
     const children = projects.some((candidate) => projectParentID(candidate) === id);
     const collapsed = collapsedProjectIDs.has(id);
     const projectActivities = projectActivitiesFor(project);
-    return <div className="activity-project-tree-node" key={id}><div className={`activity-project-tree-row ${dropProjectID === id ? "drop-target" : ""}`} onDragOver={(event) => { event.preventDefault(); setDropProjectID(id); }} onDragLeave={() => setDropProjectID(null)} onDrop={(event) => handleProjectDrop(event, project)}>{children ? <button type="button" className="activity-project-disclosure" aria-label={`${collapsed ? "Expand" : "Collapse"} ${project.title}`} onClick={() => setCollapsedProjectIDs((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })}><CaretDown size={13} className={collapsed ? "collapsed" : ""} /></button> : <span className="activity-project-disclosure-placeholder" />}{sidebarButton(projectFilterID === id, () => selectProject(project), <FolderSimple size={16} />, project.title, `${projectActivities.length} · ${formatDurationSeconds(secondsFor(projectActivities))}`, { paddingLeft: `${7 + depth * 12}px` }, () => editProject(project), project, handleProjectDragStart)}{onStartTimer ? <span className="activity-project-tree-actions"><IconButton label={`Start timer for ${project.title}`} onClick={(event) => { event.stopPropagation(); onStartTimer(project); }} disabled={timerRunning}><Play size={14} weight="fill" /></IconButton></span> : null}</div>{children && !collapsed ? projectTree(id, depth + 1) : null}</div>;
+    return <div className="activity-project-tree-node" key={id}><div className={`activity-project-tree-row ${dropProjectID === id ? "drop-target" : ""}`} onDragOver={(event) => { event.preventDefault(); setDropProjectID(id); }} onDragLeave={() => setDropProjectID(null)} onDrop={(event) => handleProjectDrop(event, project)}>{children ? <button type="button" className="activity-project-disclosure" aria-label={`${collapsed ? "Expand" : "Collapse"} ${project.title}`} onClick={() => setCollapsedProjectIDs((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })}><CaretDown size={13} className={collapsed ? "collapsed" : ""} /></button> : <span className="activity-project-disclosure-placeholder" />}{sidebarButton(selectedProjectIDs.includes(id), (event) => selectProject(project, event), <FolderSimple size={16} />, project.title, `${projectActivities.length} · ${formatDurationSeconds(secondsFor(projectActivities))}`, { paddingLeft: `${7 + depth * 12}px` }, () => editProject(project), project, handleProjectDragStart)}{onStartTimer ? <span className="activity-project-tree-actions"><IconButton label={`Start timer for ${project.title}`} onClick={(event) => { event.stopPropagation(); onStartTimer(project); }} disabled={timerRunning}><Play size={14} weight="fill" /></IconButton></span> : null}</div>{children && !collapsed ? projectTree(id, depth + 1) : null}</div>;
   });
-  return <aside className="activity-project-sidebar" aria-label="Activity projects and filters"><div className="activity-project-sidebar-heading"><h2>Projects</h2><span>{formatDurationSeconds(secondsFor(activeActivities))}</span><button type="button" className="activity-project-new" aria-label="New project" title="New project" onClick={openProjectComposer}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(projectFilterID === "all" && savedFilterID === "all", () => onProjectFilter("all"), <Waveform size={16} />, "All Activities", `${activeActivities.length} segments`)}{sidebarButton(projectFilterID === "unassigned", () => onProjectFilter("unassigned"), <TrayIcon />, "Unassigned", `${activeActivities.filter((activity) => !activity.projectID).length} segments`)}{projects.length > 0 ? <div className="activity-project-sidebar-label">My Projects</div> : null}{projectTree()}<div className={`activity-project-drop-zone ${dropTarget ? "active" : ""}`} onClick={openProjectComposer} onKeyDown={handleProjectDropZoneKeyDown} onDragOver={(event) => { event.preventDefault(); setDropTarget(true); }} onDragLeave={() => setDropTarget(false)} onDrop={handleCreateProjectDrop} role="button" tabIndex={0} aria-label="Create project from activity"><FolderSimple size={17} /><span><strong>{dropTarget ? "Release to create project" : "Create from activity"}</strong><small>{dropMessage || "Click to create a project · drop an App / Category row · ⌘ splits · ⌥ adds rules"}</small></span></div></div><div className="activity-project-sidebar-divider" /><div className="activity-project-sidebar-heading"><h2>Filters</h2><span>{filters.length}</span><button type="button" className="activity-project-new" aria-label="New filter" title="New filter" onClick={() => { const panel = document.getElementById("web-activity-filters-panel"); panel?.scrollIntoView({ behavior: "smooth", block: "center" }); window.setTimeout(() => panel?.querySelector('input[aria-label="Activity filter name"]')?.focus(), 250); }}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(savedFilterID === "all" && projectFilterID === "all", () => onSavedFilter("all"), <SlidersHorizontal size={16} />, "All activity", "No saved filter")}{filters.map((filter) => sidebarButton(savedFilterID === resourceID(filter.id), () => onSavedFilter(resourceID(filter.id)), <Waveform size={16} />, filter.name, `${(filter.rules || []).length} rule${(filter.rules || []).length === 1 ? "" : "s"}`, {}, () => editSavedFilter(filter)))}</div><p className="activity-project-sidebar-hint">Drag an App / Category row onto a project; hold ⌥ to create a future rule.</p></aside>;
+  return <aside className="activity-project-sidebar" aria-label="Activity projects and filters"><div className="activity-project-sidebar-heading"><h2>Projects</h2><span>{formatDurationSeconds(secondsFor(activeActivities))}</span><button type="button" className="activity-project-new" aria-label="New project" title="New project" onClick={openProjectComposer}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(projectFilterID === "all" && savedFilterID === "all", () => onProjectFilter("all"), <Waveform size={16} />, "All Activities", `${activeActivities.length} segments`)}{sidebarButton(projectFilterID === "unassigned", () => onProjectFilter("unassigned"), <TrayIcon />, "Unassigned", `${activeActivities.filter((activity) => !activity.projectID).length} segments`)}{projects.length > 0 ? <div className="activity-project-sidebar-label">My Projects</div> : null}{projectTree()}<div className={`activity-project-drop-zone ${dropTarget ? "active" : ""}`} onClick={openProjectComposer} onKeyDown={handleProjectDropZoneKeyDown} onDragOver={(event) => { event.preventDefault(); setDropTarget(true); }} onDragLeave={() => setDropTarget(false)} onDrop={handleCreateProjectDrop} role="button" tabIndex={0} aria-label="Create project from activity"><FolderSimple size={17} /><span><strong>{dropTarget ? "Release to create project" : "Create from activity"}</strong><small>{dropMessage || "Click to create a project · drop an App / Category row · ⌘ splits · ⌥ adds rules"}</small></span></div></div><div className="activity-project-sidebar-divider" /><div className="activity-project-sidebar-heading"><h2>Filters</h2><span>{filters.length}</span><button type="button" className="activity-project-new" aria-label="New filter" title="New filter" onClick={() => { const panel = document.getElementById("web-activity-filters-panel"); panel?.scrollIntoView({ behavior: "smooth", block: "center" }); window.setTimeout(() => panel?.querySelector('input[aria-label="Activity filter name"]')?.focus(), 250); }}><Plus size={15} /></button></div><div className="activity-project-filter-list">{sidebarButton(savedFilterID === "all" && projectFilterID === "all", () => onSavedFilter("all"), <SlidersHorizontal size={16} />, "All activity", "No saved filter")}{filters.map((filter) => sidebarButton(savedFilterID === resourceID(filter.id), () => onSavedFilter(resourceID(filter.id)), <Waveform size={16} />, filter.name, `${(filter.rules || []).length} rule${(filter.rules || []).length === 1 ? "" : "s"}`, {}, () => editSavedFilter(filter)))}</div><p className="activity-project-sidebar-hint">⌘ click to add projects · ⇧ click to select a range.</p></aside>;
 }
 
 function TrayIcon() {
@@ -5112,8 +5153,11 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
   const customCategoryID = categoryFilter.startsWith("category:") ? categoryFilter.slice("category:".length) : "";
   const savedFilter = api.filters.find((filter) => resourceID(filter.id) === savedFilterID);
   const includeSubprojects = api.preferences?.include_subprojects_when_selecting_project !== false;
-  const scopedProjectIDs = projectFilterID !== "all" && projectFilterID !== "unassigned"
-    ? includeSubprojects ? descendantProjectIDs(api.projects, projectFilterID) : new Set([resourceID(projectFilterID)])
+  const selectedProjectIDs = projectIDsFromScope(projectFilterID);
+  const scopedProjectIDs = selectedProjectIDs.length > 0
+    ? includeSubprojects
+      ? new Set(selectedProjectIDs.flatMap((projectID) => [...descendantProjectIDs(api.projects, projectID)]))
+      : new Set(selectedProjectIDs)
     : null;
   const filterActivity = (activity) => {
     const category = activityCategory(activity);
@@ -5437,9 +5481,9 @@ function ActivitiesPage({ api, dateKey, setDateKey, projectScopeID, setProjectSc
     const start = localEntryDateSeconds(dateKey, selection.start * 60, wrapAtMinute);
     const end = localEntryDateSeconds(dateKey, selection.end * 60, wrapAtMinute);
     if (!start || !end || new Date(end) <= new Date(start)) return;
-    const selectedProject = projectFilterID !== "all" && projectFilterID !== "unassigned"
-      && api.projects.some((project) => resourceID(project.id) === resourceID(projectFilterID))
-      ? resourceID(projectFilterID)
+    const selectedProject = selectedProjectIDs.length === 1
+      && api.projects.some((project) => resourceID(project.id) === selectedProjectIDs[0])
+      ? selectedProjectIDs[0]
       : "";
     openNewTimeEntry({ start, end, projectID: selectedProject, billingStatus: "billable" });
   };
@@ -5542,8 +5586,12 @@ function StatsProjectScope({ projects, segments, entries, selectedID, onChange }
       seconds: activitySeconds + entrySeconds,
     };
   }).sort((left, right) => right.seconds - left.seconds || left.name.localeCompare(right.name));
-  const scopeButton = (id, label, detail, Icon) => <button type="button" className={`stats-project-scope-option${selectedID === id ? " active" : ""}`} aria-pressed={selectedID === id} onClick={() => onChange(id)}><Icon size={16} /><span><strong>{label}</strong><small>{detail}</small></span></button>;
-  return <aside className="stats-project-scope" aria-label="Stats projects"><div className="stats-project-scope-heading"><h2>Projects</h2><span>{formatDurationSeconds(totalSeconds)}</span></div><div className="stats-project-scope-list">{scopeButton("all", "All Activities", `${activeSegments.length} segments`, Waveform)}{scopeButton("unassigned", "Unassigned", formatDurationSeconds(projectSeconds.get("unassigned") || 0), TrayIcon)}{projectRows.length ? <div className="stats-project-scope-label">My Projects</div> : null}{projectRows.map((project) => scopeButton(project.id, project.name, formatDurationSeconds(project.seconds), FolderSimple))}</div><p className="stats-project-scope-hint">Select a project to scope every chart and total to the same activity evidence.</p></aside>;
+  const selectedProjectIDs = projectIDsFromScope(selectedID);
+  const scopeButton = (id, label, detail, Icon) => {
+    const active = id === "all" ? selectedID === "all" : id === "unassigned" ? selectedID === "unassigned" : selectedProjectIDs.includes(id);
+    return <button type="button" className={`stats-project-scope-option${active ? " active" : ""}`} aria-pressed={active} onClick={() => onChange(id)}><Icon size={16} /><span><strong>{label}</strong><small>{detail}</small></span></button>;
+  };
+  return <aside className="stats-project-scope" aria-label="Stats projects"><div className="stats-project-scope-heading"><h2>Projects</h2><span>{formatDurationSeconds(totalSeconds)}</span></div><div className="stats-project-scope-list">{scopeButton("all", "All Activities", `${activeSegments.length} segments`, Waveform)}{scopeButton("unassigned", "Unassigned", formatDurationSeconds(projectSeconds.get("unassigned") || 0), TrayIcon)}{projectRows.length ? <div className="stats-project-scope-label">My Projects</div> : null}{projectRows.map((project) => scopeButton(project.id, project.name, formatDurationSeconds(project.seconds), FolderSimple))}</div><p className="stats-project-scope-hint">⌘ click projects in Activities to combine scopes.</p></aside>;
 }
 
 function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProjectScopeID }) {
@@ -5582,8 +5630,11 @@ function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProje
   const secondsForActivity = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
   const productivityValue = (activity) => activityProductivityValue(activity, api.projects);
   const includeSubprojects = api.preferences?.include_subprojects_when_selecting_project !== false;
-  const scopedProjectIDs = projectScopeID !== "all" && projectScopeID !== "unassigned"
-    ? includeSubprojects ? descendantProjectIDs(api.projects, projectScopeID) : new Set([resourceID(projectScopeID)])
+  const selectedProjectIDs = projectIDsFromScope(projectScopeID);
+  const scopedProjectIDs = selectedProjectIDs.length > 0
+    ? includeSubprojects
+      ? new Set(selectedProjectIDs.flatMap((projectID) => [...descendantProjectIDs(api.projects, projectID)]))
+      : new Set(selectedProjectIDs)
     : null;
   const inProjectScope = (activity) => projectScopeID === "all" || (projectScopeID === "unassigned" ? !activity.projectID : scopedProjectIDs.has(resourceID(activity.projectID)));
   const allSegments = days.flatMap((day) => day.activities || []);

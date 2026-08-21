@@ -206,6 +206,7 @@ struct ActivitiesView: View {
     @State private var showingFiltersPopover = false
     @State private var hideDevicesWithoutTime = false
     @State private var selectedBuiltinFilter: ActivityBuiltinFilter?
+    @State private var projectSelectionAnchor: UUID?
     @State private var timelineSelectionStart: Int?
     @State private var timelineSelectionEnd: Int?
     @State private var showingArchivedProjects = false
@@ -589,6 +590,18 @@ struct ActivitiesView: View {
             if case .all = filter, appState.activityScope != .all {
                 appState.activityScope = .all
             }
+        case .projects(let ids):
+            let validIDs = ids.filter { projectStore.project($0) != nil }
+            if validIDs.count == 1, let id = validIDs.first {
+                filter = .project(id)
+                projectSelectionAnchor = id
+            } else if validIDs.count > 1 {
+                filter = .projects(Set(validIDs))
+                projectSelectionAnchor = validIDs.sorted { $0.uuidString < $1.uuidString }.first
+            } else {
+                filter = .all
+                appState.activityScope = .all
+            }
         }
     }
 
@@ -597,15 +610,67 @@ struct ActivitiesView: View {
         selectedActivityIDs.removeAll()
         switch target {
         case .all:
+            projectSelectionAnchor = nil
             appState.activityScope = .all
         case .unassigned:
+            projectSelectionAnchor = nil
             appState.activityScope = .unassigned
         case .project(let id):
+            projectSelectionAnchor = id
             appState.activityScope = .project(id)
+        case .projects(let ids):
+            projectSelectionAnchor = ids.sorted { $0.uuidString < $1.uuidString }.first
+            appState.activityScope = .projects(ids)
         case .saved:
+            projectSelectionAnchor = nil
             appState.activityScope = .all
         case .category:
+            projectSelectionAnchor = nil
             appState.activityScope = .all
+        }
+    }
+
+    private func selectProject(_ projectID: UUID) {
+        let modifiers = NSEvent.modifierFlags
+        let projectIDs = projectStore.activeProjects.map(\.id)
+        let currentSelection = selectedProjectIDs
+        let usesCommand = modifiers.contains(.command)
+        let usesShift = modifiers.contains(.shift)
+
+        guard usesCommand || usesShift else {
+            selectActivityFilter(.project(projectID))
+            return
+        }
+
+        var nextSelection = currentSelection
+        if usesShift, let anchor = projectSelectionAnchor,
+           let anchorIndex = projectIDs.firstIndex(of: anchor),
+           let projectIndex = projectIDs.firstIndex(of: projectID) {
+            let range = anchorIndex <= projectIndex
+                ? projectIDs[anchorIndex...projectIndex]
+                : projectIDs[projectIndex...anchorIndex]
+            if usesCommand {
+                nextSelection.formUnion(range)
+            } else {
+                nextSelection = Set(range)
+            }
+        } else if usesCommand {
+            if nextSelection.contains(projectID) {
+                nextSelection.remove(projectID)
+            } else {
+                nextSelection.insert(projectID)
+            }
+        } else {
+            nextSelection = [projectID]
+        }
+
+        projectSelectionAnchor = projectID
+        if nextSelection.isEmpty {
+            selectActivityFilter(.all)
+        } else if nextSelection.count == 1, let onlyID = nextSelection.first {
+            selectActivityFilter(.project(onlyID))
+        } else {
+            selectActivityFilter(.projects(nextSelection))
         }
     }
 
@@ -982,8 +1047,29 @@ struct ActivitiesView: View {
             return filterStore.filter(id)?.name ?? "Filters"
         case .category(let id):
             return categoryStore.categories.first(where: { $0.id == id })?.name ?? "Category"
+        case .projects(let ids):
+            return ids.count == 1 ? "Project" : "\(ids.count) Projects"
         case .unassigned, .project:
             return "Filters"
+        }
+    }
+
+    private func isFilterSelected(_ target: ActivityFilter) -> Bool {
+        switch (filter, target) {
+        case (.projects(let ids), .project(let id)):
+            return ids.contains(id)
+        case (.project(let selectedID), .project(let id)):
+            return selectedID == id
+        default:
+            return filter == target
+        }
+    }
+
+    private var selectedProjectIDs: Set<UUID> {
+        switch filter {
+        case .project(let id): return [id]
+        case .projects(let ids): return ids
+        default: return []
         }
     }
 
@@ -2625,6 +2711,7 @@ struct ActivitiesView: View {
         summarySeconds: Int? = nil,
         onDoubleTap: (() -> Void)? = nil
     ) -> some View {
+        let isSelected = isFilterSelected(target)
         let button = Button {
             selectActivityFilter(target)
         } label: {
@@ -2638,17 +2725,17 @@ struct ActivitiesView: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(MetridayTheme.secondary)
                 }
-                if filter == target {
+                if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(size: 10, weight: .bold))
                 }
             }
-            .font(.system(size: 12, weight: filter == target ? .semibold : .regular))
-            .foregroundStyle(filter == target ? (tint ?? MetridayTheme.accent) : MetridayTheme.graphite)
+            .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+            .foregroundStyle(isSelected ? (tint ?? MetridayTheme.accent) : MetridayTheme.graphite)
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 38)
-            .background(filter == target ? MetridayTheme.accentSoft : .clear)
+            .background(isSelected ? MetridayTheme.accentSoft : .clear)
             .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
@@ -2772,6 +2859,7 @@ struct ActivitiesView: View {
 
     private func projectButton(_ project: TrackingProject, depth: Int = 0) -> some View {
         let target = ActivityFilter.project(project.id)
+        let isSelected = isFilterSelected(target)
         let children = projectStore.childProjects(of: project.id)
         let isCollapsed = collapsedProjectIDs.contains(project.id)
         return HStack(spacing: 0) {
@@ -2796,7 +2884,7 @@ struct ActivitiesView: View {
             }
 
             Button {
-                selectActivityFilter(target)
+                selectProject(project.id)
             } label: {
                 HStack(spacing: 10) {
                     Circle()
@@ -2808,13 +2896,13 @@ struct ActivitiesView: View {
                     Text(formatMinutes(projectDurationSeconds(for: project.id)))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(MetridayTheme.secondary)
-                    if filter == target {
+                    if isSelected {
                         Image(systemName: "checkmark")
                             .font(.system(size: 10, weight: .bold))
                     }
                 }
-                .font(.system(size: 12, weight: filter == target ? .semibold : .regular))
-                .foregroundStyle(filter == target ? MetridayTheme.accent : MetridayTheme.graphite)
+                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? MetridayTheme.accent : MetridayTheme.graphite)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
@@ -2828,7 +2916,7 @@ struct ActivitiesView: View {
             )
         }
         .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
-        .background(filter == target ? MetridayTheme.accentSoft : .clear)
+        .background(isSelected ? MetridayTheme.accentSoft : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         .onDrag {
@@ -2855,15 +2943,14 @@ struct ActivitiesView: View {
             }
             Button("Archive Project", role: .destructive) {
                 projectStore.archive(project)
-                if filter == target {
-                filter = .all
+                if isSelected {
+                    selectActivityFilter(.all)
+                }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("activities.project.\(project.id.uuidString)")
         .accessibilityLabel("Project \(project.name), \(formatMinutes(projectDurationSeconds(for: project.id)))")
-    }
-
     }
 
     private func handleProjectOrActivityDrop(
@@ -3111,6 +3198,14 @@ struct ActivitiesView: View {
                 guard let projectID = segment.projectID else { return false }
                 return projectIDs.contains(projectID)
             }
+        case .projects(let ids):
+            let projectIDs = ids.reduce(into: Set<UUID>()) { result, id in
+                result.formUnion(selectedProjectIDs(including: id))
+            }
+            return source.filter { segment in
+                guard let projectID = segment.projectID else { return false }
+                return projectIDs.contains(projectID)
+            }
         case .saved(let id):
             guard let savedFilter = filterStore.filter(id) else { return [] }
             return source.filter { filterStore.matches(savedFilter, activity: $0, date: $0.activityDate ?? selectedDate) }
@@ -3131,6 +3226,11 @@ struct ActivitiesView: View {
             baseTitle = "Unassigned"
         case .project(let id):
             baseTitle = projectStore.name(for: id)
+        case .projects(let ids):
+            let names = ids
+                .sorted { projectStore.name(for: $0) < projectStore.name(for: $1) }
+                .map { projectStore.name(for: $0) }
+            baseTitle = names.count <= 2 ? names.joined(separator: ", ") : "\(names.count) Projects"
         case .saved(let id):
             baseTitle = filterStore.filter(id)?.name ?? "Filter"
         case .category(let id):
@@ -3295,10 +3395,7 @@ struct ActivitiesView: View {
     }
 
     private var selectedProjectID: UUID? {
-        if case .project(let id) = filter {
-            return id
-        }
-        return nil
+        selectedProjectIDs.count == 1 ? selectedProjectIDs.first : nil
     }
 
     private var timeEntriesForSelectedDate: [TimeEntry] {
@@ -3853,6 +3950,7 @@ private enum ActivityFilter: Hashable {
     case all
     case unassigned
     case project(UUID)
+    case projects(Set<UUID>)
     case saved(UUID)
     case category(UUID)
 }

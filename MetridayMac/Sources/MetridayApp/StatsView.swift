@@ -1178,6 +1178,16 @@ struct StatsView: View {
                 ? projectStore.descendantProjectIDs(including: selectedID)
                 : [selectedID]
             return projectIDs.contains(projectID)
+        case .projects(let selectedIDs):
+            guard let projectID else { return false }
+            let projectIDs = selectedIDs.reduce(into: Set<UUID>()) { result, selectedID in
+                if trackingPreferences.includeSubprojectsWhenSelectingProject {
+                    result.formUnion(projectStore.descendantProjectIDs(including: selectedID))
+                } else {
+                    result.insert(selectedID)
+                }
+            }
+            return projectIDs.contains(projectID)
         }
     }
 
@@ -1318,12 +1328,14 @@ private enum StatsProjectScope: Hashable {
     case all
     case unassigned
     case project(UUID)
+    case projects(Set<UUID>)
 
     init(_ scope: ActivityProjectScope) {
         switch scope {
         case .all: self = .all
         case .unassigned: self = .unassigned
         case .project(let id): self = .project(id)
+        case .projects(let ids): self = .projects(ids)
         }
     }
 
@@ -1332,6 +1344,7 @@ private enum StatsProjectScope: Hashable {
         case .all: return .all
         case .unassigned: return .unassigned
         case .project(let id): return .project(id)
+        case .projects(let ids): return .projects(ids)
         }
     }
 
@@ -1340,6 +1353,7 @@ private enum StatsProjectScope: Hashable {
         case .all: return "all"
         case .unassigned: return "unassigned"
         case .project(let id): return id.uuidString
+        case .projects: return "multiple"
         }
     }
 }

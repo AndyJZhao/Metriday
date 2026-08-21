@@ -32,6 +32,7 @@ enum ActivityProjectScope: Hashable {
     case all
     case unassigned
     case project(UUID)
+    case projects(Set<UUID>)
 
     init(persistedValue: String?) {
         guard let value = persistedValue else {
@@ -41,7 +42,15 @@ enum ActivityProjectScope: Hashable {
         switch value {
         case "all": self = .all
         case "unassigned": self = .unassigned
-        default: self = UUID(uuidString: value).map(Self.project) ?? .all
+        default:
+            let ids = Set(value.split(separator: ",").compactMap { UUID(uuidString: String($0)) })
+            if ids.count == 1, let id = ids.first {
+                self = .project(id)
+            } else if ids.count > 1 {
+                self = .projects(ids)
+            } else {
+                self = .all
+            }
         }
     }
 
@@ -50,6 +59,7 @@ enum ActivityProjectScope: Hashable {
         case .all: return "all"
         case .unassigned: return "unassigned"
         case .project(let id): return id.uuidString
+        case .projects(let ids): return ids.map(\.uuidString).sorted().joined(separator: ",")
         }
     }
 }
