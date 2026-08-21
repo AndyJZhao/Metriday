@@ -60,12 +60,15 @@ expect(executionSummary.statusLabel == "Actual 45m", "Completed Time Block execu
 let seeded = MarkdownCodec.seed(for: date)
 let markdown = MarkdownCodec.serialize(seeded)
 let parsed = MarkdownCodec.parse(markdown, date: date)
+let blankMarkdown = MarkdownCodec.serialize(MarkdownCodec.blank(for: date))
+let blank = MarkdownCodec.parse(blankMarkdown, date: date)
 
 expect(parsed.tasks.count == 3, "Markdown should keep all tasks")
 expect(parsed.tasks[0].title == "GeneZip rebuttal experiment", "Task title should round-trip")
 expect(parsed.tasks[0].timeRange == "14:00 - 16:00", "Time range should round-trip")
 expect(parsed.tasks[0].tags == ["research", "important"], "Tags should round-trip")
 expect(parsed.tasks[2].timeRange == nil, "Unscheduled task should remain unscheduled")
+expect(blank.tasks.isEmpty && blank.notes.isEmpty, "New daily Markdown should start with a blank plan")
 expect(TimeFormat.parseRange("09:30-10:15")?.start == 570, "ASCII time range should parse")
 expect(TimeFormat.parseRange("14:00–16:00")?.end == 960, "En dash time range should parse")
 expect(TimeFormat.parseRange("16:00–14:00") == nil, "Reverse range should be rejected")
@@ -2013,8 +2016,9 @@ Task { @MainActor in
     deviceBSync.stop()
 
     let store = MarkdownStore(date: date, rootDirectory: tempRoot)
-    guard let draftID = store.tasks.first(where: { $0.title == "Draft response" })?.id else {
-        expect(false, "Seed should include Draft response")
+    expect(store.tasks.isEmpty && store.notes.isEmpty, "A new Markdown date should not inherit sample tasks")
+    guard let draftID = store.addTask(title: "Draft response") else {
+        expect(false, "A new Markdown task should be insertable")
         return
     }
 

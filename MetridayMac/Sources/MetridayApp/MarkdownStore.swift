@@ -30,7 +30,7 @@ final class MarkdownStore: ObservableObject {
         if let contents = try? String(contentsOf: initialFileURL, encoding: .utf8) {
             loadedMarkdown = contents
         } else {
-            loadedMarkdown = MarkdownCodec.serialize(MarkdownCodec.seed(for: date))
+            loadedMarkdown = MarkdownCodec.serialize(MarkdownCodec.blank(for: date))
         }
         let initialLineIndices = MarkdownCodec.taskLineIndices(in: loadedMarkdown)
         let initialIDs = Dictionary(uniqueKeysWithValues: initialLineIndices.map { ($0, UUID()) })
