@@ -5860,10 +5860,27 @@ private struct ActivityTimelinePanel: View {
                         let width = max(3, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
                         let hitWidth = max(12, width)
                         ZStack(alignment: .trailing) {
-                            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .fill(activityColor(segment).opacity(0.82))
-                                .frame(width: width, height: 18)
-                                .offset(x: -(hitWidth - width) / 2)
+                            Button {
+                                onSelectActivity(segment)
+                            } label: {
+                                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                    .fill(activityColor(segment).opacity(0.82))
+                                    .frame(width: width, height: 18)
+                                    .offset(x: -(hitWidth - width) / 2)
+                                    .frame(width: hitWidth, height: 18)
+                            }
+                            .buttonStyle(.plain)
+                            .simultaneousGesture(
+                                TapGesture(count: 2)
+                                    .onEnded {
+                                        let start = max(0, segment.startMinute)
+                                        let end = min(1_440, max(start + 15, segment.endMinute))
+                                        onCreateTimeEntry(start, end)
+                                    }
+                            )
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityLabel("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
+                            .accessibilityIdentifier("activities.timeline.activity.\(segment.id.uuidString)")
                             if hoveredSegmentID == segment.id {
                                 Button {
                                     let start = max(0, segment.startMinute)
@@ -5883,23 +5900,6 @@ private struct ActivityTimelinePanel: View {
                         }
                         .frame(width: hitWidth, height: 18)
                         .contentShape(Rectangle())
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityLabel("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
-                        .accessibilityIdentifier("activities.timeline.activity.\(segment.id.uuidString)")
-                        .gesture(
-                            TapGesture(count: 2)
-                                .exclusively(before: TapGesture())
-                                .onEnded { result in
-                                    switch result {
-                                    case .first:
-                                        let start = max(0, segment.startMinute)
-                                        let end = min(1_440, max(start + 15, segment.endMinute))
-                                        onCreateTimeEntry(start, end)
-                                        case .second:
-                                            onSelectActivity(segment)
-                                        }
-                                }
-                        )
                         .help("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))\(segment.resource.isEmpty ? "" : " · \(segment.resource)")")
                         .onHover { isHovered in
                             // Timeline blocks can overlap. Clearing the shared
@@ -6134,9 +6134,26 @@ private struct ActivityTimelinePanel: View {
                         let width = max(2, timelineWindow.x(for: range.end, width: chartWidth) - left)
                         let hitWidth = max(12, width)
                         ZStack(alignment: .topTrailing) {
-                            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                .fill(activityColor(segment).opacity(0.72))
-                                .frame(width: width, height: 16)
+                            Button {
+                                onSelectActivity(segment)
+                            } label: {
+                                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                    .fill(activityColor(segment).opacity(0.72))
+                                    .frame(width: width, height: 16)
+                                    .frame(width: hitWidth, height: 16, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            .simultaneousGesture(
+                                TapGesture(count: 2)
+                                    .onEnded {
+                                        let start = max(0, segment.startMinute)
+                                        let end = min(1_440, max(start + 15, segment.endMinute))
+                                        onCreateTimeEntry(start, end)
+                                    }
+                            )
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityLabel("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
+                            .accessibilityIdentifier("activities.vertical-timeline.activity.\(segment.id.uuidString)")
                             if hoveredSegmentID == segment.id {
                                 Button {
                                     let start = max(0, segment.startMinute)
@@ -6157,23 +6174,6 @@ private struct ActivityTimelinePanel: View {
                         .frame(width: hitWidth, height: 16, alignment: .leading)
                         .offset(x: left)
                             .contentShape(Rectangle())
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityLabel("\(segment.displayTitle) · \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
-                            .accessibilityIdentifier("activities.vertical-timeline.activity.\(segment.id.uuidString)")
-                            .gesture(
-                                TapGesture(count: 2)
-                                    .exclusively(before: TapGesture())
-                                    .onEnded { result in
-                                        switch result {
-                                        case .first:
-                                            let start = max(0, segment.startMinute)
-                                            let end = min(1_440, max(start + 15, segment.endMinute))
-                                            onCreateTimeEntry(start, end)
-                                        case .second:
-                                        onSelectActivity(segment)
-                                        }
-                                    }
-                            )
                             .onHover { isHovered in
                                 if isHovered, hoveredSegmentID != segment.id {
                                     hoveredSegmentID = segment.id
