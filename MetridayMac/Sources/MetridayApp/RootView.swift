@@ -840,6 +840,7 @@ struct GlobalTopHeader: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
                 .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isButton)
                 .accessibilityIdentifier("header.research-focus")
                 .accessibilityLabel("Research Focus; open Rules")
                 .accessibilityHint("Opens Focus rules")

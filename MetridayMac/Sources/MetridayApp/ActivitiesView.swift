@@ -2964,7 +2964,7 @@ struct ActivitiesView: View {
             .buttonStyle(.plain)
             .padding(.leading, 14 + CGFloat(depth * 16))
             .padding(.trailing, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
             .contentShape(Rectangle())
             .gesture(
                 TapGesture(count: 2)
