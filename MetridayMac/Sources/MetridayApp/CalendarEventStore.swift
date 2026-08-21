@@ -54,6 +54,7 @@ final class CalendarEventStore: ObservableObject {
     private let eventStore = EKEventStore()
     private let preferencesURL: URL
     private var selectedDate = Calendar.current.startOfDay(for: .now)
+    private var cancellables = Set<AnyCancellable>()
 
     init(rootDirectory: URL? = nil) {
         let root = rootDirectory ?? Self.defaultRootDirectory()
@@ -64,6 +65,15 @@ final class CalendarEventStore: ObservableObject {
         if isAuthorized {
             statusMessage = "Calendar ready"
         }
+        NotificationCenter.default.publisher(for: .EKEventStoreChanged)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.authorizationStatus = EKEventStore.authorizationStatus(for: .event)
+                    self.loadEvents(for: self.selectedDate)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     var isAuthorized: Bool {
