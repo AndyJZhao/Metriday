@@ -82,9 +82,38 @@ struct MetridayApp: App {
         MenuBarExtra {
             MenuBarStatusView(appState: appState)
         } label: {
-            Label("Metriday", systemImage: "timer")
+            MenuBarStatusLabel(appState: appState)
         }
         .menuBarExtraStyle(.menu)
+    }
+}
+
+private struct MenuBarStatusLabel: View {
+    @ObservedObject var appState: AppState
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let timer = appState.timeEntryStore.runningTimer
+            let isFocus = timer?.customFields["metriday_focus_session"] == "true"
+            Label {
+                Text(statusLabel(timer: timer, isFocus: isFocus, now: context.date))
+            } icon: {
+                Image(systemName: isFocus ? "target" : "timer")
+            }
+            .accessibilityLabel(statusLabel(timer: timer, isFocus: isFocus, now: context.date))
+        }
+    }
+
+    private func statusLabel(timer: RunningTimer?, isFocus: Bool, now: Date) -> String {
+        guard let timer else { return "Metriday" }
+        let prefix = isFocus ? "Focus" : "Timer"
+        guard let estimate = timer.estimatedDurationSeconds else { return prefix }
+        let remaining = max(0, estimate - Int(now.timeIntervalSince(timer.startedAt)))
+        return "\(prefix) \(clockLabel(remaining))"
+    }
+
+    private func clockLabel(_ seconds: Int) -> String {
+        String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 }
 
@@ -99,6 +128,16 @@ private struct MenuBarStatusView: View {
             Text("Local timer and tracking controls")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            if let timer = appState.timeEntryStore.runningTimer {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(timer.title)
+                        .font(.body.weight(.semibold))
+                        .lineLimit(1)
+                    Text(timerStatusLabel(timer))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             if appState.currentTask != nil || appState.focusSessionActive {
                 Button(appState.focusSessionActive ? "Pause Focus Session" : "Start Focus Session") {
                     _ = appState.toggleFocusSession()
@@ -158,5 +197,11 @@ private struct MenuBarStatusView: View {
         let remainder = minutes % 60
         if hours > 0 { return "\(hours)h \(remainder)m" }
         return "\(minutes)m"
+    }
+
+    private func timerStatusLabel(_ timer: RunningTimer) -> String {
+        guard let estimate = timer.estimatedDurationSeconds else { return "Running" }
+        let remaining = max(0, estimate - Int(Date().timeIntervalSince(timer.startedAt)))
+        return "\(durationLabel(remaining)) remaining"
     }
 }
