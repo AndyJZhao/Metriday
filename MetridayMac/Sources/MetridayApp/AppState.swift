@@ -112,9 +112,7 @@ final class AppState: ObservableObject {
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
             .sink { [weak self] _ in
                 guard let self, self.preferences.autoStopTimerOnSleep else { return }
-                let wasFocusSession = self.focusSessionActive
-                _ = self.timeEntryStore.stopTimer()
-                if wasFocusSession { self.focusIsActive = false }
+                _ = self.stopTimer()
             }
             .store(in: &workspaceCancellables)
         timeEntryStore.$canUndoEntryOMatic
@@ -218,6 +216,17 @@ final class AppState: ObservableObject {
         return wasActive
     }
 
+    /// Stops the active Timer through the Focus-aware lifecycle. Timer callers
+    /// outside the Focus UI must use this path so replacing or stopping a
+    /// Focus Session cannot leave the website blocklist active by accident.
+    @discardableResult
+    func stopTimer() -> UUID? {
+        let wasFocusSession = focusSessionActive
+        let id = timeEntryStore.stopTimer()
+        if wasFocusSession { focusIsActive = false }
+        return id
+    }
+
     @discardableResult
     func toggleFocusSession() -> Bool {
         focusSessionActive ? stopFocusSession() : startFocusSession()
@@ -273,7 +282,7 @@ final class AppState: ObservableObject {
     /// otherwise fall back to the current planned task.
     func quickStartTimer() {
         if timeEntryStore.runningTimer != nil {
-            _ = timeEntryStore.stopTimer()
+            _ = stopTimer()
             return
         }
         let recent = timeEntryStore.recentTimerEntries(limit: 1).first
@@ -283,10 +292,10 @@ final class AppState: ObservableObject {
             ?? projectID.flatMap { projectStore.project($0)?.name }
             ?? "Manual timer"
         if let recent {
-            timeEntryStore.startTimer(reusing: recent)
+            startTimer(reusing: recent)
             return
         }
-        timeEntryStore.startTimer(
+        startTimer(
             title: title,
             projectID: projectID,
             notes: recent?.notes ?? "",
@@ -298,7 +307,35 @@ final class AppState: ObservableObject {
 
     func startTimer(reusing entry: TimeEntry) {
         guard timeEntryStore.runningTimer == nil else { return }
-        timeEntryStore.startTimer(reusing: entry)
+        startTimer(
+            title: entry.title,
+            projectID: entry.projectID,
+            notes: entry.notes,
+            billingStatus: entry.billingStatus,
+            customFields: entry.customFields
+        )
+    }
+
+    func startTimer(
+        title: String,
+        projectID: UUID?,
+        notes: String = "",
+        startedAt: Date = .now,
+        estimatedDurationSeconds: Int? = nil,
+        billingStatus: BillingStatus = .billable,
+        customFields: [String: String] = [:]
+    ) {
+        let replacingFocusSession = focusSessionActive
+        timeEntryStore.startTimer(
+            title: title,
+            projectID: projectID,
+            notes: notes,
+            startedAt: startedAt,
+            estimatedDurationSeconds: estimatedDurationSeconds,
+            billingStatus: billingStatus,
+            customFields: customFields
+        )
+        if replacingFocusSession { focusIsActive = false }
     }
 
     private func handle(localAPI request: LocalAPIRequest) -> LocalAPIResponse {
@@ -1219,7 +1256,7 @@ final class AppState: ObservableObject {
                 ?? (body["estimatedDurationSeconds"] as? Int)
                 ?? (body["estimated_minutes"] as? Int).map { $0 * 60 }
             if body["is_running"] as? Bool == true {
-                timeEntryStore.startTimer(
+                startTimer(
                     title: title,
                     projectID: project,
                     notes: notes,
@@ -1842,11 +1879,9 @@ final class AppState: ObservableObject {
         }
 
         if request.method == "POST", path == "/v1/timer/stop" {
-            let wasFocusSession = focusSessionActive
-            guard let id = timeEntryStore.stopTimer() else {
+            guard let id = stopTimer() else {
                 return .error("No running timer", statusCode: 409)
             }
-            if wasFocusSession { focusIsActive = false }
             return .jsonObject([
                 "id": id.uuidString,
                 "stopped": true,
@@ -1869,7 +1904,7 @@ final class AppState: ObservableObject {
             let estimatedDurationSeconds = (body["estimatedDurationSeconds"] as? Int)
                 ?? (body["estimated_duration_seconds"] as? Int)
                 ?? (body["estimatedMinutes"] as? Int).map { $0 * 60 }
-            timeEntryStore.startTimer(
+            startTimer(
                 title: title,
                 projectID: project,
                 notes: notes,
@@ -3279,7 +3314,7 @@ final class AppState: ObservableObject {
             let projectID = projectID(for: parameters["project"] ?? parameters["projectID"])
             let billingStatus = entryBillingStatus(from: parameters["billingStatus"], projectID: projectID)
             let startedAt = parseCommandDate(parameters["start"] ?? parameters["startedAt"]) ?? .now
-            timeEntryStore.startTimer(
+            startTimer(
                 title: title,
                 projectID: projectID,
                 notes: parameters["notes"] ?? "",
@@ -3293,13 +3328,13 @@ final class AppState: ObservableObject {
                     let nanoseconds = UInt64(boundedMinutes) * 60 * 1_000_000_000
                     try? await Task.sleep(nanoseconds: nanoseconds)
                     guard timeEntryStore.runningTimer?.id == timerID else { return }
-                    _ = timeEntryStore.stopTimer()
+                    _ = stopTimer()
                 }
             }
             section = .activities
             markdownStore.statusMessage = "Timer started by URL command · \(title)"
         case ("timer", "stop"):
-            guard timeEntryStore.stopTimer() != nil else {
+            guard stopTimer() != nil else {
                 markdownStore.statusMessage = "No running timer"
                 return
             }

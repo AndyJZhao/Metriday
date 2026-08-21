@@ -127,6 +127,7 @@ struct RootView: View {
 }
 
 private struct TimerCheckInPresenter: View {
+    @EnvironmentObject private var appState: AppState
     @ObservedObject var timeEntryStore: TimeEntryStore
     @ObservedObject var projectStore: ProjectStore
 
@@ -152,7 +153,8 @@ private struct TimerCheckInPresenter: View {
             TimerCheckInSheet(
                 timer: timer,
                 projectName: projectStore.name(for: timer.projectID),
-                timeEntryStore: timeEntryStore
+                timeEntryStore: timeEntryStore,
+                onStop: { _ = appState.stopTimer() }
             ) {
                 pendingTimer = nil
             }
@@ -174,6 +176,7 @@ private struct TimerCheckInSheet: View {
     let timer: RunningTimer
     let projectName: String
     @ObservedObject var timeEntryStore: TimeEntryStore
+    let onStop: () -> Void
     let onDismiss: () -> Void
 
     var body: some View {
@@ -193,7 +196,7 @@ private struct TimerCheckInSheet: View {
                 }
                 Spacer()
                 Button("Stop Timer", role: .destructive) {
-                    _ = timeEntryStore.stopTimer()
+                    onStop()
                     close()
                 }
                 Button("Keep Working · +15m") {

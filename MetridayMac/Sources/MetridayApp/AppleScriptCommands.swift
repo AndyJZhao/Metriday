@@ -32,7 +32,7 @@ final class MetridayStartTimerCommand: NSScriptCommand {
             let billingStatus = billingRawValue
                 .flatMap(scriptBillingStatus)
                 ?? state.projectStore.resolvedBillingStatus(for: projectID)
-            state.timeEntryStore.startTimer(
+            state.startTimer(
                 title: title,
                 projectID: projectID,
                 notes: notes,
@@ -55,7 +55,7 @@ final class MetridayStopTimerCommand: NSScriptCommand {
                 scriptError("Metriday is not ready")
                 return nil
             }
-            return state.timeEntryStore.stopTimer() != nil
+            return state.stopTimer() != nil
         }
     }
 }

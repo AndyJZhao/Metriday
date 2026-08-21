@@ -358,7 +358,7 @@ struct ActivitiesView: View {
                 recentCalendarEvents: calendarStore.events,
                 suggestedProjectID: { event in appState.suggestedProjectID(for: event) }
             ) { title, projectID, notes, billingStatus, estimatedDurationSeconds in
-                timeEntryStore.startTimer(
+                appState.startTimer(
                     title: title,
                     projectID: projectID,
                     notes: notes,
@@ -632,7 +632,7 @@ struct ActivitiesView: View {
                 if timeEntryStore.runningTimer == nil {
                     showingTimerStart = true
                 } else {
-                    _ = timeEntryStore.stopTimer()
+                    _ = appState.stopTimer()
                 }
             } label: {
                 Label(
