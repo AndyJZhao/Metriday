@@ -2979,8 +2979,12 @@ function TimeEntriesPanel({ api, dateKey, onNewEntry = () => window.dispatchEven
 function WebTimeEntryRow({ entry, projects, sameTitleCount = 0, selected = false, onToggleSelect = () => {}, onEdit, onRenameAll, onDelete }) {
   const title = entry.title || "Untitled";
   const interactive = !entry.is_running;
+  const openRow = (event) => {
+    if (event.target.closest("button, .project-actions")) return;
+    onEdit?.();
+  };
   const mainContent = <><Clock size={17} /><strong>{title}</strong><span>{projectTitleFor(projects, entry.project)}</span><span>{entryRange(entry)}</span><small>{billingLabel(entry.billing_status)} · {formatDurationSeconds(entry.duration)}</small></>;
-  return <div className={`entry-table-row ${interactive ? "interactive" : ""} ${selected ? "selected" : ""}`}>
+  return <div className={`entry-table-row ${interactive ? "interactive" : ""} ${selected ? "selected" : ""}`} onClick={interactive ? openRow : undefined}>
     {interactive ? <button type="button" className="entry-select" aria-label={selected ? `Deselect ${title}` : `Select ${title}`} aria-pressed={selected} onClick={onToggleSelect}><CheckCircle weight={selected ? "fill" : "regular"} /></button> : <span className="entry-select-placeholder" aria-hidden="true" />}
     {interactive ? <button type="button" className="entry-row-main" onClick={onEdit} aria-label={`Edit time entry ${title}`}>{mainContent}</button> : <div className="entry-row-main static">{mainContent}</div>}
     {entry.is_running ? <span className="entry-running">Running</span> : <span className="project-actions">{sameTitleCount > 1 ? <button type="button" className="entry-group-edit" onClick={onRenameAll}>Edit all</button> : null}<IconButton label={`Edit ${title}`} onClick={onEdit}><NotePencil size={15} /></IconButton><IconButton label={`Delete ${title}`} onClick={onDelete}><Trash size={15} /></IconButton></span>}
