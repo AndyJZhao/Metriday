@@ -2107,6 +2107,17 @@ Task { @MainActor in
     store.schedule(id: draftID, start: 11 * 60, end: 12 * 60)
     expect(store.task(draftID)?.timeRange == "11:00 - 12:00", "Scheduling should update the Markdown model")
     expect(store.markdown.contains("11:00 - 12:00 Draft response"), "Scheduling should rewrite Markdown text")
+    let firstAPIDocument = store.planDocument(for: date)
+    let secondAPIDocument = store.planDocument(for: date)
+    expect(
+        firstAPIDocument.tasks.first?.id == secondAPIDocument.tasks.first?.id,
+        "API plan documents should preserve task identities across repeated reads"
+    )
+    expect(
+        firstAPIDocument.tasks.first?.id == draftID,
+        "API plan documents should reuse the Markdown identity sidecar"
+    )
+    expect(store.task(draftID, on: date)?.title == "Draft response", "Date-scoped Markdown lookup should resolve API task identities")
 
     store.move(id: draftID, start: 13 * 60 + 30)
     expect(store.task(draftID)?.timeRange == "13:30 - 14:30", "Moving should preserve duration and rewrite time")

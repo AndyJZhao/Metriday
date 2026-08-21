@@ -188,8 +188,14 @@ final class AppState: ObservableObject {
     }
 
     @discardableResult
-    func startFocusSession(taskID: UUID? = nil) -> Bool {
-        let task = taskID.flatMap { markdownStore.task($0) } ?? currentTask
+    func startFocusSession(taskID: UUID? = nil, date: Date? = nil) -> Bool {
+        let task: PlanTask?
+        if let taskID {
+            task = date.flatMap { markdownStore.task(taskID, on: $0) }
+                ?? markdownStore.task(taskID)
+        } else {
+            task = currentTask
+        }
         guard let task, task.isScheduled else { return false }
         selectedTaskID = task.id
         timeEntryStore.startTimer(
@@ -663,7 +669,8 @@ final class AppState: ObservableObject {
 
         if request.method == "POST", path == "/v1/focus/session/start" {
             let taskID = request.query["task_id"].flatMap(UUID.init(uuidString:))
-            guard startFocusSession(taskID: taskID), let timer = timeEntryStore.runningTimer else {
+            let date = apiDate(from: request.query["date"])
+            guard startFocusSession(taskID: taskID, date: date), let timer = timeEntryStore.runningTimer else {
                 return .error("Focus Session needs a scheduled current block", statusCode: 409)
             }
             return .jsonObject([
@@ -2515,13 +2522,9 @@ final class AppState: ObservableObject {
 
     private func planAPIResponse(for date: Date) -> [String: Any] {
         let normalized = Calendar.current.startOfDay(for: date)
-        markdownStore.ensurePlanFile(for: normalized)
         let raw = markdownStore.markdown(for: normalized)
             ?? MarkdownCodec.serialize(MarkdownCodec.blank(for: normalized))
-        let taskIDs = Dictionary(
-            uniqueKeysWithValues: MarkdownCodec.taskLineIndices(in: raw).map { ($0, UUID()) }
-        )
-        let document = MarkdownCodec.parse(raw, date: normalized, taskIDsByLine: taskIDs)
+        let document = markdownStore.planDocument(for: normalized)
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"

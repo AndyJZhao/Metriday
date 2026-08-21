@@ -132,7 +132,7 @@ The Settings sheet also maintains activity exclusion rules at ~/Library/Applicat
 - `⌥` + drop creates an Event immediately when Calendar access is already available; otherwise it opens the explicit Connect Calendar → Add Event path.
 - Drag the block body to move it; drag the top edge to change its start; drag the bottom edge to change its end.
 - Time Blocks only rewrite Markdown (for example, `- [ ] 13:00 - 14:30 Email`) and do not request Calendar access or create external events.
-- Markdown task identities are persisted in a local `TaskIdentities.json` sidecar so Focus Sessions and linked Time Entries continue to resolve the same Time Block after a reload; the Markdown file itself remains the source of truth for task content and time ranges.
+- Markdown task identities are persisted in a local `TaskIdentities.json` sidecar so Focus Sessions and linked Time Entries continue to resolve the same Time Block after a reload; the Markdown file itself remains the source of truth for task content and time ranges. Native API plan responses reuse this sidecar for date-scoped Web reads, so a browser refresh does not generate a new task identity.
 - Focus can only start for a task with a valid forward `HH:MM–HH:MM` range; incomplete or reversed ranges remain ordinary Markdown tasks until they are scheduled correctly.
 - The Web companion uses the same local Calendar bridge: `POST /v1/calendar-events` creates an event, while `PATCH` and `DELETE` update or remove writable events. Web Plan plain drops open the Time Block/Event choice, `⌘` drops create a Time Block, and `⌥` drops create an external event when Calendar access is available.
 

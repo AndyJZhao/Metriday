@@ -438,7 +438,13 @@ function useMetridayAPI(dateKey, apiBase) {
     },
     startTimer: (title, projectID, options = {}) => mutate("/v1/timer/start", { title, projectID, ...options }),
     stopTimer: () => mutate("/v1/timer/stop"),
-    startFocusSession: (taskID = null) => mutate(`/v1/focus/session/start${taskID ? `?task_id=${encodeURIComponent(resourceID(taskID))}` : ""}`),
+    startFocusSession: (taskID = null, date = null) => {
+      const params = new URLSearchParams();
+      if (taskID) params.set("task_id", resourceID(taskID));
+      if (date) params.set("date", date);
+      const query = params.toString();
+      return mutate(`/v1/focus/session/start${query ? `?${query}` : ""}`);
+    },
     stopFocusSession: () => mutate("/v1/focus/session/stop"),
     setTimerEstimate: (minutes) => mutate("/v1/timer/estimate", { estimatedMinutes: Number(minutes) }),
     adjustTimer: (minutes) => mutate("/v1/timer/adjust", { minutes: Number(minutes) }),
@@ -2143,7 +2149,7 @@ function WebTimeBlockDialog({ task, api, dateKey, onClose, onOpenPlan }) {
       setBusy(false);
     }
   };
-  const focusAction = focusForTask ? api.stopFocusSession : () => api.startFocusSession(task.id);
+  const focusAction = focusForTask ? api.stopFocusSession : () => api.startFocusSession(task.id, dateKey);
   return <div className="calendar-event-dialog-backdrop" role="presentation" onClick={onClose}><section className="calendar-event-dialog time-block-dialog" role="dialog" aria-modal="true" aria-labelledby="time-block-dialog-title" onClick={(clickEvent) => clickEvent.stopPropagation()}><header><div><span>Time Block</span><h2 id="time-block-dialog-title">{task.title || "Untitled task"}</h2><p>{range ? formatRange(range.start, range.end) : "Unscheduled"}{task.tags?.length ? ` · ${task.tags.map((tag) => `#${tag}`).join(" ")}` : ""}</p></div><IconButton label="Close Time Block" onClick={onClose}><X size={17} /></IconButton></header><div className="time-block-dialog-summary"><div><span>Planned</span><strong>{range ? formatDurationSeconds((range.end - range.start) * 60) : "—"}</strong></div><div><span>Actual</span><strong>{execution.hasExecution ? formatDurationSeconds(execution.durationSeconds) : "—"}</strong></div><div><span>Intervals</span><strong>{execution.intervalCount || "—"}</strong></div><div className="time-block-dialog-progress"><i style={{ width: `${range ? Math.min(100, (execution.durationSeconds / Math.max(1, (range.end - range.start) * 60)) * 100) : 0}%` }} /></div><p>{execution.isRunning ? "Focus is running for this block." : execution.hasExecution ? "Actual time is linked to this Markdown task." : "Start Focus to link actual time to this block."}</p></div><div className="time-block-dialog-scroll"><section><h3>Execution intervals</h3>{linkedEntries.length ? <div className="time-block-dialog-list">{linkedEntries.map((entry) => <div className="time-block-dialog-row" key={entryID(entry)}><span className="time-block-dialog-marker"><Clock size={15} /></span><div><strong>{entryRange(entry)}</strong><small>{entry.is_manual === false ? "Focus Session" : "Manual time entry"}</small></div><b>{formatDurationSeconds(Math.max(0, (new Date(entry.end_date || entry.end) - new Date(entry.start_date || entry.start)) / 1000))}</b></div>)}</div> : <p className="time-block-dialog-empty">No linked execution intervals yet.</p>}</section><section><h3>App & website evidence</h3><p className="time-block-dialog-help">Observed inside the planned window; this evidence does not rewrite Markdown.</p>{evidenceRows.length ? <div className="time-block-dialog-list">{evidenceRows.map((row) => <div className="time-block-dialog-row" key={row.key}><i className="time-block-dialog-color" style={{ background: row.color }} /><div><strong>{row.appName}</strong><small>{row.detail ? `${row.detail} · ` : ""}{row.categoryName}</small></div><b>{formatDurationSeconds(row.seconds)}</b></div>)}</div> : <p className="time-block-dialog-empty">No App or website evidence overlaps this block yet.</p>}</section></div><footer><span className="calendar-event-dialog-message" role={message ? "status" : undefined}>{message}</span><button type="button" className="secondary-button" onClick={() => { onClose(); onOpenPlan?.(); }}>Open in Plan</button><button type="button" className="primary-button" onClick={() => run(focusAction)} disabled={!api.connected || busy || anotherFocusSessionIsActive || !range}>{focusForTask ? "Pause Focus" : "Start Focus"}</button></footer></section></div>;
 }
 

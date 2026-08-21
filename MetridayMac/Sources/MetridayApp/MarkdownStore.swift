@@ -129,6 +129,28 @@ final class MarkdownStore: ObservableObject {
         )
     }
 
+    /// Reads another daily Markdown file without changing the editor's
+    /// selected date. API consumers use this path for neighbor plans so the
+    /// task IDs come from the same sidecar as the active editor instead of
+    /// being regenerated for every response.
+    func planDocument(for date: Date) -> MarkdownDocument {
+        let normalized = Calendar.current.startOfDay(for: date)
+        ensurePlanFile(for: normalized)
+        let raw = markdown(for: normalized)
+            ?? MarkdownCodec.serialize(MarkdownCodec.blank(for: normalized))
+        var identities = Self.loadTaskIdentities(rootDirectory: rootDirectory)
+        let taskIDs = Self.assignTaskIDs(in: raw, date: normalized, identities: &identities)
+        if identities != taskIdentities {
+            taskIdentities = identities
+            persistTaskIdentities()
+        }
+        return MarkdownCodec.parse(raw, date: normalized, taskIDsByLine: taskIDs)
+    }
+
+    func task(_ id: UUID, on date: Date) -> PlanTask? {
+        planDocument(for: date).tasks.first { $0.id == id }
+    }
+
     @discardableResult
     func replaceMarkdown(_ raw: String, for date: Date) -> Bool {
         let normalizedDate = Calendar.current.startOfDay(for: date)
@@ -420,11 +442,20 @@ final class MarkdownStore: ObservableObject {
                 withIntermediateDirectories: true
             )
             try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
+            persistTaskIdentities()
+        } catch {
+            statusMessage = "Could not save Markdown: \(error.localizedDescription)"
+        }
+    }
+
+    private func persistTaskIdentities() {
+        do {
+            try FileManager.default.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
             let archive = MarkdownTaskIdentityArchive(version: 1, identities: taskIdentities)
             let data = try JSONEncoder().encode(archive)
             try data.write(to: Self.taskIdentityURL(rootDirectory: rootDirectory), options: .atomic)
         } catch {
-            statusMessage = "Could not save Markdown: \(error.localizedDescription)"
+            statusMessage = "Could not save Markdown identities: \(error.localizedDescription)"
         }
     }
 
