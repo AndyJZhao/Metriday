@@ -328,6 +328,14 @@ struct TimeBlockDetailSheet: View {
             .buttonStyle(.borderedProminent)
             .disabled(anotherFocusSessionIsActive || !task.isScheduled)
 
+            Button {
+                appState.showFocusCompanion()
+            } label: {
+                Label("Show Companion", systemImage: "macwindow.on.rectangle")
+            }
+            .buttonStyle(.bordered)
+            .disabled(appState.timeEntryStore.runningTimer == nil)
+
             Spacer()
             Button("Remove time", role: .destructive) {
                 appState.markdownStore.unschedule(id: task.id)

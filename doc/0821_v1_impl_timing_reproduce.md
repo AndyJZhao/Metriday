@@ -25,10 +25,11 @@
 8. Stats、Review、Reports、Teams：统计图表、项目与时间记录层级、报告构建器、导出、Smart Activity Summary、团队与成员本地模型。
 9. Focus 与网页阻断 MVP：当前 Markdown Block 可启动 Focus-aware Timer 和前台 Safari/Chrome 域名阻断；焦点生命周期、暂停、继续、超时、睡眠恢复均有明确语义。
 10. 本地自动化与 companion：localhost API、Timing 形状的 `/api/v1` aliases、URL scheme、AppleScript、原生设置、Timing Sync 和 Web companion 已接入同一套本地数据模型。
+11. Focus/Session 独立浮动 companion：原生 AppKit/SwiftUI `NSPanel` 已接入同一套 AppState / TimeEntryStore / Focus lifecycle，支持 always-on-top、拖动、隐藏、剩余/超时、planned duration、活动分解、blocklist 状态和菜单动作。
 
 ### 明确未完成或暂缓
 
-- Timing 风格独立浮动 Focus/Session companion 仍然暂缓。当前入口是 Global Header、菜单栏、Plan/Today Time Block 的 Start/Pause Focus，以及 Web companion 的对应控制；尚未创建独立悬浮窗口。
+- Focus/Session companion 的 Phase A 已完成；后续只剩多显示器、屏幕边缘、relaunch、sleep、Accessibility test identifiers 和长时间运行等硬化验证。
 - 网页阻断目前是 Safari/Chrome 前台 tab 监控 + 本地 Focus page redirect。系统级 Network Extension 需要 Apple entitlement、签名和 app extension 分发，暂未纳入本地 dev build。
 - Calendar 默认只读；手动 Record Time Entry 和 Convert to Time Block 已有，默认不会自动复制 Markdown 或自动启动 Timer。
 - v1 仍是本地优先 dev repo，不是生产发布版本；账号服务、云端协作、正式签名分发和远程同步服务尚未作为产品前提。
@@ -253,7 +254,7 @@ Time Entries 和 Timer 状态位于：
 
 网页阻断 MVP 只检查前台 Safari/Chrome tab，通过 macOS Automation permission 将 blocklisted domain redirect 到本地 Focus page。尚未实现 system-wide Network Extension。
 
-独立 Timing 风格 floating Focus companion 是已讨论但暂缓的功能：当前没有独立悬浮窗，也没有把它误认为已完成。
+独立 Timing 风格 floating Focus companion 已作为原生 `NSPanel` 接入；它只展示并控制现有 Focus/Timer 状态，不创建第二套 Timer 或 activity store。关闭按钮和 Hide Companion 只隐藏窗口，Pause/Stop 才结束当前会话。
 
 ## 9. Today、Stats、Review、Reports、Teams
 
@@ -471,13 +472,15 @@ metriday://phone-calls/hide?address=555-0100&hidden=false
 
 新对话不需要重新盘点基础设施，直接以本文件和当前 HEAD 为基线。建议顺序：
 
-### Phase A：完成 Timing 1:1 的 Focus companion
+### Phase A：完成 Timing 1:1 的 Focus companion（已完成）
 
-1. 先用 Computer Use 对照 Timing.app Professional 的真实 Focus/Session floating companion：尺寸、入口、拖动、关闭、always-on-top、当前 Timer、planned duration、remaining/overdue、Focused/Distracting/Other breakdown、blocklist 状态和菜单操作。
-2. 明确 companion 是 Focus Session 的第二个 presentation surface，不创建第二套 Timer 或 activity store。
-3. 让 companion 订阅现有 AppState / TimeEntryStore / Focus lifecycle；Global Header、菜单栏、Plan/Today、Web API 与 companion 使用同一状态。
-4. 支持从 Global Header、菜单栏、Time Block、Focus menu 和可能的 system tray/menu action 打开；完整窗口关闭只隐藏 companion，不停止 Focus，除非用户明确点击 Stop/Pause。
-5. 先做单窗口 native AppKit/SwiftUI prototype，再补 relaunch、sleep、screen edge、multi-monitor、always-on-top、accessibility 和 test identifiers。
+- 已用 Computer Use 对照本机 Timing.app 的 Timer 入口和运行状态，确认 companion 的独立展示需求。
+- 已实现单窗口 native AppKit/SwiftUI `NSPanel` prototype，尺寸约 372×248，可调整大小并保持 floating level。
+- 已复用现有 AppState / TimeEntryStore / Focus lifecycle，没有创建第二套 Timer 或 activity store。
+- 已接入 Global Header、菜单栏、Plan/Today Time Block 详情和 Focus menu；Focus 启动时自动显示 companion。
+- 已实现拖动、always-on-top、隐藏不停止 Focus、Pause/Stop 结束会话。
+- 已实现当前 Timer、planned duration、remaining/overdue、Focused/Distracting/Other、blocklist 状态和菜单动作。
+- 已通过 `swift build`、`Scripts/run_smoke_tests.sh`、`Scripts/package_app.sh` 和 Native runtime AX 验证。
 
 ### Phase B：把 companion 变成可验证的 Focus surface
 

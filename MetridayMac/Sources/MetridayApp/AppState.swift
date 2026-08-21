@@ -49,6 +49,7 @@ final class AppState: ObservableObject {
     let activityMonitor: AppActivityMonitor
     let reviewReminderService: ReviewReminderService
     let blocker: WebBlockerService
+    private(set) var focusCompanionController: FocusCompanionController? = nil
     private var globalShortcutMonitor: GlobalShortcutMonitor?
     private var workspaceCancellables = Set<AnyCancellable>()
 
@@ -173,6 +174,7 @@ final class AppState: ObservableObject {
         self.globalShortcutMonitor = GlobalShortcutMonitor { [weak self] in
             self?.quickStartTimer()
         }
+        self.focusCompanionController = FocusCompanionController(appState: self)
     }
 
     var currentTask: PlanTask? {
@@ -285,6 +287,7 @@ final class AppState: ObservableObject {
             ]
         )
         focusIsActive = true
+        showFocusCompanion()
         return true
     }
 
@@ -296,6 +299,7 @@ final class AppState: ObservableObject {
         }
         blocker.setFocusTitle(nil)
         focusIsActive = false
+        hideFocusCompanion()
         return wasActive
     }
 
@@ -310,12 +314,25 @@ final class AppState: ObservableObject {
             blocker.setFocusTitle(nil)
             focusIsActive = false
         }
+        hideFocusCompanion()
         return id
     }
 
     @discardableResult
     func toggleFocusSession() -> Bool {
         focusSessionActive ? stopFocusSession() : startFocusSession()
+    }
+
+    func showFocusCompanion() {
+        focusCompanionController?.show()
+    }
+
+    func hideFocusCompanion() {
+        focusCompanionController?.hide()
+    }
+
+    func toggleFocusCompanion() {
+        focusCompanionController?.toggle()
     }
 
     /// Converts a read-only Calendar Event into a Markdown-backed Time Block

@@ -815,6 +815,18 @@ struct GlobalTopHeader: View {
                 .disabled(!sessionActive && appState.currentTask == nil)
                 .accessibilityIdentifier("header.focus")
 
+                Button {
+                    appState.showFocusCompanion()
+                } label: {
+                    Image(systemName: "macwindow.on.rectangle")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.borderless)
+                .help("Show Focus companion")
+                .accessibilityLabel("Show Focus companion")
+                .disabled(appState.timeEntryStore.runningTimer == nil)
+
                 Divider().frame(height: 50)
 
                 Button {

@@ -62,6 +62,11 @@ struct MetridayApp: App {
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(!appState.focusSessionActive && appState.currentTask == nil)
+                Divider()
+                Button("Show Focus Companion") {
+                    appState.showFocusCompanion()
+                }
+                .disabled(appState.timeEntryStore.runningTimer == nil)
             }
             CommandMenu("Tracking") {
                 Button(appState.activityMonitor.isTracking ? "Pause Tracking" : "Resume Tracking") {
@@ -187,6 +192,11 @@ private struct MenuBarStatusView: View {
                     _ = appState.toggleFocusSession()
                 }
                 .disabled(!appState.focusSessionActive && appState.currentTask == nil)
+            }
+            if appState.timeEntryStore.runningTimer != nil {
+                Button("Show Focus Companion") {
+                    appState.showFocusCompanion()
+                }
             }
             Button("Start / Stop Timer") {
                 appState.quickStartTimer()
