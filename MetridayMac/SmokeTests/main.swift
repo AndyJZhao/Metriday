@@ -1720,6 +1720,24 @@ Task { @MainActor in
         "Live timers should participate in materialized report entries"
     )
 
+    let focusTimerRoot = tempRoot.appendingPathComponent("FocusTimer", isDirectory: true)
+    let focusTimerStore = TimeEntryStore(rootDirectory: focusTimerRoot)
+    focusTimerStore.startTimer(
+        title: "Focus Session",
+        projectID: researchProjectID,
+        estimatedDurationSeconds: 25 * 60,
+        customFields: [
+            "metriday_focus_session": "true",
+            "metriday_plan_task_id": UUID().uuidString
+        ]
+    )
+    let reloadedFocusTimerStore = TimeEntryStore(rootDirectory: focusTimerRoot)
+    expect(
+        reloadedFocusTimerStore.runningTimer?.customFields["metriday_focus_session"] == "true",
+        "Focus Session timers should retain their identity across app reloads"
+    )
+    _ = focusTimerStore.stopTimer()
+
     let expiredTimerStore = TimeEntryStore(rootDirectory: tempRoot.appendingPathComponent("ExpiredTimer", isDirectory: true))
     expiredTimerStore.startTimer(
         title: "Expired estimate",

@@ -105,10 +105,16 @@ final class AppState: ObservableObject {
             }
             .store(in: &workspaceCancellables)
         self.integrationStore = IntegrationStore()
+        // A running Focus Timer is persisted by TimeEntryStore. Restore the
+        // companion blocklist state so relaunching Metriday does not leave the
+        // session timer and website protection out of sync.
+        self.focusIsActive = self.timeEntryStore.runningTimer?.customFields[Self.focusSessionField] == "true"
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
             .sink { [weak self] _ in
                 guard let self, self.preferences.autoStopTimerOnSleep else { return }
+                let wasFocusSession = self.focusSessionActive
                 _ = self.timeEntryStore.stopTimer()
+                if wasFocusSession { self.focusIsActive = false }
             }
             .store(in: &workspaceCancellables)
         timeEntryStore.$canUndoEntryOMatic

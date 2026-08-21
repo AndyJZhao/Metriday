@@ -149,7 +149,7 @@ While a focus session is active, Metriday can inspect the frontmost Safari or Ch
 
 A system-wide Network Extension content filter is intentionally not bundled in this local build because Apple requires a restricted entitlement and signed app-extension distribution.
 
-The Global Header and Web companion now use an explicit Focus Session lifecycle: starting the current Markdown block creates a Timer with the planned duration and activates the Focus blocklist; pausing the session stops that Timer and releases the blocklist. Rules can still toggle the blocklist independently. The session timer carries the originating Plan task ID in local custom fields, while the floating focus companion remains a separate later surface.
+The Global Header and Web companion now use an explicit Focus Session lifecycle: starting the current Markdown block creates a Timer with the planned duration and activates the Focus blocklist; pausing the session stops that Timer and releases the blocklist. Rules can still toggle the blocklist independently. The session timer carries the originating Plan task ID in local custom fields, survives an app relaunch, and releases the blocklist automatically when the Mac sleeps if `Stop running timers when the Mac sleeps` is enabled. The floating focus companion remains a separate later surface.
 
 ## Reports and menu bar
 
