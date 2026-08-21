@@ -89,7 +89,7 @@ struct MetridayApp: App {
 }
 
 private struct MenuBarStatusView: View {
-    let appState: AppState
+    @ObservedObject var appState: AppState
 
     var body: some View {
         let recentTimers = appState.timeEntryStore.recentTimerEntries(limit: 5)
@@ -99,6 +99,12 @@ private struct MenuBarStatusView: View {
             Text("Local timer and tracking controls")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            if appState.currentTask != nil || appState.focusSessionActive {
+                Button(appState.focusSessionActive ? "Pause Focus Session" : "Start Focus Session") {
+                    _ = appState.toggleFocusSession()
+                }
+                .disabled(!appState.focusSessionActive && appState.currentTask == nil)
+            }
             Button("Start / Stop Timer") {
                 appState.quickStartTimer()
             }
