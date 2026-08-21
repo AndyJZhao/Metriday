@@ -326,6 +326,24 @@ expect(TimeEntrySuggestionProvider.billingStatuses(for: "$paid") == [.paid], "Do
 expect(ActivityClassifier.relevance(appName: "Visual Studio Code", bundleIdentifier: "com.microsoft.VSCode", windowTitle: "") == .related, "Known work apps should be related")
 expect(ActivityClassifier.relevance(appName: "Google Chrome", bundleIdentifier: "com.google.Chrome", windowTitle: "YouTube") == .distracted, "Distracting window titles should be classified")
 expect(ActivityClassifier.relevance(appName: "Google Chrome", bundleIdentifier: "com.google.Chrome", windowTitle: "") == .distracted, "Browser activity should have a safe default classification")
+expect(
+    ActivityClassifier.relevance(
+        appName: "Google Chrome",
+        bundleIdentifier: "com.google.Chrome",
+        windowTitle: "GitHub",
+        resource: "https://github.com/AndyJZhao/Metriday"
+    ) == .related,
+    "Known focused websites should override the browser default classification"
+)
+expect(
+    ActivityClassifier.relevance(
+        appName: "Safari",
+        bundleIdentifier: "com.apple.Safari",
+        windowTitle: "Research video",
+        resource: "https://www.youtube.com/watch?v=demo"
+    ) == .distracted,
+    "Known distracting websites should remain distracting even with a neutral title"
+)
 expect(ActivityClassifier.relevance(appName: "Linear", bundleIdentifier: "com.linear", windowTitle: "") == .other, "Unknown foreground apps should remain tracked as other activity")
 expect(trackedActivities[0].displayTitle.contains("AppActivityMonitor.swift"), "Window title should be visible in activity display")
 expect(

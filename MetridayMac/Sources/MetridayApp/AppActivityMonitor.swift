@@ -467,7 +467,8 @@ final class AppActivityMonitor: ObservableObject {
         let relevance = ActivityClassifier.relevance(
             appName: appName,
             bundleIdentifier: bundleIdentifier,
-            windowTitle: windowTitle
+            windowTitle: windowTitle,
+            resource: resource
         )
         let startMinute = calendar.component(.hour, from: date) * 60
             + calendar.component(.minute, from: date)

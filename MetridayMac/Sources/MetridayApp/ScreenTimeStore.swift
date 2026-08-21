@@ -135,7 +135,8 @@ final class ScreenTimeStore: ObservableObject {
             let relevance = ActivityClassifier.relevance(
                 appName: appName,
                 bundleIdentifier: bundleIdentifier,
-                windowTitle: windowTitle
+                windowTitle: windowTitle,
+                resource: resource
             )
             let rawID = textValue(statement, index: 0)
             let stableKey = "\(rawID)|\(start.timeIntervalSinceReferenceDate)|\(value)|\(stream)"

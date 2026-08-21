@@ -142,10 +142,38 @@ enum ActivityClassifier {
         "youtube", "reddit", "netflix", "tiktok", "instagram", "x.com", "twitter"
     ]
 
-    static func relevance(appName: String, bundleIdentifier: String, windowTitle: String) -> ActivityRelevance {
+    /// Browser applications are not inherently distracting. When the local
+    /// monitor has a URL, classify the website identity before falling back to
+    /// the conservative browser default below. Custom Activity Categories are
+    /// still applied later and can override these defaults.
+    static let focusedWebsiteDomains = [
+        "github.com", "gitlab.com", "bitbucket.org", "arxiv.org",
+        "stackoverflow.com", "stackexchange.com", "developer.apple.com",
+        "developer.mozilla.org", "developer.chrome.com", "pytorch.org",
+        "python.org", "readthedocs.io", "wikipedia.org", "docs.google.com",
+        "drive.google.com", "notion.so", "linear.app", "figma.com"
+    ]
+
+    static let distractedWebsiteDomains = [
+        "youtube.com", "reddit.com", "netflix.com", "tiktok.com",
+        "instagram.com", "twitter.com", "x.com", "facebook.com",
+        "twitch.tv"
+    ]
+
+    static func relevance(
+        appName: String,
+        bundleIdentifier: String,
+        windowTitle: String,
+        resource: String = ""
+    ) -> ActivityRelevance {
         let normalizedTitle = windowTitle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if distractedTitleTokens.contains(where: { normalizedTitle.contains($0) }) {
+        let host = URL(string: resource)?.host?.lowercased() ?? ""
+        if distractedTitleTokens.contains(where: { normalizedTitle.contains($0) })
+            || matchesDomain(host, in: distractedWebsiteDomains) {
             return .distracted
+        }
+        if matchesDomain(host, in: focusedWebsiteDomains) {
+            return .related
         }
         if relatedBundleIdentifiers.contains(bundleIdentifier) {
             return .related
@@ -154,6 +182,11 @@ enum ActivityClassifier {
             return .distracted
         }
         return .other
+    }
+
+    private static func matchesDomain(_ host: String, in domains: [String]) -> Bool {
+        guard !host.isEmpty else { return false }
+        return domains.contains { host == $0 || host.hasSuffix(".\($0)") }
     }
 }
 
