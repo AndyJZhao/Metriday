@@ -238,6 +238,7 @@ struct ActivitiesView: View {
     @State private var showingFilterEditor = false
     @State private var showingActivitySettings = false
     @State private var isProjectDropTargeted = false
+    @State private var targetedProjectID: UUID?
     @State private var overlappingEntries: [TimeEntry] = []
     @State private var showingOverlapConfirmation = false
     @State private var displayPreferencesRestored = false
@@ -2902,6 +2903,7 @@ struct ActivitiesView: View {
         let isSelected = isFilterSelected(target)
         let children = projectStore.childProjects(of: project.id)
         let isCollapsed = collapsedProjectIDs.contains(project.id)
+        let isDropTargeted = targetedProjectID == project.id
         return HStack(spacing: 0) {
             if !children.isEmpty {
                 Button {
@@ -2956,15 +2958,39 @@ struct ActivitiesView: View {
             )
         }
         .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
-        .background(isSelected ? MetridayTheme.accentSoft : .clear)
+        .background {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(isDropTargeted ? MetridayTheme.accentSoft : (isSelected ? MetridayTheme.accentSoft : .clear))
+        }
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(MetridayTheme.accent, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                    .padding(1)
+            }
+        }
         .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         .onDrag {
             NSItemProvider(object: NSString(string: "metriday-project:\(project.id.uuidString)"))
         }
-        .onDrop(of: [UTType.plainText], isTargeted: nil) { providers, _ in
-            handleProjectOrActivityDrop(providers, onto: project)
-        }
+        .onDrop(
+            of: [UTType.plainText],
+            isTargeted: Binding(
+                get: { targetedProjectID == project.id },
+                set: { targeted in
+                    if targeted {
+                        targetedProjectID = project.id
+                    } else if targetedProjectID == project.id {
+                        targetedProjectID = nil
+                    }
+                }
+            ),
+            perform: { providers, _ in
+                targetedProjectID = nil
+                return handleProjectOrActivityDrop(providers, onto: project)
+            }
+        )
         .contextMenu {
             Button("Edit Project") {
                 editingProject = project
@@ -2991,6 +3017,7 @@ struct ActivitiesView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("activities.project.\(project.id.uuidString)")
         .accessibilityLabel("Project \(project.name), \(formatMinutes(projectDurationSeconds(for: project.id)))")
+        .accessibilityHint("Drop activities to assign them; hold Option to create a matching rule; drop a project to create a sub-project.")
     }
 
     private func handleProjectOrActivityDrop(
