@@ -2210,35 +2210,36 @@ struct ActivitiesView: View {
                             ForEach(rows ?? categoryRows(segments, nameFor: nameFor)) { row in
                             let firstActivity = row.segments.first
                             let firstSymbol = firstActivity.map { self.icon(for: $0) }
-                            HStack(spacing: 7) {
-                                AppIdentityIcon(
-                                    symbol: firstSymbol,
-                                    bundleIdentifier: firstActivity?.bundleIdentifier,
-                                    size: 22
-                                )
-                                Circle()
-                                    .fill(categoryColor(for: row.category))
-                                    .frame(width: 6, height: 6)
-                                Text(row.name)
-                                    .font(.system(size: 11))
-                                    .lineLimit(1)
-                                Spacer()
-                                Text(formatMinutes(row.seconds))
-                                    .font(.system(size: 10, weight: .semibold))
+                            Button {
+                                guard let activity = row.segments.first else { return }
+                                selectedActivity = activity
+                            } label: {
+                                HStack(spacing: 7) {
+                                    AppIdentityIcon(
+                                        symbol: firstSymbol,
+                                        bundleIdentifier: firstActivity?.bundleIdentifier,
+                                        size: 22
+                                    )
+                                    Circle()
+                                        .fill(categoryColor(for: row.category))
+                                        .frame(width: 6, height: 6)
+                                    Text(row.name)
+                                        .font(.system(size: 11))
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text(formatMinutes(row.seconds))
+                                        .font(.system(size: 10, weight: .semibold))
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
-                            .contentShape(Rectangle())
-                            .gesture(
+                            .buttonStyle(.plain)
+                            .simultaneousGesture(
                                 TapGesture(count: 2)
-                                    .exclusively(before: TapGesture())
-                                    .onEnded { result in
+                                    .onEnded {
                                         guard let activity = row.segments.first else { return }
-                                        switch result {
-                                        case .first:
-                                            prepareNewEntry(for: activity)
-                                            showingNewEntry = true
-                                        case .second:
-                                            selectedActivity = activity
-                                        }
+                                        prepareNewEntry(for: activity)
+                                        showingNewEntry = true
                                     }
                             )
                             .onDrag {
@@ -2266,10 +2267,8 @@ struct ActivitiesView: View {
                                 }
                             }
                             .help("Click for details · double-click to create a time entry")
-                            .accessibilityElement(children: .combine)
                             .accessibilityLabel("Open \(row.name) in \(title)")
                             .accessibilityHint("Double-click to create a time entry")
-                            .accessibilityAddTraits(.isButton)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.vertical, 2)
                         }
