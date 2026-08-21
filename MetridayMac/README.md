@@ -101,6 +101,8 @@ Research Focus status panels use one full-width Rules navigation action in both 
 
 Web Plan and Activities use the same interaction boundary: Time Blocks, Time Entries, activity table rows, category-card rows, and activity-timeline segments expose one explicit primary button, while selection, resize, completion, project assignment, delete, and immediate-record controls remain independent. This avoids nested interactive containers and keeps mouse, keyboard, and assistive-technology activation consistent.
 
+Today Actual activity blocks use the same boundary: opening an activity remains the block's primary action, while the hover card's `Record time` control is isolated for both pointer and keyboard activation, so recording a range cannot also open the parent activity.
+
 Native Activities chronological App rows follow the same boundary: the selection control, App / Category / duration detail button, project assignment menu, and rule shortcut are independent. Click the main activity content to inspect it, double-click it to create a Time Entry for the captured range, and use the compact controls without triggering the row action.
 
 Native horizontal and vertical activity timeline segments use the same explicit main button. The hover `+` shortcut remains an independent immediate Time Entry action, while click, double-click, drag-to-select, and context-menu behavior stay scoped to their respective surfaces.
