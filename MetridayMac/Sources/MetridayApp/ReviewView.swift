@@ -136,7 +136,8 @@ struct ReviewView: View {
                 categoryStore: categoryStore,
                 screenTimeStore: screenTimeStore,
                 timeEntryStore: timeEntryStore,
-                projectStore: projectStore
+                projectStore: projectStore,
+                trackingPreferences: appState.preferences
             )
         }
     }
@@ -639,6 +640,7 @@ struct ReviewView: View {
         }
         var options = ReportOptions()
         options.deviceName = appState.syncStore.deviceName
+        options.includeSubprojects = appState.preferences.includeSubprojectsWhenSelectingProject
         try? ReportExporter.write(
             to: url,
             activityDays: activityDays,

@@ -114,6 +114,7 @@ struct ReportsView: View {
                 screenTimeStore: screenTimeStore,
                 timeEntryStore: timeEntryStore,
                 projectStore: projectStore,
+                trackingPreferences: appState.preferences,
                 initialPreset: preset
             )
         }

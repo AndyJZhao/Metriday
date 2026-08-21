@@ -234,6 +234,7 @@ final class MetridayExportReportCommand: NSScriptCommand {
             do {
                 var options = ReportOptions()
                 options.deviceName = state.syncStore.deviceName
+                options.includeSubprojects = state.preferences.includeSubprojectsWhenSelectingProject
                 try ReportExporter.write(
                     to: destination,
                     format: format,

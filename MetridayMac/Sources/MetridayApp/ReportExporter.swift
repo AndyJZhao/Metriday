@@ -283,6 +283,7 @@ struct ReportOptions: Hashable {
     var includeCoveredAppUsage = false
     var includeShortEntries = true
     var projectIDs: Set<UUID> = []
+    var includeSubprojects = true
 
     var includeNotes: Bool {
         get { columns.contains(.notes) }
@@ -629,6 +630,9 @@ enum ReportExporter {
     ) -> Bool {
         guard !options.projectIDs.isEmpty else { return true }
         guard let projectID else { return false }
+        if !options.includeSubprojects {
+            return options.projectIDs.contains(projectID)
+        }
         return options.projectIDs.contains { selectedID in
             projectStore.descendantProjectIDs(including: selectedID).contains(projectID)
         }

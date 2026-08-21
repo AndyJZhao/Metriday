@@ -11,6 +11,7 @@ struct ReportBuilderSheet: View {
     @ObservedObject var screenTimeStore: ScreenTimeStore
     @ObservedObject var timeEntryStore: TimeEntryStore
     @ObservedObject var projectStore: ProjectStore
+    @ObservedObject var trackingPreferences: PreferencesStore
 
     @State private var options = ReportOptions()
     @State private var preset: ReportPreset = .custom
@@ -31,6 +32,7 @@ struct ReportBuilderSheet: View {
         screenTimeStore: ScreenTimeStore,
         timeEntryStore: TimeEntryStore,
         projectStore: ProjectStore,
+        trackingPreferences: PreferencesStore,
         initialPreset: ReportPreset = .custom
     ) {
         self.monitor = monitor
@@ -39,6 +41,7 @@ struct ReportBuilderSheet: View {
         self.screenTimeStore = screenTimeStore
         self.timeEntryStore = timeEntryStore
         self.projectStore = projectStore
+        self.trackingPreferences = trackingPreferences
         _rangePreset = State(initialValue: .custom)
         _startDate = State(initialValue: Calendar.current.startOfDay(for: initialStartDate))
         _endDate = State(initialValue: Calendar.current.startOfDay(for: initialEndDate))
@@ -101,9 +104,13 @@ struct ReportBuilderSheet: View {
         .frame(width: 620, height: 660)
         .onAppear {
             options.deviceName = appState.syncStore.deviceName
+            options.includeSubprojects = trackingPreferences.includeSubprojectsWhenSelectingProject
             if preset != .custom, options.groupBy == .none {
                 applyPreset(preset)
             }
+        }
+        .onChange(of: trackingPreferences.includeSubprojectsWhenSelectingProject) { _, value in
+            options.includeSubprojects = value
         }
     }
 
@@ -257,7 +264,7 @@ struct ReportBuilderSheet: View {
                 .padding(.leading, 16)
             }
 
-            Text(options.projectIDs.isEmpty ? "Exporting all active projects and unassigned time." : "Only selected projects are included in the export.")
+            Text(projectScopeDescription)
                 .font(.system(size: 10))
                 .foregroundStyle(MetridayTheme.secondary)
         }
@@ -408,6 +415,15 @@ struct ReportBuilderSheet: View {
             projectStore: projectStore,
             options: options
         ).split(separator: "\n", omittingEmptySubsequences: true).count - 1)
+    }
+
+    private var projectScopeDescription: String {
+        if options.projectIDs.isEmpty {
+            return "Exporting all active projects and unassigned time."
+        }
+        return options.includeSubprojects
+            ? "Selected projects include their active subprojects."
+            : "Only the selected project levels are included."
     }
 
     private func settingRow<Content: View>(

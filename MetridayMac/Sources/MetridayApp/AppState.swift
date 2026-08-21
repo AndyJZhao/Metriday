@@ -2705,6 +2705,10 @@ final class AppState: ObservableObject {
 
     private func reportOptions(from query: [String: String]) -> ReportOptions {
         var options = ReportOptions()
+        options.includeSubprojects = apiBoolean(
+            query["include_subprojects"],
+            default: preferences.includeSubprojectsWhenSelectingProject
+        )
         switch query["include"]?.lowercased() {
         case "app", "app_usage", "appusage": options.include = .appUsage
         case "time", "time_entries", "timeentries": options.include = .timeEntries

@@ -421,7 +421,7 @@ function useMetridayAPI(dateKey, apiBase) {
     fetchPlan,
     fetchProjects,
     downloadReportFile: async ({ startDate, endDate, format, include, groupBy, billingFilter, rounding, roundingMinutes, projectIDs = [], durationFormat = "decimalMinutes", includeShortEntries = true, includeCoveredAppUsage = false, roundIndividualEntries = true, columns = [] }) => {
-      const params = new URLSearchParams({ start_date: startDate, end_date: endDate, format, include, group_by: groupBy, billing_status: billingFilter, rounding, rounding_minutes: String(roundingMinutes), duration_format: durationFormat, include_short_entries: String(includeShortEntries), include_covered_app_usage: String(includeCoveredAppUsage), round_individual_entries: String(roundIndividualEntries), device: snapshot.activityPreferences?.selected_device || "All Devices" });
+      const params = new URLSearchParams({ start_date: startDate, end_date: endDate, format, include, group_by: groupBy, billing_status: billingFilter, rounding, rounding_minutes: String(roundingMinutes), duration_format: durationFormat, include_short_entries: String(includeShortEntries), include_covered_app_usage: String(includeCoveredAppUsage), round_individual_entries: String(roundIndividualEntries), include_subprojects: String(snapshot.preferences?.include_subprojects_when_selecting_project !== false), device: snapshot.activityPreferences?.selected_device || "All Devices" });
       if (projectIDs.length > 0) params.set("project_ids", projectIDs.join(","));
       if (columns.length > 0) params.set("columns", columns.join(","));
       const response = await fetch(`${normalizeApiBase(apiBase)}/v1/reports?${params.toString()}`);
@@ -3299,7 +3299,8 @@ function WebReportPanel({ api, dateKey }) {
       const project = api.projects.find((item) => resourceID(item.id) === resourceID(value));
       return { rate: project?.billing_rate || 0, currency: project?.currency || "USD" };
     };
-    const selectedProjectIDs = new Set(projectIDs.flatMap((projectID) => [...descendantProjectIDs(api.projects, projectID)]));
+    const includeSubprojects = api.preferences?.include_subprojects_when_selecting_project !== false;
+    const selectedProjectIDs = new Set(projectIDs.flatMap((projectID) => includeSubprojects ? [...descendantProjectIDs(api.projects, projectID)] : [projectID]));
     const includesProject = (value) => projectIDs.length === 0 || selectedProjectIDs.has(resourceID(value));
     const coveredRanges = dataset.entries
       .map((entry) => ({ start: new Date(entry.start_date || entry.start), end: new Date(entry.end_date || entry.end) }))
@@ -3380,7 +3381,7 @@ function WebReportPanel({ api, dateKey }) {
       ? groupedRows
       : groupedRows.map((row) => ({ ...row, seconds: reportRoundSeconds(row.seconds, rounding, Number(roundingInterval)) }));
     return { rows: finalRows, totalSeconds: finalRows.reduce((sum, row) => sum + row.seconds, 0), billableSeconds: finalRows.reduce((sum, row) => sum + row.billableSeconds, 0), amount: finalRows.reduce((sum, row) => sum + row.amount, 0), currencies: [...new Set(finalRows.map((row) => row.currency).filter(Boolean))] };
-  }, [api.projects, billingFilter, dataset, groupBy, includeCoveredAppUsage, includeMode, includeShortEntries, localDeviceName, projectIDs, rangeEnd, rangeStart, roundIndividualEntries, rounding, roundingInterval, selectedDevice]);
+  }, [api.preferences?.include_subprojects_when_selecting_project, api.projects, billingFilter, dataset, groupBy, includeCoveredAppUsage, includeMode, includeShortEntries, localDeviceName, projectIDs, rangeEnd, rangeStart, roundIndividualEntries, rounding, roundingInterval, selectedDevice]);
   const setDatePreset = (preset) => {
     if (preset === "today") {
       setRangeStart(dateKey);
@@ -3538,7 +3539,7 @@ function WebReportPanel({ api, dateKey }) {
       <label>Rounding<select value={rounding} onChange={(event) => setRounding(event.target.value)}><option value="none">Exact</option><option value="up">Round up</option><option value="down">Round down</option><option value="nearest">Nearest</option></select></label>
       <label>Interval<select value={roundingInterval} onChange={(event) => setRoundingInterval(Number(event.target.value))}><option value={1}>1 min</option><option value={5}>5 min</option><option value={6}>6 min</option><option value={10}>10 min</option><option value={12}>12 min</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label>
     </div>
-    <div className="report-project-filter"><strong>Projects</strong><label><input type="checkbox" checked={projectIDs.length === 0} onChange={toggleAllReportProjects} />All projects</label>{api.projects.map((project) => { const id = resourceID(project.id); return <label key={project.id}><input type="checkbox" checked={projectIDs.length === 0 || projectIDs.includes(id)} onChange={(event) => toggleReportProject(id, event.target.checked)} />{project.title || project.name}</label>; })}</div>
+    <div className="report-project-filter"><strong>Projects</strong><label><input type="checkbox" checked={projectIDs.length === 0} onChange={toggleAllReportProjects} />All projects</label>{api.projects.map((project) => { const id = resourceID(project.id); return <label key={project.id}><input type="checkbox" checked={projectIDs.length === 0 || projectIDs.includes(id)} onChange={(event) => toggleReportProject(id, event.target.checked)} />{project.title || project.name}</label>; })}<small>{api.preferences?.include_subprojects_when_selecting_project === false ? "Subprojects excluded by Settings." : "Selected projects include active subprojects."}</small></div>
     <div className="report-advanced"><label>Duration<select value={durationFormat} onChange={(event) => setDurationFormat(event.target.value)}><option value="decimalMinutes">Fractional minutes</option><option value="hms">HH:MM:SS</option><option value="human">Xh Ym Zs</option><option value="seconds">Fractional seconds</option><option value="decimalHours">Fractional hours</option></select></label><label><input type="checkbox" checked={includeShortEntries} onChange={(event) => setIncludeShortEntries(event.target.checked)} />Include App usage shorter than 1 minute</label><label><input type="checkbox" checked={includeCoveredAppUsage} onChange={(event) => setIncludeCoveredAppUsage(event.target.checked)} />Include App usage covered by Time Entries</label><label><input type="checkbox" checked={roundIndividualEntries} onChange={(event) => setRoundIndividualEntries(event.target.checked)} disabled={rounding === "none"} />Round individual entries</label></div>
     <div className="report-columns"><strong>Columns</strong>{reportColumnOptions.map(([key, label]) => <label key={key}><input type="checkbox" checked={reportColumns.includes(key)} disabled={reportColumns.length === 1 && reportColumns.includes(key)} onChange={(event) => setReportColumns((current) => event.target.checked ? [...new Set([...current, key])] : current.filter((value) => value !== key))} />{label}</label>)}</div>
     </> : null}
