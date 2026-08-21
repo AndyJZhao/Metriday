@@ -1133,7 +1133,7 @@ final class AppState: ObservableObject {
             let requestedBilling = request.query["billing_status"]
             let search = request.query["search_query"]?.lowercased()
             let entries = timeEntryStore.materializedEntries().filter { entry in
-                guard entry.start >= startDate, entry.start < endDate else { return false }
+                guard entry.start < endDate, entry.end > startDate else { return false }
                 if let requestedProject, !requestedProject.isEmpty,
                    apiProjectID(requestedProject) != entry.projectID {
                     return false
