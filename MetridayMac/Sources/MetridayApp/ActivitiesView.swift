@@ -752,6 +752,7 @@ struct ActivitiesView: View {
         .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Date Range")
+        .accessibilityAction(named: "Go to Today") { appState.goToToday() }
         .accessibilityIdentifier("activities.toolbar.date-range")
     }
 

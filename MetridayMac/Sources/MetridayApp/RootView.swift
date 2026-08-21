@@ -716,17 +716,10 @@ struct GlobalTopHeader: View {
                     .minimumScaleFactor(0.72)
 
                 ZStack(alignment: .leading) {
-                    Button {
-                        appState.goToToday()
-                    } label: {
-                        Rectangle()
-                            .fill(.clear)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Color.clear
                     .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    .accessibilityLabel("Today")
-                    .accessibilityIdentifier("header.today-banner")
+                    .onTapGesture { appState.goToToday() }
+                    .accessibilityHidden(true)
 
                     HStack(spacing: 12) {
                         Button {
@@ -765,6 +758,8 @@ struct GlobalTopHeader: View {
                 )
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Date navigation; click empty space for Today")
+                .accessibilityAction(named: "Go to Today") { appState.goToToday() }
+                .accessibilityIdentifier("header.today-banner")
                 .foregroundStyle(MetridayTheme.secondary)
             }
             .frame(width: 250, alignment: .leading)
