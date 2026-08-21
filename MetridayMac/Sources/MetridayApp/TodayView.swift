@@ -362,34 +362,48 @@ struct TodayView: View {
 
     private var insightBar: some View {
         let summary = ActivitySummary(segments: effectiveActivitySegments)
-        return HStack(spacing: 14) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 23))
-                .foregroundStyle(MetridayTheme.accent)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 12) {
-                    Text(summary.activeMinutes > 0 ? "\(summary.activeMinutes)m active" : "Waiting for activity")
-                        .fontWeight(.semibold)
-                    Text("·").foregroundStyle(MetridayTheme.secondary)
-                    Text("\(summary.taskRelatedPercentage)% task-related")
-                        .fontWeight(.semibold)
-                        .foregroundStyle(MetridayTheme.success)
-                    Text("·").foregroundStyle(MetridayTheme.secondary)
-                    Text("\(summary.distractedMinutes)m distraction")
-                        .fontWeight(.semibold)
-                        .foregroundStyle(summary.distractedMinutes > 0 ? MetridayTheme.danger : MetridayTheme.secondary)
+        return Button {
+            appState.section = .rules
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 23))
+                    .foregroundStyle(MetridayTheme.accent)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 12) {
+                        Text(summary.activeMinutes > 0 ? "\(summary.activeMinutes)m active" : "Waiting for activity")
+                            .fontWeight(.semibold)
+                        Text("·").foregroundStyle(MetridayTheme.secondary)
+                        Text("\(summary.taskRelatedPercentage)% task-related")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(MetridayTheme.success)
+                        Text("·").foregroundStyle(MetridayTheme.secondary)
+                        Text("\(summary.distractedMinutes)m distraction")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(summary.distractedMinutes > 0 ? MetridayTheme.danger : MetridayTheme.secondary)
+                    }
+                    Text(insightText(summary: summary))
+                        .font(.system(size: 11))
+                        .foregroundStyle(MetridayTheme.secondary)
                 }
-                Text(insightText(summary: summary))
-                    .font(.system(size: 11))
-                    .foregroundStyle(MetridayTheme.secondary)
+                Spacer()
+                Text("Adjust blocklist")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(MetridayTheme.accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 7)
+                            .stroke(MetridayTheme.line)
+                    }
             }
-            Spacer()
-            Button("Adjust blocklist") { appState.section = .rules }
-                .buttonStyle(.bordered)
+            .font(.system(size: 12))
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 68)
+            .contentShape(Rectangle())
         }
-        .font(.system(size: 12))
-        .padding(.horizontal, 18)
-        .frame(height: 68)
+        .buttonStyle(.plain)
         .metridayPanel(radius: 10)
     }
 

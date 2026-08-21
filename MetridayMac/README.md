@@ -95,7 +95,7 @@ Calendar Events are an optional EventKit integration. After Calendar access is g
 
 Completed Reminders are an optional read-only EventKit integration. After Reminders access is granted, completed reminders appear in Activities for the selected day and their titles can be used as Time Entry suggestions or opened through Record for editing. Settings can limit the integration to selected reminder lists and hide recurring reminders; those filters are stored locally. Metriday never creates or changes reminders and does not automatically create a Time Entry.
 
-Calendar event, completed reminder, and phone-call rows expose their full primary content area as the Record action; compact trailing edit, delete, and hide controls retain their own independent hit targets.
+Calendar event, completed reminder, and phone-call rows expose their full primary content area as the Record action in Native and Web; compact trailing edit, delete, and hide controls retain their own independent hit targets.
 
 Research Focus status panels use one full-width Rules navigation action in both Native and Web; the former nested “Adjust allowed sites” controls are presentation text inside that primary hit target, so mouse, keyboard, and accessibility activation stay consistent.
 
