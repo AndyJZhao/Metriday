@@ -53,6 +53,8 @@ struct StatsView: View {
     @State private var customStartDate: Date
     @State private var customEndDate: Date
     @State private var projectSelectionAnchor: UUID?
+    @State private var collapsedStatsProjectIDs: Set<String> = []
+    @State private var collapsedStatsTitleIDs: Set<String> = []
     @StateObject private var activityCache = ActivitySegmentCache()
     @State private var refreshToken = 0
 
@@ -856,23 +858,29 @@ struct StatsView: View {
                     .chartLegend(.hidden)
                     .frame(width: 170, height: 170)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(projectPoints) { point in
-                            HStack(spacing: 7) {
-                                Circle()
-                                    .fill(point.color)
-                                    .frame(width: 8, height: 8)
-                                Text(point.name)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .lineLimit(1)
-                                Spacer(minLength: 6)
-                                Text(formatSeconds(point.seconds))
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(MetridayTheme.secondary)
+                    ScrollView(.vertical) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(statsTimeEntryGroups) { group in
+                                VStack(alignment: .leading, spacing: 0) {
+                                    statsProjectRow(group)
+                                    if !collapsedStatsProjectIDs.contains(group.id) {
+                                        ForEach(group.titleGroups) { titleGroup in
+                                            VStack(alignment: .leading, spacing: 0) {
+                                                statsTitleRow(titleGroup)
+                                                if !collapsedStatsTitleIDs.contains(titleGroup.id) {
+                                                    ForEach(titleGroup.entries) { entry in
+                                                        statsEntryRow(entry, color: group.color)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, maxHeight: 220, alignment: .topLeading)
                 }
             }
         }
@@ -880,6 +888,124 @@ struct StatsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .metridayPanel()
         .accessibilityIdentifier("stats.projects-and-time-entries")
+    }
+
+    @ViewBuilder
+    private func statsProjectRow(_ group: StatsProjectEntryGroup) -> some View {
+        let hasChildren = !group.titleGroups.isEmpty
+        if hasChildren {
+            Button {
+                toggleStatsProject(group.id)
+            } label: {
+                statsProjectRowLabel(
+                    group,
+                    isCollapsed: collapsedStatsProjectIDs.contains(group.id)
+                )
+            }
+            .buttonStyle(.plain)
+        } else {
+            statsProjectRowLabel(group, isCollapsed: true)
+        }
+    }
+
+    private func statsProjectRowLabel(
+        _ group: StatsProjectEntryGroup,
+        isCollapsed: Bool
+    ) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: group.titleGroups.isEmpty || isCollapsed ? "chevron.right" : "chevron.down")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(MetridayTheme.secondary)
+                .frame(width: 10)
+            Circle()
+                .fill(group.color)
+                .frame(width: 8, height: 8)
+            Text(group.name)
+                .font(.system(size: 11, weight: .semibold))
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            Text(formatSeconds(group.seconds))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(MetridayTheme.secondary)
+        }
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Project " + group.name + ", " + formatSeconds(group.seconds))
+        .accessibilityIdentifier("stats.projects-and-time-entries.project.\(group.id)")
+    }
+
+    private func statsTitleRow(_ group: StatsTitleEntryGroup) -> some View {
+        Button {
+            toggleStatsTitle(group.id)
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: collapsedStatsTitleIDs.contains(group.id) ? "chevron.right" : "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(MetridayTheme.secondary)
+                    .frame(width: 10)
+                Image(systemName: "text.alignleft")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(MetridayTheme.secondary)
+                Text(group.title)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                Text(formatSeconds(group.seconds))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(MetridayTheme.secondary)
+            }
+            .padding(.vertical, 4)
+            .padding(.leading, 17)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Title group \(group.title), \(formatSeconds(group.seconds))")
+        .accessibilityIdentifier("stats.projects-and-time-entries.title.\(group.id)")
+    }
+
+    private func statsEntryRow(_ entry: StatsEntryDetail, color: Color) -> some View {
+        Button {
+            openStatsEntry(entry)
+        } label: {
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(color.opacity(0.82))
+                    .frame(width: 7, height: 7)
+                    .padding(.leading, 34)
+                Text(statsEntryRangeLabel(entry))
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(MetridayTheme.graphite)
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                Text(formatSeconds(entry.seconds))
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(MetridayTheme.secondary)
+            }
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Open Activities for \(statsEntryRangeLabel(entry))")
+        .accessibilityLabel("Time entry \(statsEntryRangeLabel(entry)), \(formatSeconds(entry.seconds))")
+        .accessibilityIdentifier("stats.projects-and-time-entries.entry.\(entry.id.uuidString)")
+    }
+
+    private func statsEntryRangeLabel(_ entry: StatsEntryDetail) -> String {
+        let calendar = Calendar.current
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let timeFormatter = DateFormatter()
+        timeFormatter.locale = Locale(identifier: "en_US_POSIX")
+        timeFormatter.dateFormat = "HH:mm:ss"
+        if calendar.isDate(entry.start, inSameDayAs: entry.end) {
+            return "(dateFormatter.string(from: entry.start)), (timeFormatter.string(from: entry.start))–(timeFormatter.string(from: entry.end))"
+        }
+        return "(dateFormatter.string(from: entry.start)) (timeFormatter.string(from: entry.start))–(dateFormatter.string(from: entry.end)) (timeFormatter.string(from: entry.end))"
     }
 
     private var periodChartTitle: String {
@@ -1131,6 +1257,7 @@ struct StatsView: View {
             .map { projectID, seconds in
                 StatsProjectPoint(
                     id: projectID?.uuidString ?? "unassigned",
+                    projectID: projectID,
                     name: projectStore.name(for: projectID),
                     seconds: seconds,
                     color: projectColor(for: projectID),
@@ -1140,6 +1267,77 @@ struct StatsView: View {
             .sorted { $0.seconds > $1.seconds }
             .prefix(8)
             .map { $0 }
+    }
+
+    private var statsTimeEntryGroups: [StatsProjectEntryGroup] {
+        let periodStart = periodStartDate
+        let periodEnd = periodEndDate
+        let entries = timeEntryStore.materializedEntries().compactMap { entry -> StatsEntryDetail? in
+            guard entry.start < periodEnd,
+                  entry.end > periodStart,
+                  matchesProjectScope(entry.projectID) else { return nil }
+            let start = max(entry.start, periodStart)
+            let end = min(entry.end, periodEnd)
+            guard end > start else { return nil }
+            return StatsEntryDetail(
+                id: entry.id,
+                projectID: entry.projectID,
+                title: entry.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled" : entry.title,
+                start: start,
+                end: end,
+                seconds: max(1, Int(end.timeIntervalSince(start)))
+            )
+        }
+        let entriesByProject = Dictionary(grouping: entries) { detail in
+            detail.projectID?.uuidString ?? "unassigned"
+        }
+        return projectPoints.map { point in
+            let projectEntries = entriesByProject[point.id] ?? []
+            let entriesByTitle = Dictionary(grouping: projectEntries) { $0.title }
+            var titleGroups: [StatsTitleEntryGroup] = []
+            for (title, titleEntries) in entriesByTitle {
+                titleGroups.append(
+                    StatsTitleEntryGroup(
+                        id: point.id + "::" + title,
+                        title: title,
+                        entries: titleEntries.sorted { $0.start < $1.start },
+                        seconds: titleEntries.reduce(0) { $0 + $1.seconds }
+                    )
+                )
+            }
+            titleGroups.sort { left, right in
+                left.seconds == right.seconds ? left.title < right.title : left.seconds > right.seconds
+            }
+            return StatsProjectEntryGroup(
+                id: point.id,
+                projectID: point.projectID,
+                name: point.name,
+                color: point.color,
+                seconds: point.seconds,
+                titleGroups: titleGroups
+            )
+        }
+    }
+
+    private func toggleStatsProject(_ id: String) {
+        if collapsedStatsProjectIDs.contains(id) {
+            collapsedStatsProjectIDs.remove(id)
+        } else {
+            collapsedStatsProjectIDs.insert(id)
+        }
+    }
+
+    private func toggleStatsTitle(_ id: String) {
+        if collapsedStatsTitleIDs.contains(id) {
+            collapsedStatsTitleIDs.remove(id)
+        } else {
+            collapsedStatsTitleIDs.insert(id)
+        }
+    }
+
+    private func openStatsEntry(_ entry: StatsEntryDetail) {
+        appState.selectDate(Calendar.current.startOfDay(for: entry.start))
+        appState.section = .activities
     }
 
     private var categoryPoints: [StatsCategoryPoint] {
@@ -1410,6 +1608,7 @@ private struct StatsHourPoint: Identifiable {
 
 private struct StatsProjectPoint: Identifiable {
     let id: String
+    let projectID: UUID?
     let name: String
     let seconds: Int
     let color: Color
@@ -1419,6 +1618,31 @@ private struct StatsProjectPoint: Identifiable {
         let divisor = unit == .hour ? 1 : 24
         return max(1, Int((Double(seconds) / 60.0 / Double(divisor)).rounded()))
     }
+}
+
+private struct StatsProjectEntryGroup: Identifiable {
+    let id: String
+    let projectID: UUID?
+    let name: String
+    let color: Color
+    let seconds: Int
+    let titleGroups: [StatsTitleEntryGroup]
+}
+
+private struct StatsTitleEntryGroup: Identifiable {
+    let id: String
+    let title: String
+    let entries: [StatsEntryDetail]
+    let seconds: Int
+}
+
+private struct StatsEntryDetail: Identifiable {
+    let id: UUID
+    let projectID: UUID?
+    let title: String
+    let start: Date
+    let end: Date
+    let seconds: Int
 }
 
 private enum StatsProjectScope: Hashable {
