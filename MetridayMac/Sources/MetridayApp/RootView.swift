@@ -726,11 +726,6 @@ struct GlobalTopHeader: View {
                     .minimumScaleFactor(0.72)
 
                 ZStack(alignment: .leading) {
-                    Color.clear
-                    .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    .onTapGesture { appState.goToToday() }
-                    .accessibilityHidden(true)
-
                     HStack(spacing: 12) {
                         Button {
                             appState.section = .plan
@@ -760,6 +755,16 @@ struct GlobalTopHeader: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: 34)
+                .background {
+                    Button {
+                        appState.goToToday()
+                    } label: {
+                        Color.clear
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .accessibilityHidden(true)
+                }
                 .background(MetridayTheme.canvas)
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .overlay(
@@ -904,11 +909,6 @@ struct PageDateHeader: View {
             Spacer()
             if showsDateControls {
                 ZStack(alignment: .leading) {
-                    Color.clear
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .onTapGesture { appState.goToToday() }
-                        .accessibilityHidden(true)
-
                     HStack(spacing: 7) {
                         Button {
                             showingDatePicker.toggle()
@@ -985,6 +985,16 @@ struct PageDateHeader: View {
                 .accessibilityLabel("Date range")
                 .accessibilityAction(named: "Go to Today") { appState.goToToday() }
                 .accessibilityIdentifier("\(title.lowercased()).date-range")
+                .background {
+                    Button {
+                        appState.goToToday()
+                    } label: {
+                        Color.clear
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityHidden(true)
+                }
             }
         }
     }

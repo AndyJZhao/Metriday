@@ -1580,7 +1580,14 @@ function DateControls({ dateKey, onChange, label = "Choose date" }) {
     if (event.target.closest("button, input, label")) return;
     onChange(localDateKey());
   };
-  return <div className="date-controls" onClick={handleBlankClick} title="Click empty space to go to Today" aria-label="Date navigation" role="group">
+  const handleBlankKeyDown = (event) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onChange(localDateKey());
+    }
+  };
+  return <div className="date-controls" onClick={handleBlankClick} onKeyDown={handleBlankKeyDown} title="Click empty space to go to Today" aria-label="Date navigation; activate empty space for Today" role="group" tabIndex={0}>
     <DatePickerControl dateKey={dateKey} onChange={onChange} label={label} />
     <button type="button" className="quiet-pill" onClick={() => onChange(localDateKey())}>Today</button>
     <IconButton label="Previous day" onClick={() => onChange(offsetDateKey(dateKey, -1))}><CaretLeft size={18} /></IconButton>

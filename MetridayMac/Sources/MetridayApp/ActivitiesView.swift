@@ -787,11 +787,6 @@ struct ActivitiesView: View {
 
     private var dateRangeToolbar: some View {
         ZStack {
-            Color.clear
-                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                .onTapGesture { appState.goToToday() }
-                .accessibilityHidden(true)
-
             HStack(spacing: 0) {
                 Button {
                     appState.moveSelectedDate(byDays: -1)
@@ -842,6 +837,16 @@ struct ActivitiesView: View {
         .accessibilityLabel("Date Range")
         .accessibilityAction(named: "Go to Today") { appState.goToToday() }
         .accessibilityIdentifier("activities.toolbar.date-range")
+        .background {
+            Button {
+                appState.goToToday()
+            } label: {
+                Color.clear
+            }
+            .buttonStyle(.plain)
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .accessibilityHidden(true)
+        }
     }
 
     private var activitySearchField: some View {
