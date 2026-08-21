@@ -7,7 +7,7 @@ struct CalendarEventTimelineItem: Identifiable {
     let endMinute: Int
 
     var id: String {
-        "(event.id)-(startMinute)-(endMinute)"
+        "\(event.id)-\(startMinute)-\(endMinute)"
     }
 }
 
@@ -55,7 +55,7 @@ struct CalendarEventTimelineBlock: View {
                         .font(.system(size: 10, weight: .semibold))
                         .lineLimit(2)
                 }
-                Text("(TimeFormat.string(item.startMinute))–(TimeFormat.string(item.endMinute)) · (item.event.calendarTitle)")
+                Text("\(TimeFormat.string(item.startMinute))–\(TimeFormat.string(item.endMinute)) · \(item.event.calendarTitle)")
                     .font(.system(size: 9))
                     .foregroundStyle(MetridayTheme.secondary)
                     .lineLimit(1)
@@ -76,10 +76,10 @@ struct CalendarEventTimelineBlock: View {
         .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .offset(y: TimelineMetrics.y(for: item.startMinute))
         .onHover { isHovering = $0 }
-        .help("Calendar Event · (item.event.title)")
-        .accessibilityLabel("Calendar Event (item.event.title), (TimeFormat.range(start: item.startMinute, end: item.endMinute))")
+        .help("Calendar Event · \(item.event.title)")
+        .accessibilityLabel("Calendar Event \(item.event.title), \(TimeFormat.range(start: item.startMinute, end: item.endMinute))")
         .accessibilityHint("Read-only external event. Select to view details or record time.")
-        .accessibilityIdentifier("calendar.event.(item.event.id)")
+        .accessibilityIdentifier("calendar.event.\(item.event.id)")
     }
 }
 
@@ -93,7 +93,7 @@ struct CalendarEventDetailSheet: View {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "HH:mm"
-        return "(formatter.string(from: event.start))–(formatter.string(from: event.end))"
+        return "\(formatter.string(from: event.start))–\(formatter.string(from: event.end))"
     }
 
     var body: some View {
