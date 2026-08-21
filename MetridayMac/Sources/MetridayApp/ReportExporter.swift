@@ -234,6 +234,7 @@ enum ReportPreset: String, CaseIterable, Identifiable {
     case custom
     case timesheet
     case timesheetWeekDay
+    case timesheetWeekDayNotes
     case weeklySnippet
     case timePerProject
     case timePerApplication
@@ -252,6 +253,8 @@ enum ReportPreset: String, CaseIterable, Identifiable {
             return "Timesheet"
         case .timesheetWeekDay:
             return "Timesheet (Week + Day)"
+        case .timesheetWeekDayNotes:
+            return "Timesheet (Week + Day + Notes)"
         case .weeklySnippet:
             return "Weekly Snippet"
         case .timePerProject:

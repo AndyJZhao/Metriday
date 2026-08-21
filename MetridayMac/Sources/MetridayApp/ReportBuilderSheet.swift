@@ -72,6 +72,11 @@ struct ReportBuilderSheet: View {
             .frame(width: 190)
             .accessibilityLabel("Report builder mode")
             .accessibilityIdentifier("reports.builder-mode")
+            .onChange(of: advancedMode) { _, isAdvanced in
+                if !isAdvanced {
+                    applyPreset(preset)
+                }
+            }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -80,6 +85,9 @@ struct ReportBuilderSheet: View {
                     if advancedMode {
                         projectPanel
                         settingsPanel
+                        columnsPanel
+                    } else {
+                        easySettingsPanel
                         columnsPanel
                     }
                     previewPanel
@@ -222,6 +230,69 @@ struct ReportBuilderSheet: View {
                 .lineSpacing(2)
         }
         .padding(18)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(MetridayTheme.line, lineWidth: 1)
+        )
+    }
+
+    private var easySettingsPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Easy report options")
+                .font(.system(size: 15, weight: .bold))
+                .padding(.bottom, 12)
+
+            settingRow("Include") {
+                Picker("Include", selection: $options.include) {
+                    ForEach(ReportIncludeMode.allCases) { value in
+                        Text(value.label).tag(value)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 230)
+            }
+
+            settingRow("Rounding") {
+                HStack(spacing: 8) {
+                    Picker("Rounding", selection: $options.rounding) {
+                        ForEach(ReportRoundingMode.allCases) { value in
+                            Text(value.label).tag(value)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 150)
+
+                    Picker("Interval", selection: $options.roundingMinutes) {
+                        ForEach([1, 5, 6, 10, 12, 15, 30, 60], id: \.self) { minutes in
+                            Text("\(minutes) min").tag(minutes)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 90)
+                    .disabled(options.rounding == .none)
+                }
+            }
+
+            settingRow("File format") {
+                Picker("File format", selection: $format) {
+                    ForEach(ReportFileFormat.allCases) { value in
+                        Text(value.label).tag(value)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 230)
+            }
+
+            Text("Easy reports keep the common Timing workflow visible while Advanced mode exposes project, billing, grouping, and duration controls.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .lineSpacing(2)
+                .padding(.top, 8)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
@@ -450,6 +521,10 @@ struct ReportBuilderSheet: View {
         case .timesheetWeekDay:
             options.include = .both
             options.groupBy = .weekAndDay
+        case .timesheetWeekDayNotes:
+            options.include = .both
+            options.groupBy = .weekAndDay
+            options.columns.insert(.notes)
         case .weeklySnippet:
             options.include = .both
             options.groupBy = .week

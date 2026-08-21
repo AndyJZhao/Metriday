@@ -3234,7 +3234,7 @@ function WebReportPanel({ api, dateKey }) {
   const [reportPreset, setReportPreset] = useState("timesheet");
   const [reportMode, setReportMode] = useState("advanced");
   const [includeMode, setIncludeMode] = useState("both");
-  const [groupBy, setGroupBy] = useState("exact");
+  const [groupBy, setGroupBy] = useState("project");
   const [billingFilter, setBillingFilter] = useState("all");
   const [rounding, setRounding] = useState("none");
   const [roundingInterval, setRoundingInterval] = useState(15);
@@ -3271,6 +3271,7 @@ function WebReportPanel({ api, dateKey }) {
   const reportPresets = [
     { key: "timesheet", label: "Timesheet", include: "both", group: "project", icon: CalendarBlank },
     { key: "timesheet-week-day", label: "Timesheet (Week + Day)", include: "both", group: "weekAndDay", icon: CalendarBlank },
+    { key: "timesheet-week-day-notes", label: "Timesheet (Week + Day + Notes)", include: "both", group: "weekAndDay", icon: CalendarBlank, notes: true },
     { key: "weekly-snippet", label: "Weekly Snippet", include: "both", group: "week", icon: CalendarBlank },
     { key: "time-project", label: "Time Per Project", include: "both", group: "project", icon: FolderSimple },
     { key: "time-application", label: "Time Per Application", include: "app", group: "application", icon: Browsers },
@@ -3407,6 +3408,11 @@ function WebReportPanel({ api, dateKey }) {
     setReportPreset(selected.key);
     setIncludeMode(selected.include);
     setGroupBy(selected.group);
+    if (selected.notes) setReportColumns((current) => [...new Set([...current, "notes"])]);
+  };
+  const switchReportMode = (mode) => {
+    setReportMode(mode);
+    if (mode === "easy") applyReportPreset(reportPreset);
   };
   const formatReportDuration = (seconds) => {
     const value = Math.max(0, Number(seconds || 0));
@@ -3519,7 +3525,7 @@ function WebReportPanel({ api, dateKey }) {
       <div><TrendUp size={22} /><span>Export formats</span><strong>5</strong><small>CSV · XLSX · JSON · HTML · PDF</small></div>
     </section>
     <section className="report-builder-panel">
-      <div className="chart-heading"><div><h2>Report Builder</h2><p>Timing-style presets with custom date, project, grouping, billing, and duration options.</p></div><div className="report-builder-heading-actions"><div className="report-builder-mode" role="group" aria-label="Report builder mode"><button type="button" className={reportMode === "easy" ? "active" : ""} onClick={() => setReportMode("easy")}>Easy</button><button type="button" className={reportMode === "advanced" ? "active" : ""} onClick={() => setReportMode("advanced")}>Advanced</button></div><button type="button" className="report-builder-open" onClick={() => controlsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>Open Builder</button></div></div>
+      <div className="chart-heading"><div><h2>Report Builder</h2><p>Timing-style presets with Easy Include/Columns/Rounding controls and Advanced project, grouping, billing, and duration options.</p></div><div className="report-builder-heading-actions"><div className="report-builder-mode" role="group" aria-label="Report builder mode"><button type="button" className={reportMode === "easy" ? "active" : ""} onClick={() => switchReportMode("easy")}>Easy</button><button type="button" className={reportMode === "advanced" ? "active" : ""} onClick={() => switchReportMode("advanced")}>Advanced</button></div><button type="button" className="report-builder-open" onClick={() => controlsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>Open Builder</button></div></div>
       <div className="report-preset-cards">{reportPresets.map((preset) => { const Icon = preset.icon; return <button type="button" className={`report-preset-card${reportPreset === preset.key ? " active" : ""}`} key={preset.key} onClick={() => applyReportPreset(preset.key)}><span className="report-preset-icon"><Icon size={18} /></span><strong>{preset.label}</strong><CaretRight size={14} /></button>; })}</div>
     </section>
     <div className="chart-heading">
@@ -3542,7 +3548,14 @@ function WebReportPanel({ api, dateKey }) {
     <div className="report-project-filter"><strong>Projects</strong><label><input type="checkbox" checked={projectIDs.length === 0} onChange={toggleAllReportProjects} />All projects</label>{api.projects.map((project) => { const id = resourceID(project.id); return <label key={project.id}><input type="checkbox" checked={projectIDs.length === 0 || projectIDs.includes(id)} onChange={(event) => toggleReportProject(id, event.target.checked)} />{project.title || project.name}</label>; })}<small>{api.preferences?.include_subprojects_when_selecting_project === false ? "Subprojects excluded by Settings." : "Selected projects include active subprojects."}</small></div>
     <div className="report-advanced"><label>Duration<select value={durationFormat} onChange={(event) => setDurationFormat(event.target.value)}><option value="decimalMinutes">Fractional minutes</option><option value="hms">HH:MM:SS</option><option value="human">Xh Ym Zs</option><option value="seconds">Fractional seconds</option><option value="decimalHours">Fractional hours</option></select></label><label><input type="checkbox" checked={includeShortEntries} onChange={(event) => setIncludeShortEntries(event.target.checked)} />Include App usage shorter than 1 minute</label><label><input type="checkbox" checked={includeCoveredAppUsage} onChange={(event) => setIncludeCoveredAppUsage(event.target.checked)} />Include App usage covered by Time Entries</label><label><input type="checkbox" checked={roundIndividualEntries} onChange={(event) => setRoundIndividualEntries(event.target.checked)} disabled={rounding === "none"} />Round individual entries</label></div>
     <div className="report-columns"><strong>Columns</strong>{reportColumnOptions.map(([key, label]) => <label key={key}><input type="checkbox" checked={reportColumns.includes(key)} disabled={reportColumns.length === 1 && reportColumns.includes(key)} onChange={(event) => setReportColumns((current) => event.target.checked ? [...new Set([...current, key])] : current.filter((value) => value !== key))} />{label}</label>)}</div>
-    </> : null}
+    </> : <>
+    <div className="report-filters report-easy-filters">
+      <label>Include<select value={includeMode} onChange={(event) => setIncludeMode(event.target.value)}><option value="both">Time entries + app activity</option><option value="time">Time entries only</option><option value="app">App activity only</option></select></label>
+      <label>Rounding<select value={rounding} onChange={(event) => setRounding(event.target.value)}><option value="none">Exact</option><option value="up">Round up</option><option value="down">Round down</option><option value="nearest">Nearest</option></select></label>
+      <label>Interval<select value={roundingInterval} onChange={(event) => setRoundingInterval(Number(event.target.value))}><option value={1}>1 min</option><option value={5}>5 min</option><option value={6}>6 min</option><option value={10}>10 min</option><option value={12}>12 min</option><option value={15}>15 min</option><option value={30}>30 min</option><option value={60}>1 hour</option></select></label>
+    </div>
+    <div className="report-columns"><strong>Columns</strong>{reportColumnOptions.map(([key, label]) => <label key={key}><input type="checkbox" checked={reportColumns.includes(key)} disabled={reportColumns.length === 1 && reportColumns.includes(key)} onChange={(event) => setReportColumns((current) => event.target.checked ? [...new Set([...current, key])] : current.filter((value) => value !== key))} />{label}</label>)}</div>
+    </>}
     {message ? <p className="entry-message" role="status">{message}</p> : null}
     <div className="report-metrics"><div><span>Total</span><strong>{formatReportDuration(report.totalSeconds)}</strong></div><div><span>Billable</span><strong>{formatReportDuration(report.billableSeconds)}</strong></div><div><span>Amount</span><strong>{report.amount.toFixed(2)} {report.currencies.length === 1 ? report.currencies[0] : report.currencies.length > 1 ? "mixed" : "USD"}</strong></div><div><span>Rows</span><strong>{loading ? "…" : report.rows.length}</strong></div></div>
     {report.rows.length > 0 ? <div className="report-table-scroll"><div className="report-table" style={{ "--report-grid": reportPreviewGrid }}><div className="report-table-head">{reportPreviewColumns.map(([key, label]) => <span key={key} className={`report-table-cell report-table-cell-${key}`}>{label}</span>)}</div><div className="report-table-body">{report.rows.map((row, index) => <div className="report-table-row" key={`${row.kind}-${row.start.toISOString()}-${index}`}>{reportPreviewColumns.map(([key]) => { const value = reportPreviewValue(row, key); return key === "title" ? <strong key={key} className={`report-table-cell report-table-cell-${key}`} title={value}>{value || "—"}</strong> : <span key={key} className={`report-table-cell report-table-cell-${key}`} title={value}>{value || "—"}</span>; })}</div>)}</div></div></div> : <div className="entries-empty"><ChartBar size={24} /><span>{loading ? "Loading report data…" : api.connected ? "No rows match this report." : "Connect the native app to generate a report."}</span></div>}

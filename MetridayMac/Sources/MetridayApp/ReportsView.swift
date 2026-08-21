@@ -283,7 +283,7 @@ struct ReportsView: View {
 
     private func reportPresetIcon(_ preset: ReportPreset) -> String {
         switch preset {
-        case .timesheet, .timesheetWeekDay, .weeklySnippet: return "calendar"
+        case .timesheet, .timesheetWeekDay, .timesheetWeekDayNotes, .weeklySnippet: return "calendar"
         case .timePerProject: return "folder"
         case .timePerApplication: return "rectangle.on.rectangle"
         case .timePerDocument: return "doc.text"
