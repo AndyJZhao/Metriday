@@ -52,6 +52,7 @@ struct StatsView: View {
     @State private var statsPeriod: StatsPeriod = .week
     @State private var customStartDate: Date
     @State private var customEndDate: Date
+    @State private var projectSelectionAnchor: UUID?
 
     init(
         monitor: AppActivityMonitor,
@@ -239,6 +240,9 @@ struct StatsView: View {
         .onChange(of: customEndDate) { _, newDate in
             if newDate < customStartDate { customStartDate = newDate }
         }
+        .onAppear {
+            projectSelectionAnchor = selectedProjectIDs.first
+        }
     }
 
     private var projectScopePanel: some View {
@@ -292,7 +296,7 @@ struct StatsView: View {
             }
             .padding(.top, 8)
 
-            Text("Select a project to scope every chart and total to the same activity evidence.")
+            Text("Select a project to scope every chart and total. Hold ⌘ to combine projects or ⇧ to select a range.")
                 .font(.system(size: 9))
                 .foregroundStyle(MetridayTheme.secondary)
                 .lineSpacing(2)
@@ -310,8 +314,9 @@ struct StatsView: View {
         detail: String,
         symbol: String
     ) -> some View {
-        Button {
-            appState.activityScope = scope.activityScope
+        let isSelected = isProjectScopeSelected(scope)
+        return Button {
+            selectProjectScope(scope)
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: symbol)
@@ -328,17 +333,81 @@ struct StatsView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(projectScope == scope ? MetridayTheme.accentDeep : MetridayTheme.graphite)
+            .foregroundStyle(isSelected ? MetridayTheme.accentDeep : MetridayTheme.graphite)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(projectScope == scope ? MetridayTheme.accentSoft : Color.clear)
+            .background(isSelected ? MetridayTheme.accentSoft : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("stats.project-scope.\(scope.identifier)")
-        .accessibilityAddTraits(projectScope == scope ? .isSelected : [])
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var selectedProjectIDs: Set<UUID> {
+        switch projectScope {
+        case .project(let id): return [id]
+        case .projects(let ids): return ids
+        default: return []
+        }
+    }
+
+    private func isProjectScopeSelected(_ scope: StatsProjectScope) -> Bool {
+        switch scope {
+        case .project(let id): return selectedProjectIDs.contains(id)
+        default: return projectScope == scope
+        }
+    }
+
+    private func selectProjectScope(_ scope: StatsProjectScope) {
+        guard case .project(let projectID) = scope else {
+            projectSelectionAnchor = nil
+            appState.activityScope = scope.activityScope
+            return
+        }
+
+        let modifiers = NSEvent.modifierFlags
+        let usesCommand = modifiers.contains(.command)
+        let usesShift = modifiers.contains(.shift)
+        guard usesCommand || usesShift else {
+            projectSelectionAnchor = projectID
+            appState.activityScope = .project(projectID)
+            return
+        }
+
+        let projectIDs = projectStore.activeProjects.map(\.id)
+        var nextSelection = selectedProjectIDs
+        if usesShift, let anchor = projectSelectionAnchor,
+           let anchorIndex = projectIDs.firstIndex(of: anchor),
+           let projectIndex = projectIDs.firstIndex(of: projectID) {
+            let range = anchorIndex <= projectIndex
+                ? projectIDs[anchorIndex...projectIndex]
+                : projectIDs[projectIndex...anchorIndex]
+            if usesCommand {
+                nextSelection.formUnion(range)
+            } else {
+                nextSelection = Set(range)
+            }
+        } else if usesCommand {
+            if nextSelection.contains(projectID) {
+                nextSelection.remove(projectID)
+            } else {
+                nextSelection.insert(projectID)
+            }
+        } else {
+            nextSelection = [projectID]
+        }
+
+        projectSelectionAnchor = projectID
+        if nextSelection.isEmpty {
+            appState.activityScope = .all
+        } else if nextSelection.count == 1, let onlyID = nextSelection.first {
+            appState.activityScope = .project(onlyID)
+        } else {
+            appState.activityScope = .projects(nextSelection)
+        }
     }
 
     private func statCard(

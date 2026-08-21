@@ -5560,6 +5560,7 @@ function StatsDonut({ rows, total, label, centerLabel = null, centerCaption = nu
 }
 
 function StatsProjectScope({ projects, segments, entries, selectedID, onChange }) {
+  const projectSelectionAnchor = useRef(null);
   const secondsForActivity = (activity) => Math.max(0, Number(activity.endSecond || 0) - Number(activity.startSecond || 0));
   const activeSegments = segments.filter((activity) => activityCategory(activity).key !== "idle");
   const projectSeconds = new Map();
@@ -5587,11 +5588,44 @@ function StatsProjectScope({ projects, segments, entries, selectedID, onChange }
     };
   }).sort((left, right) => right.seconds - left.seconds || left.name.localeCompare(right.name));
   const selectedProjectIDs = projectIDsFromScope(selectedID);
+  const orderedProjectIDs = projectRows.map((project) => project.id);
+  const selectScope = (id, event) => {
+    if (id === "all" || id === "unassigned") {
+      projectSelectionAnchor.current = null;
+      onChange(id);
+      return;
+    }
+    const useCommand = Boolean(event?.metaKey);
+    const useShift = Boolean(event?.shiftKey);
+    if (!useCommand && !useShift) {
+      projectSelectionAnchor.current = id;
+      onChange(id);
+      return;
+    }
+    let nextSelection = new Set(selectedProjectIDs);
+    if (useShift && projectSelectionAnchor.current) {
+      const anchorIndex = orderedProjectIDs.indexOf(projectSelectionAnchor.current);
+      const projectIndex = orderedProjectIDs.indexOf(id);
+      if (anchorIndex >= 0 && projectIndex >= 0) {
+        const start = Math.min(anchorIndex, projectIndex);
+        const end = Math.max(anchorIndex, projectIndex);
+        const range = orderedProjectIDs.slice(start, end + 1);
+        nextSelection = useCommand ? new Set([...nextSelection, ...range]) : new Set(range);
+      }
+    } else if (useCommand) {
+      if (nextSelection.has(id)) nextSelection.delete(id);
+      else nextSelection.add(id);
+    } else {
+      nextSelection = new Set([id]);
+    }
+    projectSelectionAnchor.current = id;
+    onChange(nextSelection.size ? [...nextSelection].join(",") : "all");
+  };
   const scopeButton = (id, label, detail, Icon) => {
     const active = id === "all" ? selectedID === "all" : id === "unassigned" ? selectedID === "unassigned" : selectedProjectIDs.includes(id);
-    return <button type="button" className={`stats-project-scope-option${active ? " active" : ""}`} aria-pressed={active} onClick={() => onChange(id)}><Icon size={16} /><span><strong>{label}</strong><small>{detail}</small></span></button>;
+    return <button type="button" className={`stats-project-scope-option${active ? " active" : ""}`} aria-pressed={active} onClick={(event) => selectScope(id, event)}><Icon size={16} /><span><strong>{label}</strong><small>{detail}</small></span></button>;
   };
-  return <aside className="stats-project-scope" aria-label="Stats projects"><div className="stats-project-scope-heading"><h2>Projects</h2><span>{formatDurationSeconds(totalSeconds)}</span></div><div className="stats-project-scope-list">{scopeButton("all", "All Activities", `${activeSegments.length} segments`, Waveform)}{scopeButton("unassigned", "Unassigned", formatDurationSeconds(projectSeconds.get("unassigned") || 0), TrayIcon)}{projectRows.length ? <div className="stats-project-scope-label">My Projects</div> : null}{projectRows.map((project) => scopeButton(project.id, project.name, formatDurationSeconds(project.seconds), FolderSimple))}</div><p className="stats-project-scope-hint">⌘ click projects in Activities to combine scopes.</p></aside>;
+  return <aside className="stats-project-scope" aria-label="Stats projects"><div className="stats-project-scope-heading"><h2>Projects</h2><span>{formatDurationSeconds(totalSeconds)}</span></div><div className="stats-project-scope-list">{scopeButton("all", "All Activities", `${activeSegments.length} segments`, Waveform)}{scopeButton("unassigned", "Unassigned", formatDurationSeconds(projectSeconds.get("unassigned") || 0), TrayIcon)}{projectRows.length ? <div className="stats-project-scope-label">My Projects</div> : null}{projectRows.map((project) => scopeButton(project.id, project.name, formatDurationSeconds(project.seconds), FolderSimple))}</div><p className="stats-project-scope-hint">⌘ click to combine projects · ⇧ click to select a range.</p></aside>;
 }
 
 function StatsPage({ api, dateKey, setDateKey, setPage, projectScopeID, setProjectScopeID }) {
