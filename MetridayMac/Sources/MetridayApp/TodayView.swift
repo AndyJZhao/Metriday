@@ -81,25 +81,27 @@ struct TodayView: View {
                 }
                 ForEach(scheduledTasks) { task in
                     if let start = task.startMinute, let end = task.endMinute {
-                        StaticTimelineBlock(
-                            title: task.title,
-                            start: start,
-                            end: end,
-                            symbol: symbol(for: task),
-                            isCurrent: appState.currentTask?.id == task.id,
-                            actual: timeBlockExecutionSummary(
-                                taskID: task.id,
-                                entries: timeEntryStore.materializedEntries(),
-                                runningTimer: timeEntryStore.runningTimer,
-                                date: appState.selectedDate
-                            )
-                        )
-                        .padding(.horizontal, 10)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
+                        Button {
                             selectedTimeBlock = task
+                        } label: {
+                            StaticTimelineBlock(
+                                title: task.title,
+                                start: start,
+                                end: end,
+                                symbol: symbol(for: task),
+                                isCurrent: appState.currentTask?.id == task.id,
+                                actual: timeBlockExecutionSummary(
+                                    taskID: task.id,
+                                    entries: timeEntryStore.materializedEntries(),
+                                    runningTimer: timeEntryStore.runningTimer,
+                                    date: appState.selectedDate
+                                )
+                            )
+                            .padding(.horizontal, 10)
                         }
-                        .accessibilityAddTraits(.isButton)
+                        .buttonStyle(.plain)
+                        .offset(y: TimelineMetrics.y(for: start))
+                        .contentShape(Rectangle())
                         .accessibilityLabel("Plan \(task.title), \(TimeFormat.range(start: start, end: end))\(executionAccessibilitySuffix(for: task))")
                     }
                 }
@@ -142,29 +144,37 @@ struct TodayView: View {
             ZStack(alignment: .topLeading) {
                 TimelineGrid()
                 ForEach(visibleActivitySegments) { segment in
-                    actualBlock(segment: segment) {
-                        ActivityRow(
-                            minutes: segment.duration,
-                            title: segment.displayTitle,
-                            range: TimeFormat.range(start: segment.startMinute, end: segment.endMinute),
-                            symbol: symbol(for: segment),
-                            bundleIdentifier: segment.bundleIdentifier,
-                            relevance: segment.relevance,
-                            categoryColor: categoryColor(for: category(for: segment))
-                        )
+                    Button {
+                        selectedActivity = segment
+                    } label: {
+                        actualBlock(segment: segment) {
+                            ActivityRow(
+                                minutes: segment.duration,
+                                title: segment.displayTitle,
+                                range: TimeFormat.range(start: segment.startMinute, end: segment.endMinute),
+                                symbol: symbol(for: segment),
+                                bundleIdentifier: segment.bundleIdentifier,
+                                relevance: segment.relevance,
+                                categoryColor: categoryColor(for: category(for: segment))
+                            )
+                        }
                     }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                    .offset(y: TimelineMetrics.y(forSecond: segment.startSecond))
                     .contentShape(Rectangle())
-                    .onTapGesture { selectedActivity = segment }
-                    .accessibilityAddTraits(.isButton)
                     .accessibilityLabel("Actual \(segment.displayTitle), \(TimeFormat.range(start: segment.startMinute, end: segment.endMinute))")
                 }
                 ForEach(visibleTimeEntries) { entry in
-                    recordedTimeBlock(entry)
+                    Button {
+                        selectedTimeEntry = timeEntryStore.materializedEntries().first(where: { $0.id == entry.id })
+                    } label: {
+                        recordedTimeBlock(entry)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                    .offset(y: TimelineMetrics.y(forSecond: entry.startSecond))
                         .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedTimeEntry = timeEntryStore.materializedEntries().first(where: { $0.id == entry.id })
-                        }
-                        .accessibilityAddTraits(.isButton)
                         .accessibilityLabel("Recorded \(entry.title), \(TimeFormat.range(start: entry.startSecond / 60, end: Int(ceil(Double(entry.endSecond) / 60.0))))")
                 }
                 if Calendar.current.isDateInToday(appState.selectedDate) {
@@ -225,7 +235,6 @@ struct TodayView: View {
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.horizontal, 10)
-        .offset(y: TimelineMetrics.y(forSecond: entry.startSecond))
     }
 
     private var visibleActivitySegments: [ActivitySegment] {
@@ -344,7 +353,6 @@ struct TodayView: View {
             .frame(height: max(3, height))
             .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             .padding(.horizontal, 10)
-            .offset(y: TimelineMetrics.y(forSecond: segment.startSecond))
             .help("\(segment.displayTitle) · \(segment.duration)m")
         } else if segment.durationSeconds < 30 * 60 {
             Rectangle()
@@ -353,7 +361,6 @@ struct TodayView: View {
                 .frame(height: max(3, height))
                 .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                 .padding(.horizontal, 10)
-                .offset(y: TimelineMetrics.y(forSecond: segment.startSecond))
                 .help("\(segment.displayTitle) · \(segment.duration)m")
         } else {
             content()
@@ -363,7 +370,6 @@ struct TodayView: View {
                 .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(MetridayTheme.line, lineWidth: 1))
                 .frame(height: height)
                 .padding(.horizontal, 10)
-                .offset(y: TimelineMetrics.y(forSecond: segment.startSecond))
         }
     }
 

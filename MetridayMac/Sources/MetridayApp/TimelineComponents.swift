@@ -95,7 +95,6 @@ struct StaticTimelineBlock: View {
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(isCurrent ? MetridayTheme.accentDeep : MetridayTheme.accent.opacity(0.17), lineWidth: 1))
         .frame(height: TimelineMetrics.height(start: start, end: end))
-        .offset(y: TimelineMetrics.y(for: start))
     }
 }
 
