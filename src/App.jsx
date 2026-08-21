@@ -4080,6 +4080,14 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
       rowClickTimer.current = null;
       onCreateTimeEntry?.(activity);
     };
+    const openRowDetails = (event) => {
+      if (event.target.closest("button, .activity-row-action")) return;
+      openDetails(event);
+    };
+    const openRowTimeEntry = (event) => {
+      if (event.target.closest("button, .activity-row-action")) return;
+      openTimeEntry(event);
+    };
     const handleKeyDown = (event) => {
       if (event.target.closest(".activity-row-action")) return;
       if (event.key === "Enter" || event.key === " ") {
@@ -4093,7 +4101,7 @@ function ActivityTable({ activities, onSelect, viewMode = "unified", groupMode =
       openActivityContextMenu(event, activity);
     };
     const selected = selectedActivityIDs.has(resourceID(activity.id));
-    return <div className={`activity-table-row activity-table-row-expanded ${selected ? "selected" : ""}`} key={activity.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-metriday-activity", activity.id); event.dataTransfer.setData("text/plain", activity.id); event.dataTransfer.setData("application/x-metriday-activity-date", activity.date || dateKey); }} onContextMenu={openContextMenu} title="Drag this activity to a project to assign it">
+    return <div className={`activity-table-row activity-table-row-expanded ${selected ? "selected" : ""}`} key={activity.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-metriday-activity", activity.id); event.dataTransfer.setData("text/plain", activity.id); event.dataTransfer.setData("application/x-metriday-activity-date", activity.date || dateKey); }} onClick={openRowDetails} onDoubleClick={openRowTimeEntry} onContextMenu={openContextMenu} title="Drag this activity to a project to assign it">
       {onToggleActivitySelection ? <button type="button" className={`activity-row-select activity-row-action ${selected ? "selected" : ""}`} aria-label={selected ? `Deselect ${app}` : `Select ${app}`} aria-pressed={selected} onClick={() => onToggleActivitySelection(activity.id)}><CheckCircle size={16} weight={selected ? "fill" : "regular"} /></button> : <span className="activity-row-select-placeholder" aria-hidden="true" />}
       <button type="button" className="activity-row-main" onClick={openDetails} onDoubleClick={openTimeEntry} onKeyDown={handleKeyDown} aria-label={`Open details for ${app} ${formatRange(start, end)}`}>
         <span className="activity-app-cell"><span className="activity-table-icon"><Icon size={19} weight="duotone" /></span><span className="activity-app-copy"><strong>{app}</strong>{context ? <small>{context}</small> : null}{displayPreferences?.show_activity_date_ranges ? <small className="activity-date-range">{activityDateRangeLabel(activity, api?.preferences?.wrap_days_at_minute)}</small> : null}</span></span>
