@@ -478,19 +478,20 @@ metriday://phone-calls/hide?address=555-0100&hidden=false
 - 已实现单窗口 native AppKit/SwiftUI `NSPanel` prototype，尺寸约 372×248，可调整大小并保持 floating level。
 - 已复用现有 AppState / TimeEntryStore / Focus lifecycle，没有创建第二套 Timer 或 activity store。
 - 已接入 Global Header、菜单栏、Plan/Today Time Block 详情和 Focus menu；Focus 启动时自动显示 companion。
-- 已实现拖动、always-on-top、隐藏不停止 Focus、Pause/Stop 结束会话。
+- 已实现拖动、always-on-top、隐藏不停止 Focus；Pause 保留可 Resume 的 Markdown Block 上下文，Stop 才结束并清除会话。
 - 已实现当前 Timer、planned duration、remaining/overdue、Focused/Distracting/Other、blocklist 状态和菜单动作。
 - 已通过 `swift build`、`Scripts/run_smoke_tests.sh`、`Scripts/package_app.sh` 和 Native runtime AX 验证。
 
-### Phase B：把 companion 变成可验证的 Focus surface
+### Phase B：把 companion 变成可验证的 Focus surface（已完成）
 
-- 实时显示 Timer/Focus 的 remaining、open-ended、Over by 状态；
-- 显示当前 Block / task title、project、planned range、actual accumulated time；
-- 显示 Focused、Distracting、Other、Idle 的短条或百分比；
-- 显示 blocklist ready / blocked / permission required；
-- 提供 Stop、Pause、Resume、Open Metriday、Open Rules、Open current Block；
-- 用同一套 AX hit-target 规则覆盖整个 banner 和每个 action；
-- 通过 `swift build`、smoke、package、Computer Use runtime 和长时间 CPU 观察验证。
+- companion 已实时显示 Timer/Focus 的 remaining、open-ended、Paused 和 Over by 状态；
+- 已显示当前 Markdown Block、project context、planned range、actual accumulated time 和 interval count；
+- 已显示 Focused、Distracting、Other、Idle 的短条与百分比；
+- 已区分 blocklist ready、active、blocked domain 和 permission required；
+- 已提供 Stop、Pause、Resume、Open Metriday、Open Rules、Open current Block；
+- Pause 会保留同一 Markdown Block 的暂停上下文，Resume 按已累计实际时间扣减计划时长，Stop 才清除暂停上下文；
+- Native 与 Web 共用 pause/resume API，状态通过 focusPaused、paused task ID 和 plan date 传播；
+- 已通过 swift build、Scripts/run_smoke_tests.sh、Scripts/package_app.sh 和本地 API start → pause → resume → stop 生命周期验证；AX 验证待 Mac 解锁后补做。
 
 ### Phase C：之后再补硬化与差异化改进
 

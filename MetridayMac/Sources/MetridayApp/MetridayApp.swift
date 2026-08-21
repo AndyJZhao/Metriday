@@ -57,16 +57,16 @@ struct MetridayApp: App {
                 )
             }
             CommandMenu("Focus") {
-                Button(appState.focusSessionActive ? "Pause Focus" : "Start Focus") {
+                Button(appState.focusSessionActive ? "Pause Focus" : appState.focusIsPaused ? "Resume Focus" : "Start Focus") {
                     _ = appState.toggleFocusSession()
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
-                .disabled(!appState.focusSessionActive && appState.currentTask == nil)
+                .disabled(!appState.focusSessionActive && !appState.focusIsPaused && appState.currentTask == nil)
                 Divider()
                 Button("Show Focus Companion") {
                     appState.showFocusCompanion()
                 }
-                .disabled(appState.timeEntryStore.runningTimer == nil)
+                .disabled(appState.timeEntryStore.runningTimer == nil && !appState.focusIsPaused)
             }
             CommandMenu("Tracking") {
                 Button(appState.activityMonitor.isTracking ? "Pause Tracking" : "Resume Tracking") {
@@ -187,13 +187,13 @@ private struct MenuBarStatusView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            if appState.currentTask != nil || appState.focusSessionActive {
-                Button(appState.focusSessionActive ? "Pause Focus Session" : "Start Focus Session") {
+            if appState.currentTask != nil || appState.focusSessionActive || appState.focusIsPaused {
+                Button(appState.focusSessionActive ? "Pause Focus Session" : appState.focusIsPaused ? "Resume Focus Session" : "Start Focus Session") {
                     _ = appState.toggleFocusSession()
                 }
-                .disabled(!appState.focusSessionActive && appState.currentTask == nil)
+                .disabled(!appState.focusSessionActive && !appState.focusIsPaused && appState.currentTask == nil)
             }
-            if appState.timeEntryStore.runningTimer != nil {
+            if appState.timeEntryStore.runningTimer != nil || appState.focusIsPaused {
                 Button("Show Focus Companion") {
                     appState.showFocusCompanion()
                 }

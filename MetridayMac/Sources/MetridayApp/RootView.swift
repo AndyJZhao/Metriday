@@ -719,6 +719,7 @@ struct GlobalTopHeader: View {
 
     var body: some View {
         let sessionActive = appState.focusSessionActive
+        let sessionPaused = appState.focusIsPaused
         HStack(spacing: 18) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(dateTitle)
@@ -804,7 +805,7 @@ struct GlobalTopHeader: View {
                     _ = appState.toggleFocusSession()
                 } label: {
                     Label(
-                        sessionActive ? "Pause focus" : "Resume focus",
+                        sessionActive ? "Pause focus" : sessionPaused ? "Resume focus" : "Start focus",
                         systemImage: sessionActive ? "pause.fill" : "play.fill"
                     )
                     .font(.system(size: 13, weight: .semibold))
@@ -812,7 +813,7 @@ struct GlobalTopHeader: View {
                     .frame(height: 42)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!sessionActive && appState.currentTask == nil)
+                .disabled(!sessionActive && !sessionPaused && appState.currentTask == nil)
                 .accessibilityIdentifier("header.focus")
 
                 Button {
@@ -825,7 +826,7 @@ struct GlobalTopHeader: View {
                 .buttonStyle(.borderless)
                 .help("Show Focus companion")
                 .accessibilityLabel("Show Focus companion")
-                .disabled(appState.timeEntryStore.runningTimer == nil)
+                .disabled(appState.timeEntryStore.runningTimer == nil && !sessionPaused)
 
                 Divider().frame(height: 50)
 
@@ -838,7 +839,7 @@ struct GlobalTopHeader: View {
                             .foregroundStyle(MetridayTheme.success)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Research Focus").font(.system(size: 13, weight: .semibold))
-                            Text(appState.focusIsActive ? "Blocklist active" : "Blocklist ready")
+                            Text(appState.focusIsActive ? "Blocklist active" : sessionPaused ? "Focus paused" : "Blocklist ready")
                                 .font(.system(size: 11))
                                 .foregroundStyle(MetridayTheme.secondary)
                             Text("Adjust allowed sites")

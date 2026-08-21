@@ -41,6 +41,10 @@ struct TimeBlockDetailSheet: View {
         appState.focusSessionActive && !isFocused
     }
 
+    private var isPausedFocusBlock: Bool {
+        appState.focusIsPaused && appState.pausedFocusTaskID == task.id
+    }
+
     private var effectiveActivitySegments: [ActivitySegment] {
         appState.categoryStore.applyingCategories(
             to: appState.activityMonitor.segments(for: selectedDate) + appState.screenTimeStore.segments(for: selectedDate),
@@ -318,12 +322,17 @@ struct TimeBlockDetailSheet: View {
             Button {
                 appState.selectedTaskID = task.id
                 if isFocused {
-                    _ = appState.stopFocusSession()
+                    _ = appState.pauseFocusSession()
+                } else if isPausedFocusBlock {
+                    _ = appState.resumeFocusSession()
                 } else {
                     _ = appState.startFocusSession(taskID: task.id, date: selectedDate)
                 }
             } label: {
-                Label(isFocused ? "Pause Focus" : "Start Focus", systemImage: isFocused ? "pause.fill" : "play.fill")
+                Label(
+                    isFocused ? "Pause Focus" : isPausedFocusBlock ? "Resume Focus" : "Start Focus",
+                    systemImage: isFocused ? "pause.fill" : "play.fill"
+                )
             }
             .buttonStyle(.borderedProminent)
             .disabled(anotherFocusSessionIsActive || !task.isScheduled)
@@ -334,7 +343,7 @@ struct TimeBlockDetailSheet: View {
                 Label("Show Companion", systemImage: "macwindow.on.rectangle")
             }
             .buttonStyle(.bordered)
-            .disabled(appState.timeEntryStore.runningTimer == nil)
+            .disabled(appState.timeEntryStore.runningTimer == nil && !appState.focusIsPaused)
 
             Spacer()
             Button("Remove time", role: .destructive) {

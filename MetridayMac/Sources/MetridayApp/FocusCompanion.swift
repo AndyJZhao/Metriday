@@ -19,7 +19,7 @@ final class FocusCompanionController: NSObject, NSWindowDelegate {
         guard let appState else { return }
         if panel == nil {
             let panel = FocusCompanionPanel(
-                contentRect: NSRect(x: 0, y: 0, width: 372, height: 248),
+                contentRect: NSRect(x: 0, y: 0, width: 420, height: 370),
                 styleMask: [.borderless, .resizable, .nonactivatingPanel],
                 backing: .buffered,
                 defer: false
@@ -32,8 +32,8 @@ final class FocusCompanionController: NSObject, NSWindowDelegate {
             panel.isOpaque = false
             panel.backgroundColor = .clear
             panel.hasShadow = true
-            panel.minSize = NSSize(width: 340, height: 228)
-            panel.maxSize = NSSize(width: 460, height: 330)
+            panel.minSize = NSSize(width: 390, height: 330)
+            panel.maxSize = NSSize(width: 520, height: 460)
             panel.contentView = NSHostingView(
                 rootView: FocusCompanionView(appState: appState)
             )
@@ -78,6 +78,8 @@ private final class FocusCompanionPanel: NSPanel {
 struct FocusCompanionView: View {
     @ObservedObject var appState: AppState
     @ObservedObject private var timeEntryStore: TimeEntryStore
+    @ObservedObject private var blocker: WebBlockerService
+    @ObservedObject private var projectStore: ProjectStore
     @State private var metrics = FocusCompanionMetrics.empty
 
     private static let metricsClock = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
@@ -85,22 +87,23 @@ struct FocusCompanionView: View {
     init(appState: AppState) {
         self.appState = appState
         self._timeEntryStore = ObservedObject(wrappedValue: appState.timeEntryStore)
+        self._blocker = ObservedObject(wrappedValue: appState.blocker)
+        self._projectStore = ObservedObject(wrappedValue: appState.projectStore)
     }
 
     var body: some View {
         TimelineView(.periodic(from: MetridayTimeline.anchor, by: 1)) { context in
             let timer = timeEntryStore.runningTimer
-            let isFocus = timer?.customFields["metriday_focus_session"] == "true"
             let snapshot = snapshot(for: timer, now: context.date, metrics: metrics)
 
             VStack(alignment: .leading, spacing: 0) {
-                header(isFocus: isFocus, timer: timer)
+                header(snapshot: snapshot)
                 Divider().opacity(0.7)
+                currentBlock(snapshot: snapshot)
                 timerSummary(snapshot: snapshot)
+                activityBreakdown(snapshot: snapshot)
                 Divider().opacity(0.7)
-                breakdown(snapshot: snapshot)
-                Divider().opacity(0.7)
-                footer(timer: timer, isFocus: isFocus)
+                footer(timer: timer, snapshot: snapshot)
             }
             .padding(16)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -113,7 +116,7 @@ struct FocusCompanionView: View {
             .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
             .padding(1)
         }
-        .frame(minWidth: 340, minHeight: 228)
+        .frame(minWidth: 390, minHeight: 330)
         .onExitCommand {
             appState.hideFocusCompanion()
         }
@@ -125,20 +128,20 @@ struct FocusCompanionView: View {
         }
     }
 
-    private func header(isFocus: Bool, timer: RunningTimer?) -> some View {
+    private func header(snapshot: FocusCompanionSnapshot) -> some View {
         HStack(spacing: 9) {
-            Image(systemName: isFocus ? "target" : "timer")
+            Image(systemName: snapshot.isFocus ? "target" : "timer")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(isFocus ? MetridayTheme.accentDeep : MetridayTheme.secondary)
+                .foregroundStyle(snapshot.isFocus ? MetridayTheme.accentDeep : MetridayTheme.secondary)
                 .frame(width: 24, height: 24)
-                .background((isFocus ? MetridayTheme.accent : MetridayTheme.line).opacity(0.16))
+                .background((snapshot.isFocus ? MetridayTheme.accent : MetridayTheme.line).opacity(0.16))
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(isFocus ? "Focus Session" : timer == nil ? "Focus Companion" : "Timer")
+                Text(snapshot.isFocus ? snapshot.isPaused ? "Focus Session · Paused" : "Focus Session" : "Timer")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(MetridayTheme.secondary)
-                Text(timer?.title ?? "No active timer")
+                Text(snapshot.timerTitle)
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(MetridayTheme.graphite)
                     .lineLimit(1)
@@ -160,124 +163,287 @@ struct FocusCompanionView: View {
             .buttonStyle(.plain)
             .help("Hide Focus companion")
             .accessibilityLabel("Hide Focus companion")
+            .accessibilityIdentifier("focus-companion.hide")
         }
-        .padding(.bottom, 12)
+        .padding(.bottom, 11)
+    }
+
+    private func currentBlock(snapshot: FocusCompanionSnapshot) -> some View {
+        Button {
+            appState.openCurrentFocusBlock()
+            appState.hideFocusCompanion()
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: snapshot.hasTask ? "checkmark.circle" : "folder")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(snapshot.hasTask ? MetridayTheme.accentDeep : MetridayTheme.secondary)
+                    .frame(width: 22, height: 22)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(snapshot.hasTask ? "Current Block" : "Timer context")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(MetridayTheme.secondary)
+                    Text(snapshot.hasTask ? snapshot.taskTitle : snapshot.projectPath)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(MetridayTheme.graphite)
+                        .lineLimit(1)
+                    Text(snapshot.hasTask
+                         ? "\(snapshot.projectPath) · \(snapshot.plannedRange)"
+                         : snapshot.plannedRange)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(MetridayTheme.secondary)
+            }
+            .padding(.vertical, 9)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(0.42))
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .disabled(!snapshot.hasTask)
+        .accessibilityLabel(snapshot.hasTask ? "Open current Block \(snapshot.taskTitle)" : "Timer context")
+        .accessibilityIdentifier("focus-companion.current-block")
+        .padding(.vertical, 9)
     }
 
     private func timerSummary(snapshot: FocusCompanionSnapshot) -> some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text(snapshot.statusLabel)
-                    .font(.system(size: 31, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(snapshot.isOverdue ? MetridayTheme.danger : MetridayTheme.graphite)
-                Text(snapshot.detailLabel)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(MetridayTheme.secondary)
-                    .lineLimit(1)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(snapshot.statusLabel)
+                        .font(.system(size: 29, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(snapshot.isOverdue ? MetridayTheme.danger : MetridayTheme.graphite)
+                    Text(snapshot.detailLabel)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(MetridayTheme.secondary)
+                        .lineLimit(1)
+                }
 
-            Spacer(minLength: 8)
+                Spacer(minLength: 8)
 
-            VStack(alignment: .trailing, spacing: 5) {
-                Text(snapshot.plannedLabel)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(MetridayTheme.secondary)
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(appState.focusIsActive ? MetridayTheme.success : MetridayTheme.secondary)
-                        .frame(width: 7, height: 7)
-                    Text(appState.focusIsActive ? "Blocklist active" : "Blocklist ready")
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(snapshot.plannedLabel)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(MetridayTheme.secondary)
+                    Text(snapshot.actualLabel)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(appState.focusIsActive ? MetridayTheme.success : MetridayTheme.secondary)
+                        .foregroundStyle(snapshot.execution.isRunning ? MetridayTheme.accentDeep : MetridayTheme.secondary)
+                    blocklistBadge(snapshot.blocklist)
                 }
             }
-        }
-        .padding(.vertical, 14)
-        .overlay(alignment: .bottom) {
+
             GeometryReader { proxy in
-                Capsule()
-                    .fill(Color.black.opacity(0.07))
-                    .frame(height: 4)
-                    .overlay(alignment: .leading) {
-                        Capsule()
-                            .fill(snapshot.isOverdue ? MetridayTheme.danger : MetridayTheme.accent)
-                            .frame(width: proxy.size.width * snapshot.progress, height: 4)
-                    }
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.black.opacity(0.07))
+                    Capsule()
+                        .fill(snapshot.isOverdue ? MetridayTheme.danger : MetridayTheme.accent)
+                        .frame(width: proxy.size.width * snapshot.progress)
+                }
             }
-            .frame(height: 4)
+            .frame(height: 5)
         }
+        .padding(.bottom, 10)
     }
 
-    private func breakdown(snapshot: FocusCompanionSnapshot) -> some View {
-        HStack(spacing: 8) {
-            breakdownItem("Focused", seconds: snapshot.quality.focusedSeconds, color: MetridayTheme.accentDeep)
-            breakdownItem("Distracting", seconds: snapshot.quality.distractedSeconds, color: MetridayTheme.danger)
-            breakdownItem("Other", seconds: snapshot.quality.otherSeconds + snapshot.quality.idleSeconds, color: MetridayTheme.secondary)
+    private func blocklistBadge(_ state: FocusCompanionBlocklistState) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(state.color)
+                .frame(width: 6, height: 6)
+            Text(state.title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(state.color)
         }
-        .padding(.vertical, 11)
+        .help(state.detail)
+        .accessibilityLabel("Blocklist \(state.title). \(state.detail)")
+        .accessibilityIdentifier("focus-companion.blocklist")
     }
 
-    private func breakdownItem(_ title: String, seconds: Int, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
-                Circle().fill(color).frame(width: 6, height: 6)
-                Text(title)
+    private func activityBreakdown(snapshot: FocusCompanionSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text("Activity breakdown")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(MetridayTheme.secondary)
+                Spacer()
+                Text(snapshot.quality.hasActivity ? "\(snapshot.qualityPercentage)% focused" : "No evidence yet")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(MetridayTheme.secondary)
             }
-            Text(durationLabel(seconds))
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+
+            qualityBar(snapshot.quality)
+
+            HStack(spacing: 8) {
+                qualityMetric("Focused", seconds: snapshot.quality.focusedSeconds, color: MetridayTheme.accentDeep, total: snapshot.qualityTotalSeconds)
+                qualityMetric("Distracting", seconds: snapshot.quality.distractedSeconds, color: MetridayTheme.danger, total: snapshot.qualityTotalSeconds)
+                qualityMetric("Other", seconds: snapshot.quality.otherSeconds, color: MetridayTheme.secondary, total: snapshot.qualityTotalSeconds)
+                qualityMetric("Idle", seconds: snapshot.quality.idleSeconds, color: MetridayTheme.line, total: snapshot.qualityTotalSeconds)
+            }
+        }
+        .padding(.bottom, 10)
+    }
+
+    private func qualityBar(_ quality: TimeBlockActivityQuality) -> some View {
+        let total = max(1, quality.focusedSeconds + quality.distractedSeconds + quality.otherSeconds + quality.idleSeconds)
+        return GeometryReader { proxy in
+            HStack(spacing: 1) {
+                qualitySegment(quality.focusedSeconds, total: total, width: proxy.size.width, color: MetridayTheme.accentDeep)
+                qualitySegment(quality.distractedSeconds, total: total, width: proxy.size.width, color: MetridayTheme.danger)
+                qualitySegment(quality.otherSeconds, total: total, width: proxy.size.width, color: MetridayTheme.secondary)
+                qualitySegment(quality.idleSeconds, total: total, width: proxy.size.width, color: MetridayTheme.line)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 7)
+        .background(MetridayTheme.line.opacity(0.25))
+        .clipShape(Capsule())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Activity breakdown: \(percentage(quality.focusedSeconds, of: total)) percent focused, \(percentage(quality.distractedSeconds, of: total)) percent distracting, \(percentage(quality.otherSeconds, of: total)) percent other, \(percentage(quality.idleSeconds, of: total)) percent idle")
+    }
+
+    private func qualitySegment(_ seconds: Int, total: Int, width: CGFloat, color: Color) -> some View {
+        color
+            .frame(width: max(0, width * CGFloat(seconds) / CGFloat(total)))
+            .opacity(seconds > 0 ? 1 : 0)
+    }
+
+    private func qualityMetric(_ title: String, seconds: Int, color: Color, total: Int) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 3) {
+                Circle().fill(color).frame(width: 5, height: 5)
+                Text(title)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(MetridayTheme.secondary)
+            }
+            Text("\(percentage(seconds, of: total))% · \(durationLabel(seconds))")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(MetridayTheme.graphite)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title) \(percentage(seconds, of: total)) percent, \(durationLabel(seconds))")
     }
 
-    private func footer(timer: RunningTimer?, isFocus: Bool) -> some View {
-        HStack(spacing: 8) {
-            Button {
-                if isFocus {
-                    _ = appState.toggleFocusSession()
-                } else if timer != nil {
-                    _ = appState.stopTimer()
+    private func footer(timer: RunningTimer?, snapshot: FocusCompanionSnapshot) -> some View {
+        HStack(spacing: 7) {
+            if snapshot.isFocus && !snapshot.isPaused {
+                Button {
+                    _ = appState.pauseFocusSession()
+                } label: {
+                    Label("Pause", systemImage: "pause.fill")
+                        .font(.system(size: 10, weight: .semibold))
                 }
-            } label: {
-                Label(isFocus ? "Pause" : "Stop", systemImage: isFocus ? "pause.fill" : "stop.fill")
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(timer == nil)
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("focus-companion.pause")
 
-            Button("Open") {
-                if let taskID = timer?.customFields["metriday_plan_task_id"].flatMap(UUID.init(uuidString:)) {
-                    appState.selectedTaskID = taskID
-                    appState.section = .plan
+                Button {
+                    _ = appState.stopFocusSession()
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("focus-companion.stop")
+            } else if snapshot.isFocus && snapshot.isPaused {
+                Button {
+                    _ = appState.resumeFocusSession()
+                } label: {
+                    Label("Resume", systemImage: "play.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("focus-companion.resume")
+
+                Button {
+                    _ = appState.stopFocusSession()
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("focus-companion.stop")
+            } else if timer != nil {
+                Button {
+                    _ = appState.stopTimer()
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("focus-companion.stop")
+            } else {
+                Button {
+                    _ = appState.resumeFocusSession()
+                } label: {
+                    Label("Resume", systemImage: "play.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!appState.focusIsPaused)
+                .accessibilityIdentifier("focus-companion.resume")
+            }
+
+            Button(snapshot.hasTask ? "Open Block" : "Open") {
+                if snapshot.hasTask {
+                    appState.openCurrentFocusBlock()
                 } else {
                     appState.section = .activities
+                    activateMainWindow()
                 }
                 appState.hideFocusCompanion()
             }
             .buttonStyle(.bordered)
+            .accessibilityIdentifier("focus-companion.open")
 
             Spacer(minLength: 0)
 
             Menu {
                 Button("Open Metriday") {
-                    NSApp.activate(ignoringOtherApps: true)
+                    activateMainWindow()
                     appState.hideFocusCompanion()
                 }
-                Button("Open Plan") {
-                    appState.section = .plan
+                Button("Open Rules") {
+                    appState.section = .rules
+                    activateMainWindow()
                     appState.hideFocusCompanion()
+                }
+                if snapshot.hasTask {
+                    Button("Open current Block") {
+                        appState.openCurrentFocusBlock()
+                        appState.hideFocusCompanion()
+                    }
                 }
                 Divider()
                 Button("Hide Companion") {
                     appState.hideFocusCompanion()
                 }
-                if timer != nil {
-                    Button(isFocus ? "Stop Focus" : "Stop Timer", role: .destructive) {
-                        if isFocus { _ = appState.stopFocusSession() } else { _ = appState.stopTimer() }
+                if snapshot.isFocus && !snapshot.isPaused {
+                    Button("Pause Focus") {
+                        _ = appState.pauseFocusSession()
+                    }
+                    Button("Stop Focus", role: .destructive) {
+                        _ = appState.stopFocusSession()
+                    }
+                } else if snapshot.isFocus && snapshot.isPaused {
+                    Button("Resume Focus") {
+                        _ = appState.resumeFocusSession()
+                    }
+                    Button("Stop Focus", role: .destructive) {
+                        _ = appState.stopFocusSession()
+                    }
+                } else if timer != nil {
+                    Button("Stop Timer", role: .destructive) {
+                        _ = appState.stopTimer()
                     }
                 }
             } label: {
@@ -288,8 +454,9 @@ struct FocusCompanionView: View {
             .menuStyle(.borderlessButton)
             .help("Companion actions")
             .accessibilityLabel("Companion actions")
+            .accessibilityIdentifier("focus-companion.actions")
         }
-        .padding(.top, 11)
+        .padding(.top, 10)
     }
 
     private func snapshot(
@@ -297,60 +464,93 @@ struct FocusCompanionView: View {
         now: Date,
         metrics: FocusCompanionMetrics
     ) -> FocusCompanionSnapshot {
-        guard let timer else {
-            return .empty
+        let isFocus = timer?.customFields["metriday_focus_session"] == "true" || appState.focusIsPaused
+        let taskID = timer?.customFields["metriday_plan_task_id"].flatMap(UUID.init(uuidString:))
+            ?? appState.pausedFocusTaskID
+        let taskDate = timer?.customFields["metriday_plan_date"].flatMap(dayDate(from:))
+            ?? appState.pausedFocusDate
+            ?? appState.selectedDate
+        let task = taskID.flatMap { appState.markdownStore.task($0, on: taskDate) }
+        let timerTitle = timer?.title ?? task?.title ?? (isFocus ? "Focus Session" : "No active timer")
+        let plannedSeconds = task.map { $0.duration * 60 } ?? timer?.estimatedDurationSeconds
+        let currentRunSeconds = timer.map { max(0, Int(now.timeIntervalSince($0.startedAt))) } ?? 0
+        let isLinkedRunning = timer != nil && taskID != nil
+        let actualSeconds = metrics.execution.durationSeconds + (isLinkedRunning ? currentRunSeconds : 0)
+        let intervalCount = metrics.execution.intervalCount + (isLinkedRunning ? 1 : 0)
+        let actualExecution = TimeBlockExecutionSummary(
+            durationSeconds: actualSeconds,
+            intervalCount: intervalCount,
+            isRunning: isLinkedRunning
+        )
+        let remainingSeconds: Int?
+        if isFocus, task != nil {
+            remainingSeconds = plannedSeconds.map { $0 - actualSeconds }
+        } else {
+            remainingSeconds = plannedSeconds.map { $0 - currentRunSeconds }
         }
-
-        let taskID = timer.customFields["metriday_plan_task_id"].flatMap(UUID.init(uuidString:))
-        let task = taskID.flatMap { appState.markdownStore.task($0) }
-        let plannedSeconds = task.map { $0.duration * 60 } ?? timer.estimatedDurationSeconds
-        let elapsedSeconds = max(0, Int(now.timeIntervalSince(timer.startedAt)))
-        let remainingSeconds = plannedSeconds.map { $0 - elapsedSeconds }
         let isOverdue = remainingSeconds.map { $0 < 0 } ?? false
+        let progress = plannedSeconds.map {
+            min(1, max(0, Double(isFocus && task != nil ? actualSeconds : currentRunSeconds) / Double(max(1, $0))))
+        } ?? 0
+        let plannedRange = task?.timeRange ?? "Open-ended"
+        let actualLabel = actualExecution.hasExecution ? "Actual \(actualExecution.durationLabel)" : "No actual time"
+        let detailLabel: String
+        if isFocus && appState.focusIsPaused {
+            detailLabel = "Paused · \(actualExecution.intervalCount) interval\(actualExecution.intervalCount == 1 ? "" : "s")"
+        } else if isFocus && task != nil {
+            detailLabel = task?.timeRange ?? "Running now"
+        } else {
+            detailLabel = "Running now"
+        }
         return FocusCompanionSnapshot(
-            statusLabel: statusLabel(remainingSeconds: remainingSeconds, elapsedSeconds: elapsedSeconds),
-            detailLabel: task?.timeRange ?? "Running now",
+            timerTitle: timerTitle,
+            taskTitle: task?.title ?? timerTitle,
+            projectPath: projectStore.hierarchyPath(for: timer?.projectID),
+            plannedRange: plannedRange,
+            statusLabel: statusLabel(remainingSeconds: remainingSeconds, elapsedSeconds: currentRunSeconds, isPaused: appState.focusIsPaused),
+            detailLabel: detailLabel,
             plannedLabel: plannedSeconds.map { "Planned \(durationLabel($0))" } ?? "Open-ended",
-            progress: plannedSeconds.map { min(1, max(0, Double(elapsedSeconds) / Double(max(1, $0)))) } ?? 0,
+            actualLabel: actualLabel,
+            progress: progress,
             isOverdue: isOverdue,
+            isFocus: isFocus,
+            isPaused: appState.focusIsPaused,
+            hasTask: task != nil,
             quality: metrics.quality,
-            execution: metrics.execution
+            execution: actualExecution,
+            blocklist: blocklistState()
         )
     }
 
     private func refreshMetrics() {
-        guard let timer = timeEntryStore.runningTimer else {
-            metrics = .empty
-            return
-        }
-        let taskID = timer.customFields["metriday_plan_task_id"].flatMap(UUID.init(uuidString:))
-        let task = taskID.flatMap { appState.markdownStore.task($0) }
-        let quality: TimeBlockActivityQuality
-        if let task {
-            quality = activityQuality(for: task)
-        } else {
-            quality = .empty
-        }
+        let timer = timeEntryStore.runningTimer
+        let taskID = timer?.customFields["metriday_plan_task_id"].flatMap(UUID.init(uuidString:))
+            ?? appState.pausedFocusTaskID
+        let taskDate = timer?.customFields["metriday_plan_date"].flatMap(dayDate(from:))
+            ?? appState.pausedFocusDate
+            ?? appState.selectedDate
+        let task = taskID.flatMap { appState.markdownStore.task($0, on: taskDate) }
+        let quality = task.map { activityQuality(for: $0, date: taskDate) } ?? .empty
         let execution = task.map {
             timeBlockExecutionSummary(
                 taskID: $0.id,
-                entries: timeEntryStore.materializedEntries(),
-                runningTimer: timer,
-                date: appState.selectedDate
+                entries: timeEntryStore.entries,
+                runningTimer: nil,
+                date: taskDate
             )
         } ?? .empty
         metrics = FocusCompanionMetrics(quality: quality, execution: execution)
     }
 
-    private func activityQuality(for task: PlanTask) -> TimeBlockActivityQuality {
+    private func activityQuality(for task: PlanTask, date: Date) -> TimeBlockActivityQuality {
         guard let start = task.startMinute, let end = task.endMinute else {
             return .empty
         }
         let segments = appState.categoryStore.applyingCategories(
-            to: appState.activityMonitor.segments(for: appState.selectedDate)
-                + appState.screenTimeStore.segments(for: appState.selectedDate),
+            to: appState.activityMonitor.segments(for: date)
+                + appState.screenTimeStore.segments(for: date),
             filterStore: appState.filterStore,
-            date: appState.selectedDate
+            date: date
         )
         return timeBlockActivityQuality(
             segments: segments,
@@ -359,12 +559,41 @@ struct FocusCompanionView: View {
         )
     }
 
-    private func statusLabel(remainingSeconds: Int?, elapsedSeconds: Int) -> String {
+    private func blocklistState() -> FocusCompanionBlocklistState {
+        let status = blocker.status.lowercased()
+        if status.contains("permission") || status.contains("automation") {
+            return .permissionRequired(blocker.status)
+        }
+        if let domain = blocker.lastBlockedDomain, blocker.isActive {
+            return .blocked(domain)
+        }
+        return blocker.isActive ? .active : .ready
+    }
+
+    private func statusLabel(remainingSeconds: Int?, elapsedSeconds: Int, isPaused: Bool) -> String {
+        if isPaused { return "Paused" }
         guard let remainingSeconds else { return durationLabel(elapsedSeconds) }
         if remainingSeconds < 0 {
             return "Over by \(durationLabel(-remainingSeconds))"
         }
         return durationLabel(remainingSeconds)
+    }
+
+    private func activateMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first(where: { $0.canBecomeKey && !$0.isKind(of: NSPanel.self) })?.makeKeyAndOrderFront(nil)
+    }
+
+    private func dayDate(from rawValue: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: rawValue)
+    }
+
+    private func percentage(_ value: Int, of total: Int) -> Int {
+        guard total > 0 else { return 0 }
+        return Int((Double(value) / Double(total) * 100).rounded())
     }
 
     private func durationLabel(_ seconds: Int) -> String {
@@ -387,21 +616,63 @@ private struct FocusCompanionMetrics {
 }
 
 private struct FocusCompanionSnapshot {
+    let timerTitle: String
+    let taskTitle: String
+    let projectPath: String
+    let plannedRange: String
     let statusLabel: String
     let detailLabel: String
     let plannedLabel: String
+    let actualLabel: String
     let progress: Double
     let isOverdue: Bool
+    let isFocus: Bool
+    let isPaused: Bool
+    let hasTask: Bool
     let quality: TimeBlockActivityQuality
     let execution: TimeBlockExecutionSummary
+    let blocklist: FocusCompanionBlocklistState
 
-    static let empty = FocusCompanionSnapshot(
-        statusLabel: "No timer",
-        detailLabel: "Start a Timer or Focus Session from Metriday",
-        plannedLabel: "",
-        progress: 0,
-        isOverdue: false,
-        quality: .empty,
-        execution: .empty
-    )
+    var qualityTotalSeconds: Int {
+        quality.focusedSeconds + quality.distractedSeconds + quality.otherSeconds + quality.idleSeconds
+    }
+
+    var qualityPercentage: Int {
+        guard qualityTotalSeconds > 0 else { return 0 }
+        return Int((Double(quality.focusedSeconds) / Double(qualityTotalSeconds) * 100).rounded())
+    }
+}
+
+private enum FocusCompanionBlocklistState: Hashable {
+    case ready
+    case active
+    case blocked(String)
+    case permissionRequired(String)
+
+    var title: String {
+        switch self {
+        case .ready: return "Ready"
+        case .active: return "Active"
+        case .blocked(let domain): return "Blocked · \(domain)"
+        case .permissionRequired: return "Permission needed"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .ready: return "Focus protection is ready to start"
+        case .active: return "Safari and Chrome are being monitored"
+        case .blocked(let domain): return "\(domain) was redirected by the active blocklist"
+        case .permissionRequired(let status): return status
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .ready: return MetridayTheme.secondary
+        case .active: return MetridayTheme.success
+        case .blocked: return MetridayTheme.danger
+        case .permissionRequired: return MetridayTheme.warning
+        }
+    }
 }

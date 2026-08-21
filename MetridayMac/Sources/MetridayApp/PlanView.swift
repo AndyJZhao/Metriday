@@ -1094,6 +1094,10 @@ struct CalendarTaskBlock: View {
         appState.focusSessionActive && !isFocused
     }
 
+    private var isPausedFocusBlock: Bool {
+        appState.focusIsPaused && appState.pausedFocusTaskID == task.id
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(task.timeRange ?? "")
@@ -1142,7 +1146,9 @@ struct CalendarTaskBlock: View {
                 Button {
                     appState.selectedTaskID = task.id
                     if isFocused {
-                        _ = appState.stopFocusSession()
+                        _ = appState.pauseFocusSession()
+                    } else if isPausedFocusBlock {
+                        _ = appState.resumeFocusSession()
                     } else {
                         _ = appState.startFocusSession(taskID: task.id, date: appState.selectedDate)
                     }
@@ -1156,8 +1162,8 @@ struct CalendarTaskBlock: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(anotherFocusSessionIsActive)
-                .help(isFocused ? "Pause Focus" : anotherFocusSessionIsActive ? "Another Focus Session is running" : "Start Focus")
-                .accessibilityLabel(isFocused ? "Pause Focus for \(task.title)" : "Start Focus for \(task.title)")
+                .help(isFocused ? "Pause Focus" : isPausedFocusBlock ? "Resume Focus" : anotherFocusSessionIsActive ? "Another Focus Session is running" : "Start Focus")
+                .accessibilityLabel(isFocused ? "Pause Focus for \(task.title)" : isPausedFocusBlock ? "Resume Focus for \(task.title)" : "Start Focus for \(task.title)")
                 .padding(.top, 5)
                 .padding(.trailing, 6)
             }

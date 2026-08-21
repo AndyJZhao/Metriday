@@ -6,6 +6,8 @@ import Foundation
 final class AppState: ObservableObject {
     private static let focusSessionField = "metriday_focus_session"
     private static let focusTaskDateField = "metriday_plan_date"
+    private static let pausedFocusTaskKey = "Metriday.pausedFocusTaskID"
+    private static let pausedFocusDateKey = "Metriday.pausedFocusDate"
 
     @Published var section: AppSection = .today
     @Published private(set) var selectedDate: Date
@@ -19,6 +21,8 @@ final class AppState: ObservableObject {
     @Published var focusIsActive = false {
         didSet { blocker.isActive = focusIsActive }
     }
+    @Published private(set) var pausedFocusTaskID: UUID?
+    @Published private(set) var pausedFocusDate: Date?
     @Published var selectedTaskID: UUID?
     @Published var requestedTimeEntryID: UUID?
     @Published var draggingTaskID: UUID?
@@ -114,11 +118,14 @@ final class AppState: ObservableObject {
             .flatMap(UUID.init(uuidString:))
         let restoredFocusDate = restoredFocusTimer?.customFields[Self.focusTaskDateField]
             .flatMap { self.apiDate(from: $0) }
+        self.pausedFocusTaskID = UserDefaults.standard.string(forKey: Self.pausedFocusTaskKey)
+            .flatMap(UUID.init(uuidString:))
+        self.pausedFocusDate = UserDefaults.standard.object(forKey: Self.pausedFocusDateKey) as? Date
         if let restoredFocusDate {
             self.selectedDate = Calendar.current.startOfDay(for: restoredFocusDate)
             _ = markdownStore.load(date: self.selectedDate)
         }
-        self.selectedTaskID = restoredFocusTaskID
+        self.selectedTaskID = restoredFocusTaskID ?? pausedFocusTaskID
         blocker.setFocusTitle(
             restoredFocusTimer?.customFields[Self.focusSessionField] == "true"
                 ? restoredFocusTimer?.title
@@ -175,6 +182,9 @@ final class AppState: ObservableObject {
             self?.quickStartTimer()
         }
         self.focusCompanionController = FocusCompanionController(appState: self)
+        if restoredFocusTimer != nil || pausedFocusTaskID != nil {
+            showFocusCompanion()
+        }
     }
 
     var currentTask: PlanTask? {
@@ -246,6 +256,10 @@ final class AppState: ObservableObject {
         return timer.customFields[Self.focusSessionField] == "true"
     }
 
+    var focusIsPaused: Bool {
+        pausedFocusTaskID != nil && !focusSessionActive
+    }
+
     @discardableResult
     func setFocusActive(_ active: Bool) -> Bool {
         guard active || !focusSessionActive else { return false }
@@ -287,18 +301,54 @@ final class AppState: ObservableObject {
             ]
         )
         focusIsActive = true
+        clearPausedFocus()
         showFocusCompanion()
         return true
     }
 
+    /// Pauses a Focus Session without losing the Markdown task context. The
+    /// completed interval is materialized by TimeEntryStore, while the
+    /// companion remains available to resume or explicitly stop the session.
+    @discardableResult
+    func pauseFocusSession() -> Bool {
+        guard let timer = timeEntryStore.runningTimer, focusSessionActive else { return false }
+        let taskID = timer.customFields["metriday_plan_task_id"].flatMap(UUID.init(uuidString:))
+        let date = timer.customFields[Self.focusTaskDateField].flatMap { apiDate(from: $0) }
+            ?? selectedDate
+        _ = timeEntryStore.stopTimer()
+        blocker.setFocusTitle(nil)
+        focusIsActive = false
+        pausedFocusTaskID = taskID
+        pausedFocusDate = Calendar.current.startOfDay(for: date)
+        persistPausedFocus()
+        showFocusCompanion()
+        return true
+    }
+
+    /// Resumes the paused Markdown Time Block using its accumulated execution
+    /// time. A completed planned duration naturally becomes open-ended through
+    /// timeBlockFocusEstimateSeconds, so Resume never resets the block.
+    @discardableResult
+    func resumeFocusSession(taskID requestedTaskID: UUID? = nil, date requestedDate: Date? = nil) -> Bool {
+        guard !focusSessionActive else { return true }
+        let taskID = requestedTaskID ?? pausedFocusTaskID ?? currentTask?.id
+        let date = requestedDate ?? pausedFocusDate ?? selectedDate
+        guard let taskID else { return false }
+        if !Calendar.current.isDate(date, inSameDayAs: selectedDate) {
+            selectDate(date)
+        }
+        return startFocusSession(taskID: taskID, date: date)
+    }
+
     @discardableResult
     func stopFocusSession() -> Bool {
-        let wasActive = focusSessionActive || focusIsActive
+        let wasActive = focusSessionActive || focusIsActive || focusIsPaused
         if focusSessionActive {
             _ = timeEntryStore.stopTimer()
         }
         blocker.setFocusTitle(nil)
         focusIsActive = false
+        clearPausedFocus()
         hideFocusCompanion()
         return wasActive
     }
@@ -314,13 +364,59 @@ final class AppState: ObservableObject {
             blocker.setFocusTitle(nil)
             focusIsActive = false
         }
+        clearPausedFocus()
         hideFocusCompanion()
         return id
     }
 
     @discardableResult
     func toggleFocusSession() -> Bool {
-        focusSessionActive ? stopFocusSession() : startFocusSession()
+        focusSessionActive ? pauseFocusSession() : resumeFocusSession()
+    }
+
+    private func persistPausedFocus() {
+        if let taskID = pausedFocusTaskID {
+            UserDefaults.standard.set(taskID.uuidString, forKey: Self.pausedFocusTaskKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.pausedFocusTaskKey)
+        }
+        if let pausedFocusDate {
+            UserDefaults.standard.set(pausedFocusDate, forKey: Self.pausedFocusDateKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.pausedFocusDateKey)
+        }
+    }
+
+    private func clearPausedFocus() {
+        pausedFocusTaskID = nil
+        pausedFocusDate = nil
+        UserDefaults.standard.removeObject(forKey: Self.pausedFocusTaskKey)
+        UserDefaults.standard.removeObject(forKey: Self.pausedFocusDateKey)
+    }
+
+    func openCurrentFocusBlock() {
+        guard let timer = timeEntryStore.runningTimer else {
+            guard let taskID = pausedFocusTaskID else { return }
+            if let date = pausedFocusDate,
+               !Calendar.current.isDate(date, inSameDayAs: selectedDate) {
+                selectDate(date)
+            }
+            selectedTaskID = taskID
+            section = .plan
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        if let date = timer.customFields[Self.focusTaskDateField].flatMap({ apiDate(from: $0) }),
+           !Calendar.current.isDate(date, inSameDayAs: selectedDate) {
+            selectDate(date)
+        }
+        if let taskID = timer.customFields["metriday_plan_task_id"].flatMap(UUID.init(uuidString:)) {
+            selectedTaskID = taskID
+            section = .plan
+        } else {
+            section = .activities
+        }
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func showFocusCompanion() {
@@ -437,6 +533,8 @@ final class AppState: ObservableObject {
         }
         blocker.setFocusTitle(entry.title)
         focusIsActive = true
+        clearPausedFocus()
+        showFocusCompanion()
     }
 
     func startTimer(
@@ -462,6 +560,7 @@ final class AppState: ObservableObject {
             blocker.setFocusTitle(nil)
             focusIsActive = false
         }
+        clearPausedFocus()
     }
 
     private func handle(localAPI request: LocalAPIRequest) -> LocalAPIResponse {
@@ -513,7 +612,10 @@ final class AppState: ObservableObject {
                 "deviceName": syncStore.deviceName,
                 "api": localAPIServer.endpoint,
                 "focusActive": focusIsActive,
-                "focusSessionActive": focusSessionActive
+                "focusSessionActive": focusSessionActive,
+                "focusPaused": focusIsPaused,
+                "focusPausedTaskID": pausedFocusTaskID?.uuidString ?? NSNull(),
+                "focusPausedDate": pausedFocusDate.map(apiDate) ?? NSNull()
             ]
             if let task = currentTask(for: statusDate) {
                 response["currentTask"] = [
@@ -817,11 +919,42 @@ final class AppState: ObservableObject {
             return .jsonObject([
                 "active": focusIsActive,
                 "focusSessionActive": focusSessionActive,
+                "focusPaused": focusIsPaused,
                 "timerID": timer.id.uuidString,
                 "title": timer.title,
                 "startedAt": apiDate(timer.startedAt),
                 "estimatedDurationSeconds": timer.estimatedDurationSeconds.map { $0 as Any } ?? NSNull()
             ], statusCode: 201)
+        }
+
+        if request.method == "POST", path == "/v1/focus/session/pause" {
+            guard pauseFocusSession() else {
+                return .error("No Focus Session is running", statusCode: 409)
+            }
+            return .jsonObject([
+                "active": focusIsActive,
+                "focusSessionActive": focusSessionActive,
+                "focusPaused": focusIsPaused,
+                "paused": true
+            ])
+        }
+
+        if request.method == "POST", path == "/v1/focus/session/resume" {
+            let taskID = request.query["task_id"].flatMap(UUID.init(uuidString:))
+            let date = apiDate(from: request.query["date"])
+            guard resumeFocusSession(taskID: taskID, date: date),
+                  let timer = timeEntryStore.runningTimer else {
+                return .error("Focus Session needs a scheduled Time Block", statusCode: 409)
+            }
+            return .jsonObject([
+                "active": focusIsActive,
+                "focusSessionActive": focusSessionActive,
+                "focusPaused": focusIsPaused,
+                "timerID": timer.id.uuidString,
+                "title": timer.title,
+                "startedAt": apiDate(timer.startedAt),
+                "estimatedDurationSeconds": timer.estimatedDurationSeconds.map { $0 as Any } ?? NSNull()
+            ])
         }
 
         if request.method == "POST", path == "/v1/focus/session/stop" {
@@ -831,6 +964,7 @@ final class AppState: ObservableObject {
             return .jsonObject([
                 "active": focusIsActive,
                 "focusSessionActive": focusSessionActive,
+                "focusPaused": focusIsPaused,
                 "stopped": true
             ])
         }
@@ -2203,6 +2337,8 @@ final class AppState: ObservableObject {
                     "DELETE /v1/rules/{id}",
                     "POST /v1/focus",
                     "POST /v1/focus/session/start",
+                    "POST /v1/focus/session/pause",
+                    "POST /v1/focus/session/resume",
                     "POST /v1/focus/session/stop",
                     "GET /v1/time-entries?date=YYYY-MM-DD",
                     "POST /v1/time-entries",
