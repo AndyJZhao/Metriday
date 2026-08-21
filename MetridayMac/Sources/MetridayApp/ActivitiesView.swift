@@ -317,6 +317,9 @@ struct ActivitiesView: View {
                             onRecord: { event in
                                 prepareNewEntry(for: event)
                                 showingNewEntry = true
+                            },
+                            onConvert: { event in
+                                _ = appState.convertCalendarEventToTimeBlock(event)
                             }
                         )
                         RemindersPanel(
@@ -4711,6 +4714,7 @@ private struct CalendarEventsPanel: View {
     @ObservedObject var store: CalendarEventStore
     let selectedDate: Date
     let onRecord: (CalendarEventItem) -> Void
+    let onConvert: (CalendarEventItem) -> Void
 
     @State private var editingEvent: CalendarEventItem?
     @State private var eventPendingDeletion: CalendarEventItem?
@@ -4748,7 +4752,7 @@ private struct CalendarEventsPanel: View {
                 HStack(spacing: 9) {
                     Image(systemName: "lock.shield")
                         .foregroundStyle(MetridayTheme.secondary)
-                    Text("Connect a calendar to show meetings on the timeline and record offline time with one click.")
+                        Text("Connect a calendar to show meetings on the timeline, record offline time, or convert an event into a Markdown Time Block.")
                         .font(.system(size: 11))
                         .foregroundStyle(MetridayTheme.secondary)
                         .lineSpacing(2)
@@ -4791,6 +4795,13 @@ private struct CalendarEventsPanel: View {
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                             .accessibilityIdentifier("calendar.record.\(event.id)")
+                            Button("Convert") {
+                                onConvert(event)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .help("Convert this event into a Markdown Time Block")
+                            .accessibilityIdentifier("calendar.convert.\(event.id)")
                             Button {
                                 editingEvent = event
                             } label: {

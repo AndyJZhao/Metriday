@@ -4569,11 +4569,24 @@ function WebCalendarEventsPanel({ api, onRecord, dateKey }) {
       setMessage(error.message || "Could not record the calendar event.");
     }
   };
+  const convert = async (event) => {
+    if (!api.connected || typeof api.convertCalendarEventToTimeBlock !== "function") {
+      setMessage("Connect Metriday to convert a Calendar Event.");
+      return;
+    }
+    try {
+      await api.convertCalendarEventToTimeBlock(event.id, eventDateKey);
+      setMessage(`Converted “${event.title || "Calendar event"}” to a Time Block.`);
+      await api.refresh();
+    } catch (error) {
+      setMessage(error.message || "Could not convert the calendar event.");
+    }
+  };
   const time = (value) => {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   };
-  return <><section className="web-source-panel" aria-label="Calendar Events"><div className="web-source-heading"><div><h2>Calendar Events</h2><p>Calendar events can be recorded as local time or edited when their calendar is writable.</p></div><div className="web-source-actions"><span className={`api-badge ${payload.authorized ? "online" : ""}`}>{payload.authorized ? `${events.length} events` : "Not connected"}</span>{!payload.authorized && api.requestSourceAccess ? <button type="button" className="quiet-pill" onClick={() => api.requestSourceAccess("calendar")}>Connect</button> : null}<button type="button" className="quiet-pill" onClick={api.refresh}>Refresh</button></div></div>{events.length > 0 ? <div className="web-source-list">{events.map((event) => <div className="web-source-row" key={event.id}><button type="button" className="web-source-row-main" onClick={() => record(event)} aria-label={"Record calendar event " + event.title}><span className="web-source-icon"><CalendarBlank size={18} /></span><span className="web-source-row-copy"><strong>{event.title}</strong><small>{event.calendar || "Calendar"} · {time(event.start)}–{time(event.end)}{event.location ? ` · ${event.location}` : ""}</small></span></button><button type="button" className="quiet-pill" onClick={() => record(event)}>Record</button>{event.is_editable ? <button type="button" className="quiet-pill" onClick={() => setSelectedEvent(event)}>Edit</button> : null}</div>)}</div> : <div className="web-source-empty"><CalendarBlank size={22} /><span>{payload.status || "No calendar events for this date."}</span></div>}{message ? <p className="entry-message" role="status">{message}</p> : null}</section>{selectedEvent ? <WebCalendarEventDialog event={selectedEvent} api={api} dateKey={eventDateKey} onClose={() => setSelectedEvent(null)} /> : null}</>;
+  return <><section className="web-source-panel" aria-label="Calendar Events"><div className="web-source-heading"><div><h2>Calendar Events</h2><p>Calendar events can be recorded as local time, converted into Markdown Time Blocks, or edited when their calendar is writable.</p></div><div className="web-source-actions"><span className={`api-badge ${payload.authorized ? "online" : ""}`}>{payload.authorized ? `${events.length} events` : "Not connected"}</span>{!payload.authorized && api.requestSourceAccess ? <button type="button" className="quiet-pill" onClick={() => api.requestSourceAccess("calendar")}>Connect</button> : null}<button type="button" className="quiet-pill" onClick={api.refresh}>Refresh</button></div></div>{events.length > 0 ? <div className="web-source-list">{events.map((event) => <div className="web-source-row" key={event.id}><button type="button" className="web-source-row-main" onClick={() => record(event)} aria-label={"Record calendar event " + event.title}><span className="web-source-icon"><CalendarBlank size={18} /></span><span className="web-source-row-copy"><strong>{event.title}</strong><small>{event.calendar || "Calendar"} · {time(event.start)}–{time(event.end)}{event.location ? ` · ${event.location}` : ""}</small></span></button><button type="button" className="quiet-pill" onClick={() => record(event)}>Record</button><button type="button" className="quiet-pill" onClick={() => convert(event)}>Convert</button>{event.is_editable ? <button type="button" className="quiet-pill" onClick={() => setSelectedEvent(event)}>Edit</button> : null}</div>)}</div> : <div className="web-source-empty"><CalendarBlank size={22} /><span>{payload.status || "No calendar events for this date."}</span></div>}{message ? <p className="entry-message" role="status">{message}</p> : null}</section>{selectedEvent ? <WebCalendarEventDialog event={selectedEvent} api={api} dateKey={eventDateKey} onClose={() => setSelectedEvent(null)} /> : null}</>;
 }
 
 function WebRemindersPanel({ api, onRecord }) {
