@@ -832,6 +832,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .exclusion-case-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; color: var(--muted); font-size: 10px; white-space: nowrap; }
 .exclusion-case-toggle input { min-height: 0; accent-color: var(--accent); }
 .web-filter-row { grid-template-columns: 30px minmax(0, 1fr) 90px 66px; }
+.web-filter-row-main { min-height: 50px; }
+.web-filter-row-main .web-filter-match { flex: 0 0 auto; white-space: nowrap; }
 .web-category-form { display: grid; gap: 12px; margin-top: 16px; }
 .web-category-primary-fields { display: grid; grid-template-columns: minmax(180px, 1fr) 130px 130px; gap: 8px; }
 .web-category-form input, .web-category-form select { min-height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #353941; font-size: 11px; }
