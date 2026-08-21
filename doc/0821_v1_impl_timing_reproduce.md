@@ -491,7 +491,7 @@ metriday://phone-calls/hide?address=555-0100&hidden=false
 - 已提供 Stop、Pause、Resume、Open Metriday、Open Rules、Open current Block；
 - Pause 会保留同一 Markdown Block 的暂停上下文，Resume 按已累计实际时间扣减计划时长，Stop 才清除暂停上下文；
 - Native 与 Web 共用 pause/resume API，状态通过 focusPaused、paused task ID 和 plan date 传播；
-- 已通过 swift build、Scripts/run_smoke_tests.sh、Scripts/package_app.sh 和本地 API start → pause → resume → stop 生命周期验证；AX 验证待 Mac 解锁后补做。
+- 已通过 swift build、Scripts/run_smoke_tests.sh、Scripts/package_app.sh 和本地 API start → pause → resume → stop 生命周期验证；已在解锁后的真实 macOS 窗口完成 AX 验收：Plan Time Block 启动、companion 展示、Hide 不停止、Global Header 重开、Pause/Resume、Open Block、菜单动作和 Stop 后清除 Focus 状态。
 
 ### Phase C：之后再补硬化与差异化改进
 
