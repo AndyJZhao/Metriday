@@ -5,6 +5,7 @@ import Foundation
 @MainActor
 final class AppState: ObservableObject {
     private static let focusSessionField = "metriday_focus_session"
+    private static let focusTaskDateField = "metriday_plan_date"
 
     @Published var section: AppSection = .today
     @Published private(set) var selectedDate: Date
@@ -105,11 +106,25 @@ final class AppState: ObservableObject {
             }
             .store(in: &workspaceCancellables)
         self.integrationStore = IntegrationStore()
-        blocker.setFocusTitle(timeEntryStore.runningTimer?.title)
+        let restoredFocusTimer = timeEntryStore.runningTimer
+        let restoredFocusTaskID = restoredFocusTimer?.customFields["metriday_plan_task_id"]
+            .flatMap(UUID.init(uuidString:))
+        let restoredFocusDate = restoredFocusTimer?.customFields[Self.focusTaskDateField]
+            .flatMap { self.apiDate(from: $0) }
+        if let restoredFocusDate {
+            self.selectedDate = Calendar.current.startOfDay(for: restoredFocusDate)
+            _ = markdownStore.load(date: self.selectedDate)
+        }
+        self.selectedTaskID = restoredFocusTaskID
+        blocker.setFocusTitle(
+            restoredFocusTimer?.customFields[Self.focusSessionField] == "true"
+                ? restoredFocusTimer?.title
+                : nil
+        )
         // A running Focus Timer is persisted by TimeEntryStore. Restore the
         // companion blocklist state so relaunching Metriday does not leave the
         // session timer and website protection out of sync.
-        self.focusIsActive = self.timeEntryStore.runningTimer?.customFields[Self.focusSessionField] == "true"
+        self.focusIsActive = restoredFocusTimer?.customFields[Self.focusSessionField] == "true"
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
             .sink { [weak self] _ in
                 guard let self, self.preferences.autoStopTimerOnSleep else { return }
@@ -138,10 +153,10 @@ final class AppState: ObservableObject {
                 }
             }
             .store(in: &workspaceCancellables)
-        self.calendarStore.loadEvents(for: initialDate)
-        self.reminderStore.loadCompleted(for: initialDate)
-        self.phoneCallStore.loadCalls(for: initialDate)
-        self.screenTimeStore.load(for: initialDate, wrapAtMinute: initialPreferences.wrapDaysAtMinute)
+        self.calendarStore.loadEvents(for: self.selectedDate)
+        self.reminderStore.loadCompleted(for: self.selectedDate)
+        self.phoneCallStore.loadCalls(for: self.selectedDate)
+        self.screenTimeStore.load(for: self.selectedDate, wrapAtMinute: initialPreferences.wrapDaysAtMinute)
         self.localAPIServer.start(handler: { [weak self] request in
             guard let self else {
                 return .error("Metriday is unavailable", statusCode: 503)
@@ -220,7 +235,8 @@ final class AppState: ObservableObject {
             billingStatus: .billable,
             customFields: [
                 Self.focusSessionField: "true",
-                "metriday_plan_task_id": task.id.uuidString
+                "metriday_plan_task_id": task.id.uuidString,
+                Self.focusTaskDateField: apiDayKey(taskDate)
             ]
         )
         focusIsActive = true
@@ -333,14 +349,26 @@ final class AppState: ObservableObject {
     func startTimer(reusing entry: TimeEntry) {
         guard timeEntryStore.runningTimer == nil else { return }
         let isFocusSession = entry.customFields[Self.focusSessionField] == "true"
+        var customFields = entry.customFields
+        if isFocusSession, customFields[Self.focusTaskDateField] == nil {
+            customFields[Self.focusTaskDateField] = apiDayKey(selectedDate)
+        }
         startTimer(
             title: entry.title,
             projectID: entry.projectID,
             notes: entry.notes,
             billingStatus: entry.billingStatus,
-            customFields: entry.customFields
+            customFields: customFields
         )
         guard isFocusSession, timeEntryStore.runningTimer != nil else { return }
+        if let focusDate = customFields[Self.focusTaskDateField].flatMap({ apiDate(from: $0) }) {
+            let normalizedDate = Calendar.current.startOfDay(for: focusDate)
+            if !Calendar.current.isDate(normalizedDate, inSameDayAs: selectedDate) {
+                selectedDate = normalizedDate
+                _ = markdownStore.load(date: normalizedDate)
+                reloadDateSources(for: normalizedDate)
+            }
+        }
         if let rawTaskID = entry.customFields["metriday_plan_task_id"],
            let taskID = UUID(uuidString: rawTaskID) {
             selectedTaskID = taskID
