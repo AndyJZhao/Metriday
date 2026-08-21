@@ -1436,6 +1436,8 @@ Task { @MainActor in
     )
     let activityPreferencesRoot = tempRoot.appendingPathComponent("ActivityPreferences", isDirectory: true)
     let activityPreferences = ActivitiesPreferencesStore(rootDirectory: activityPreferencesRoot)
+    expect(activityPreferences.activityDisplayMode == "unified", "New activity preferences should default to Unified like Timing")
+    expect(activityPreferences.timelineOrientation == .horizontal, "New activity preferences should default to the compact horizontal timeline")
     activityPreferences.includeTimeEntries = false
     activityPreferences.showWindowTitles = false
     activityPreferences.showActivityDateRanges = true

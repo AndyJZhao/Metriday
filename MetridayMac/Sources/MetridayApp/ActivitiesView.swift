@@ -193,7 +193,7 @@ struct ActivitiesView: View {
     @State private var filter: ActivityFilter = .all
     @State private var includeIdle = false
     @State private var searchText = ""
-    @State private var activityMode: ActivityDisplayMode = .chronological
+    @State private var activityMode: ActivityDisplayMode = .unified
     @State private var groupActivitiesByProject = true
     @State private var groupActivitiesByDevice = false
     @State private var collapsedProjectGroups: Set<String> = []
@@ -594,7 +594,7 @@ struct ActivitiesView: View {
 
     private func restoreDisplayPreferences() {
         guard !displayPreferencesRestored else { return }
-        activityMode = ActivityDisplayMode(rawValue: preferences.activityDisplayMode) ?? .chronological
+        activityMode = ActivityDisplayMode(rawValue: preferences.activityDisplayMode) ?? .unified
         groupActivitiesByProject = preferences.groupByProject
         groupActivitiesByDevice = preferences.groupByDevice
         includeIdle = preferences.includeIdle

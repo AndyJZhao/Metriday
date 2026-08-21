@@ -142,12 +142,12 @@ final class ActivitiesPreferencesStore: ObservableObject {
             groupPathsIndependently = false
             groupPathsBy = .allDirectories
             activityTimeRange = .selectedDay
-            activityDisplayMode = "chronological"
+            activityDisplayMode = "unified"
             groupByProject = true
             groupByDevice = false
             includeIdle = false
             selectedDevice = "All Devices"
-            timelineOrientation = .vertical
+            timelineOrientation = .horizontal
             collapseActivitiesShorterThanSeconds = 0
             persist()
         }
@@ -258,12 +258,12 @@ final class ActivitiesPreferencesStore: ObservableObject {
             groupPathsIndependently = try container.decodeIfPresent(Bool.self, forKey: .groupPathsIndependently) ?? false
             groupPathsBy = try container.decodeIfPresent(ActivityPathGrouping.self, forKey: .groupPathsBy) ?? .allDirectories
             activityTimeRange = try container.decodeIfPresent(ActivityTimeRange.self, forKey: .activityTimeRange) ?? .selectedDay
-            activityDisplayMode = try container.decodeIfPresent(String.self, forKey: .activityDisplayMode) ?? "chronological"
+            activityDisplayMode = try container.decodeIfPresent(String.self, forKey: .activityDisplayMode) ?? "unified"
             groupByProject = try container.decodeIfPresent(Bool.self, forKey: .groupByProject) ?? true
             groupByDevice = try container.decodeIfPresent(Bool.self, forKey: .groupByDevice) ?? false
             includeIdle = try container.decodeIfPresent(Bool.self, forKey: .includeIdle) ?? false
             selectedDevice = try container.decodeIfPresent(String.self, forKey: .selectedDevice) ?? "All Devices"
-            timelineOrientation = try container.decodeIfPresent(ActivityTimelineOrientation.self, forKey: .timelineOrientation) ?? .vertical
+            timelineOrientation = try container.decodeIfPresent(ActivityTimelineOrientation.self, forKey: .timelineOrientation) ?? .horizontal
             collapseActivitiesShorterThanSeconds = max(0, try container.decodeIfPresent(Int.self, forKey: .collapseActivitiesShorterThanSeconds) ?? 0)
         }
     }
