@@ -320,7 +320,7 @@ struct TimeBlockDetailSheet: View {
                 if isFocused {
                     _ = appState.stopFocusSession()
                 } else {
-                    _ = appState.startFocusSession()
+                    _ = appState.startFocusSession(taskID: task.id, date: selectedDate)
                 }
             } label: {
                 Label(isFocused ? "Pause Focus" : "Start Focus", systemImage: isFocused ? "pause.fill" : "play.fill")
