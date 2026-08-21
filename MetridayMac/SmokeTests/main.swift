@@ -662,6 +662,10 @@ Task { @MainActor in
         timeEntryStore.recentTimerEntries(limit: 1).first?.title == reusableTimerEntry.title,
         "Stopped timers should remain available in recent timer suggestions"
     )
+    expect(
+        timeEntryStore.latestEntry?.title == reusableTimerEntry.title,
+        "Latest time entry should be available for menu-bar editing"
+    )
     let undoCreatedEntry = timeEntryStore.entries[0]
     let undoReplacedEntry = TimeEntry(
         id: UUID(),

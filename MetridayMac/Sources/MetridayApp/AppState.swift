@@ -20,6 +20,7 @@ final class AppState: ObservableObject {
         didSet { blocker.isActive = focusIsActive }
     }
     @Published var selectedTaskID: UUID?
+    @Published var requestedTimeEntryID: UUID?
     @Published var draggingTaskID: UUID?
     @Published var dragLocation: CGPoint = .zero
     @Published var calendarTimelineFrame: CGRect = .zero
@@ -176,6 +177,13 @@ final class AppState: ObservableObject {
 
     var currentTask: PlanTask? {
         currentTask(for: selectedDate)
+    }
+
+    func requestEditTimeEntry(_ id: UUID) {
+        requestedTimeEntryID = id
+        section = .activities
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first(where: { $0.canBecomeKey })?.makeKeyAndOrderFront(nil)
     }
 
     func currentTask(for date: Date) -> PlanTask? {

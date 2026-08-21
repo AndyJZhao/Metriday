@@ -532,6 +532,7 @@ struct ActivitiesView: View {
         .onAppear {
             restoreDisplayPreferences()
             restoreActivityScope()
+            presentRequestedTimeEntryIfNeeded()
         }
         .onChange(of: activityMode) { _, newMode in
             guard displayPreferencesRestored else { return }
@@ -567,6 +568,18 @@ struct ActivitiesView: View {
             selectedTimeEntryIDs.removeAll()
             selectedActivityIDs.removeAll()
         }
+        .onChange(of: appState.requestedTimeEntryID) { _, _ in
+            presentRequestedTimeEntryIfNeeded()
+        }
+    }
+
+    private func presentRequestedTimeEntryIfNeeded() {
+        guard let requestedID = appState.requestedTimeEntryID,
+              let entry = timeEntryStore.entries.first(where: { $0.id == requestedID }) else {
+            return
+        }
+        editingEntry = entry
+        appState.requestedTimeEntryID = nil
     }
 
     private func restoreDisplayPreferences() {

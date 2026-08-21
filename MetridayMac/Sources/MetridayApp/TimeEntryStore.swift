@@ -267,6 +267,10 @@ final class TimeEntryStore: ObservableObject {
             .sorted { $0.start < $1.start }
     }
 
+    var latestEntry: TimeEntry? {
+        entries.max { $0.end < $1.end }
+    }
+
     var runningDurationSeconds: Int {
         guard let runningTimer else { return 0 }
         return max(0, Int(Date().timeIntervalSince(runningTimer.startedAt)))

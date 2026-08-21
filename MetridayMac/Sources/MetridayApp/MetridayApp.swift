@@ -158,6 +158,11 @@ private struct MenuBarStatusView: View {
             Button("Start / Stop Timer") {
                 appState.quickStartTimer()
             }
+            if let latestEntry = appState.timeEntryStore.latestEntry {
+                Button("Edit Latest Time Entry") {
+                    appState.requestEditTimeEntry(latestEntry.id)
+                }
+            }
             if appState.timeEntryStore.runningTimer == nil, !recentTimers.isEmpty {
                 Menu("Resume Recent Timer") {
                     ForEach(recentTimers) { entry in
