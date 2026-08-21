@@ -4896,7 +4896,7 @@ function WebActivityProjectSidebar({ projects, filters, activities, projectFilte
   };
   const acceptsProjectDropZoneDrag = (event) => {
     const types = Array.from(event.dataTransfer?.types || []);
-    return types.includes("application/x-metriday-activity") || types.includes("Files");
+    return types.includes("application/x-metriday-activity");
   };
   const handleSidebarDragOver = (event) => {
     if (alwaysShowProjectDropZone || !acceptsProjectDropZoneDrag(event)) return;
