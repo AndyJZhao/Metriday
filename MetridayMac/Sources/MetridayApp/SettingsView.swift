@@ -42,6 +42,7 @@ struct SettingsSheet: View {
                     reviewReminderPanel
                     workingHoursPanel
                     projectSelectionPanel
+                    projectColorPreferencesPanel
                     permissionsPanel
                     calendarPreferencesPanel
                     reminderPreferencesPanel
@@ -337,6 +338,45 @@ struct SettingsSheet: View {
                 .contentShape(Rectangle())
 
             Text("When enabled, selecting a parent project in Activities or Stats includes activity assigned to its descendants. Collapsed project totals always include their children.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .lineSpacing(2)
+        }
+        .settingsPanel()
+    }
+
+    private var projectColorPreferencesPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("New project colors", systemImage: "paintpalette")
+                .font(.system(size: 15, weight: .bold))
+
+            HStack {
+                Text("Top-level projects")
+                    .font(.system(size: 12))
+                Spacer()
+                Picker("Top-level project colors", selection: $projectStore.newTopLevelColorScheme) {
+                    ForEach(NewTopLevelProjectColorScheme.allCases) { scheme in
+                        Text(scheme.label).tag(scheme)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 170)
+            }
+
+            HStack {
+                Text("Child projects")
+                    .font(.system(size: 12))
+                Spacer()
+                Picker("Child project colors", selection: $projectStore.newChildColorScheme) {
+                    ForEach(NewChildProjectColorScheme.allCases) { scheme in
+                        Text(scheme.label).tag(scheme)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 190)
+            }
+
+            Text("These defaults apply only when a new project does not specify an explicit color. Existing projects and App / Website / Item category colors are unchanged.")
                 .font(.system(size: 10))
                 .foregroundStyle(MetridayTheme.secondary)
                 .lineSpacing(2)

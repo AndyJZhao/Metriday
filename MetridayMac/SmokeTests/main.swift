@@ -1080,6 +1080,66 @@ Task { @MainActor in
     )
     exclusions.remove(bundleIdentifier: "com.example.PrivateApp")
 
+    let colorSchemeRoot = tempRoot.appendingPathComponent("ColorSchemes", isDirectory: true)
+    let colorSchemeStore = ProjectStore(rootDirectory: colorSchemeRoot)
+    colorSchemeStore.newTopLevelColorScheme = .darker
+    guard let darkerRootID = colorSchemeStore.createProject(name: "Darker Root"),
+          let darkerRoot = colorSchemeStore.project(darkerRootID) else {
+        expect(false, "Project store should create a project using the configured top-level color scheme")
+        return
+    }
+    let standardColorSchemeStore = ProjectStore(
+        rootDirectory: tempRoot.appendingPathComponent("StandardColorSchemes", isDirectory: true)
+    )
+    guard let standardRootID = standardColorSchemeStore.createProject(name: "Standard Root"),
+          let standardRoot = standardColorSchemeStore.project(standardRootID) else {
+        expect(false, "Project store should create a project using the standard top-level color scheme")
+        return
+    }
+    expect(darkerRoot.color != standardRoot.color, "Darker top-level projects should use a distinct palette")
+
+    colorSchemeStore.newChildColorScheme = .inherit
+    guard let inheritedChildID = colorSchemeStore.createProject(
+        name: "Inherited Child",
+        parentID: darkerRootID
+    ),
+          let inheritedChild = colorSchemeStore.project(inheritedChildID) else {
+        expect(false, "Project store should create an inherited-color child project")
+        return
+    }
+    expect(inheritedChild.color == darkerRoot.color, "Inherited child projects should match their parent color")
+
+    colorSchemeStore.newChildColorScheme = .similar
+    guard let similarChildID = colorSchemeStore.createProject(
+        name: "Similar Child",
+        parentID: darkerRootID
+    ),
+          let similarChild = colorSchemeStore.project(similarChildID) else {
+        expect(false, "Project store should create a similar-color child project")
+        return
+    }
+    expect(similarChild.color == darkerRoot.color.similarColor, "Similar child projects should use a related palette color")
+
+    colorSchemeStore.newChildColorScheme = .rainbow
+    guard let rainbowChildID = colorSchemeStore.createProject(
+        name: "Rainbow Child",
+        parentID: darkerRootID
+    ),
+          let rainbowChild = colorSchemeStore.project(rainbowChildID) else {
+        expect(false, "Project store should create a rainbow-color child project")
+        return
+    }
+    expect(rainbowChild.color != darkerRoot.color, "Rainbow child projects should cycle through palette colors")
+    guard let explicitColorID = colorSchemeStore.createProject(name: "Explicit Color", color: .blue),
+          let explicitColorProject = colorSchemeStore.project(explicitColorID) else {
+        expect(false, "Project store should create a project with an explicit color")
+        return
+    }
+    expect(explicitColorProject.color == .blue, "Explicit project colors should override the configured palette")
+    let reloadedColorSchemeStore = ProjectStore(rootDirectory: colorSchemeRoot)
+    expect(reloadedColorSchemeStore.newTopLevelColorScheme == .darker, "Top-level color preferences should persist")
+    expect(reloadedColorSchemeStore.newChildColorScheme == .rainbow, "Child color preferences should persist")
+
     let projectRoot = tempRoot.appendingPathComponent("Projects", isDirectory: true)
     let projectStore = ProjectStore(rootDirectory: projectRoot)
     guard let researchProjectID = projectStore.createProject(name: "Smoke Research") else {

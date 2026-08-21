@@ -1339,6 +1339,8 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
     review_reminder_notification_status: "Notifications not requested",
     include_subprojects_when_selecting_project: true,
     always_show_project_drop_zone: true,
+    new_top_level_project_color_scheme: "standard",
+    new_child_project_color_scheme: "rainbow",
     allow_local_network_api: false,
     launch_at_login: false,
     launch_at_login_status: "Login item not configured",
@@ -1483,6 +1485,9 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
       <div className="settings-section"><div className="settings-section-heading"><strong>Project selection</strong></div>
         <label className="settings-toggle-row"><span><input type="checkbox" checked={preferences.include_subprojects_when_selecting_project !== false} onChange={(event) => updatePreference("include_subprojects_when_selecting_project", event.target.checked)} disabled={!connected || saving} />Include sub-projects when selecting a project</span></label>
         <label className="settings-toggle-row"><span><input type="checkbox" checked={preferences.always_show_project_drop_zone !== false} onChange={(event) => updatePreference("always_show_project_drop_zone", event.target.checked)} disabled={!connected || saving} />Always show Project Drop Zone</span><small>Keep the project creation drop target visible in Activities</small></label>
+        <label className="settings-field-row"><span>Top-level project colors<select value={preferences.new_top_level_project_color_scheme || "standard"} onChange={(event) => updatePreference("new_top_level_project_color_scheme", event.target.value)} disabled={!connected || saving}><option value="standard">Standard palette</option><option value="darker">Darker palette</option></select></span></label>
+        <label className="settings-field-row"><span>Child project colors<select value={preferences.new_child_project_color_scheme || "rainbow"} onChange={(event) => updatePreference("new_child_project_color_scheme", event.target.value)} disabled={!connected || saving}><option value="inherit">Inherit parent color</option><option value="similar">Use a similar color</option><option value="rainbow">Use rainbow colors</option></select></span></label>
+        <small className="settings-help-text">These defaults affect only new projects without an explicit color.</small>
         <small className="settings-help-text">Selecting a parent in Activities or Stats includes descendant activity when enabled. Collapsed project totals always include their children.</small>
       </div>
       <div className="settings-section"><div className="settings-section-heading"><strong>Privacy & connection</strong></div>

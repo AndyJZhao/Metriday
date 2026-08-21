@@ -547,6 +547,14 @@ final class AppState: ObservableObject {
             if let value = body["always_show_project_drop_zone"] as? Bool {
                 preferences.alwaysShowProjectDropZone = value
             }
+            if let raw = body["new_top_level_project_color_scheme"] as? String,
+               let scheme = NewTopLevelProjectColorScheme(rawValue: raw) {
+                projectStore.newTopLevelColorScheme = scheme
+            }
+            if let raw = body["new_child_project_color_scheme"] as? String,
+               let scheme = NewChildProjectColorScheme(rawValue: raw) {
+                projectStore.newChildColorScheme = scheme
+            }
             if let value = body["allow_local_network_api"] as? Bool {
                 preferences.allowLocalNetworkAPI = value
                 localAPIServer.setAllowsLAN(value)
@@ -1087,9 +1095,13 @@ final class AppState: ObservableObject {
 
         if timingWebAPI, request.method == "POST", path == "/v1/projects" {
             guard let body = apiBody(request),
-                  let title = (body["title"] as? String ?? body["name"] as? String),
-                  let projectID = projectStore.createProject(
+                  let title = (body["title"] as? String ?? body["name"] as? String) else {
+                return .error("Project needs a title", statusCode: 400)
+            }
+            let requestedColor = (body["color"] as? String).flatMap { projectColor(from: $0) }
+            guard let projectID = projectStore.createProject(
                       name: title,
+                      color: requestedColor,
                       parentID: (body["parent"] as? String).flatMap(apiProjectID),
                       teamID: (body["team_id"] as? String).flatMap(apiTeamID)
                   ),
@@ -1097,7 +1109,6 @@ final class AppState: ObservableObject {
                 return .error("Project needs a title", statusCode: 400)
             }
             if let notes = body["notes"] as? String { project.notes = notes }
-            if let color = body["color"] as? String, let value = projectColor(from: color) { project.color = value }
             if let sortOrder = body["sort_order"] as? Int { project.sortOrder = sortOrder }
             if let productivity = body["productivity"] as? Int { project.productivity = productivity }
             if let productivityScore = body["productivity_score"] as? Double {
@@ -2825,6 +2836,8 @@ final class AppState: ObservableObject {
             "review_reminder_notification_status": reviewReminderService.notificationStatus,
             "include_subprojects_when_selecting_project": preferences.includeSubprojectsWhenSelectingProject,
             "always_show_project_drop_zone": preferences.alwaysShowProjectDropZone,
+            "new_top_level_project_color_scheme": projectStore.newTopLevelColorScheme.rawValue,
+            "new_child_project_color_scheme": projectStore.newChildColorScheme.rawValue,
             "allow_local_network_api": preferences.allowLocalNetworkAPI,
             "launch_at_login": loginItemManager.isEnabled,
             "launch_at_login_status": loginItemManager.statusMessage,

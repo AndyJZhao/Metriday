@@ -8,6 +8,47 @@ enum ProjectColor: String, CaseIterable, Codable {
     case purple
     case red
     case graphite
+
+    var similarColor: ProjectColor {
+        switch self {
+        case .blue: return .purple
+        case .green: return .blue
+        case .orange: return .red
+        case .purple: return .blue
+        case .red: return .orange
+        case .graphite: return .blue
+        }
+    }
+}
+
+enum NewTopLevelProjectColorScheme: String, CaseIterable, Codable, Identifiable {
+    case standard
+    case darker
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .standard: return "Standard palette"
+        case .darker: return "Darker palette"
+        }
+    }
+}
+
+enum NewChildProjectColorScheme: String, CaseIterable, Codable, Identifiable {
+    case inherit
+    case similar
+    case rainbow
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .inherit: return "Inherit parent color"
+        case .similar: return "Use a similar color"
+        case .rainbow: return "Use rainbow colors"
+        }
+    }
 }
 
 /// A project's billing preference can either be explicit or inherit from its
@@ -390,6 +431,12 @@ final class ProjectStore: ObservableObject {
     @Published private(set) var projects: [TrackingProject]
     @Published private(set) var rules: [ProjectRule]
     @Published var statusMessage = "Projects ready"
+    @Published var newTopLevelColorScheme: NewTopLevelProjectColorScheme {
+        didSet { persist() }
+    }
+    @Published var newChildColorScheme: NewChildProjectColorScheme {
+        didSet { persist() }
+    }
 
     private let fileURL: URL
 
@@ -401,9 +448,13 @@ final class ProjectStore: ObservableObject {
            let payload = try? JSONDecoder().decode(Payload.self, from: data) {
             self.projects = payload.projects
             self.rules = payload.rules
+            self.newTopLevelColorScheme = payload.newTopLevelColorScheme
+            self.newChildColorScheme = payload.newChildColorScheme
         } else {
             self.projects = Self.seedProjects()
             self.rules = []
+            self.newTopLevelColorScheme = .standard
+            self.newChildColorScheme = .rainbow
             persist()
         }
     }
@@ -484,7 +535,7 @@ final class ProjectStore: ObservableObject {
     @discardableResult
     func createProject(
         name rawName: String,
-        color: ProjectColor = .blue,
+        color: ProjectColor? = nil,
         parentID: UUID? = nil,
         teamID: UUID? = nil
     ) -> UUID? {
@@ -497,11 +548,37 @@ final class ProjectStore: ObservableObject {
             .filter { $0.parentID == validParentID }
             .map(\.sortOrder)
             .max() ?? -1) + 1
-        let project = TrackingProject(name: name, color: color, parentID: validParentID, sortOrder: nextSortOrder, teamID: teamID)
+        let resolvedColor = color ?? defaultColor(for: validParentID)
+        let project = TrackingProject(name: name, color: resolvedColor, parentID: validParentID, sortOrder: nextSortOrder, teamID: teamID)
         projects.append(project)
         persist()
         statusMessage = "Project created · \(name)"
         return project.id
+    }
+
+    private func defaultColor(for parentID: UUID?) -> ProjectColor {
+        if let parentID, let parent = project(parentID) {
+            switch newChildColorScheme {
+            case .inherit:
+                return parent.color
+            case .similar:
+                return parent.color.similarColor
+            case .rainbow:
+                return rainbowPalette[activeProjects.count % rainbowPalette.count]
+            }
+        }
+        let palette = newTopLevelColorScheme == .darker
+            ? darkerPalette
+            : ProjectColor.allCases
+        return palette[activeProjects.filter { $0.parentID == nil }.count % palette.count]
+    }
+
+    private var rainbowPalette: [ProjectColor] {
+        [.red, .orange, .green, .blue, .purple, .graphite]
+    }
+
+    private var darkerPalette: [ProjectColor] {
+        [.graphite, .blue, .purple, .red, .green, .orange]
     }
 
     func updateProject(_ project: TrackingProject) {
@@ -988,7 +1065,12 @@ final class ProjectStore: ObservableObject {
                 at: fileURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            let payload = Payload(projects: projects, rules: rules)
+            let payload = Payload(
+                projects: projects,
+                rules: rules,
+                newTopLevelColorScheme: newTopLevelColorScheme,
+                newChildColorScheme: newChildColorScheme
+            )
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             try encoder.encode(payload).write(to: fileURL, options: .atomic)
@@ -1017,5 +1099,33 @@ final class ProjectStore: ObservableObject {
     private struct Payload: Codable {
         let projects: [TrackingProject]
         let rules: [ProjectRule]
+        let newTopLevelColorScheme: NewTopLevelProjectColorScheme
+        let newChildColorScheme: NewChildProjectColorScheme
+
+        init(
+            projects: [TrackingProject],
+            rules: [ProjectRule],
+            newTopLevelColorScheme: NewTopLevelProjectColorScheme,
+            newChildColorScheme: NewChildProjectColorScheme
+        ) {
+            self.projects = projects
+            self.rules = rules
+            self.newTopLevelColorScheme = newTopLevelColorScheme
+            self.newChildColorScheme = newChildColorScheme
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            projects = try container.decode([TrackingProject].self, forKey: .projects)
+            rules = try container.decode([ProjectRule].self, forKey: .rules)
+            newTopLevelColorScheme = try container.decodeIfPresent(
+                NewTopLevelProjectColorScheme.self,
+                forKey: .newTopLevelColorScheme
+            ) ?? .standard
+            newChildColorScheme = try container.decodeIfPresent(
+                NewChildProjectColorScheme.self,
+                forKey: .newChildColorScheme
+            ) ?? .rainbow
+        }
     }
 }
