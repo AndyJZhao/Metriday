@@ -380,6 +380,52 @@ final class TimeEntryStore: ObservableObject {
         statusMessage = "Time entry updated"
     }
 
+    /// Moves an entry without changing its duration. Timeline dragging passes
+    /// a snapped minute delta so the stored range remains date-accurate even
+    /// when the visible timeline is clipped at a logical-day boundary.
+    func move(_ entry: TimeEntry, by minutes: Int) {
+        let delta = TimeInterval(minutes * 60)
+        updateRange(
+            id: entry.id,
+            start: entry.start.addingTimeInterval(delta),
+            end: entry.end.addingTimeInterval(delta),
+            status: "Time entry moved"
+        )
+    }
+
+    /// Moves only the beginning of an entry, retaining at least one minute.
+    func resizeStart(_ entry: TimeEntry, by minutes: Int) {
+        let delta = TimeInterval(minutes * 60)
+        let latestStart = entry.end.addingTimeInterval(-60)
+        updateRange(
+            id: entry.id,
+            start: min(entry.start.addingTimeInterval(delta), latestStart),
+            end: entry.end,
+            status: "Time entry start adjusted"
+        )
+    }
+
+    /// Moves only the end of an entry, retaining at least one minute.
+    func resizeEnd(_ entry: TimeEntry, by minutes: Int) {
+        let delta = TimeInterval(minutes * 60)
+        let earliestEnd = entry.start.addingTimeInterval(60)
+        updateRange(
+            id: entry.id,
+            start: entry.start,
+            end: max(entry.end.addingTimeInterval(delta), earliestEnd),
+            status: "Time entry end adjusted"
+        )
+    }
+
+    private func updateRange(id: UUID, start: Date, end: Date, status: String) {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        guard end > start else { return }
+        entries[index].start = start
+        entries[index].end = end
+        persist()
+        statusMessage = status
+    }
+
     @discardableResult
     func renameEntries(_ ids: Set<UUID>, to rawTitle: String) -> Int {
         let title = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)

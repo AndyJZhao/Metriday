@@ -1829,6 +1829,43 @@ Task { @MainActor in
         "Time entries should detect overlapping ranges"
     )
 
+    let timelineTimeEntries = TimeEntryStore(rootDirectory: tempRoot.appendingPathComponent("TimelineEntries", isDirectory: true))
+    guard let timelineEntryID = timelineTimeEntries.addEntry(
+        title: "Timeline adjustment",
+        projectID: researchProjectID,
+        start: entryStart,
+        end: entryEnd
+    ), let manualEntry = timelineTimeEntries.entries.first(where: { $0.id == timelineEntryID }) else {
+        expect(false, "Manual entry should be available for timeline adjustment")
+        return
+    }
+    timelineTimeEntries.move(manualEntry, by: 15)
+    let movedEntry = timelineTimeEntries.entries.first(where: { $0.id == timelineEntryID })
+    expect(
+        movedEntry?.start == entryStart.addingTimeInterval(15 * 60)
+            && movedEntry?.end == entryEnd.addingTimeInterval(15 * 60),
+        "Timeline move should preserve a time entry duration"
+    )
+    guard let movedEntry else {
+        expect(false, "Moved entry should remain available for edge resizing")
+        return
+    }
+    timelineTimeEntries.resizeStart(movedEntry, by: 15)
+    let resizedStartEntry = timelineTimeEntries.entries.first(where: { $0.id == timelineEntryID })
+    expect(
+        resizedStartEntry?.start == entryStart.addingTimeInterval(30 * 60)
+            && resizedStartEntry?.end == entryEnd.addingTimeInterval(15 * 60),
+        "Timeline start resize should retain the entry end"
+    )
+    if let resizedStartEntry {
+        timelineTimeEntries.resizeEnd(resizedStartEntry, by: 15)
+    }
+    let resizedEntry = timelineTimeEntries.entries.first(where: { $0.id == timelineEntryID })
+    expect(
+        resizedEntry?.end == entryEnd.addingTimeInterval(30 * 60),
+        "Timeline end resize should retain the entry start"
+    )
+
     let splitTimeEntries = TimeEntryStore(rootDirectory: tempRoot.appendingPathComponent("SplitTimeEntries", isDirectory: true))
     let splitStart = date.addingTimeInterval(9 * 60 * 60)
     let splitEnd = date.addingTimeInterval(12 * 60 * 60)

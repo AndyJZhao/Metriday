@@ -309,6 +309,15 @@ struct ActivitiesView: View {
                             },
                             onDeleteTimeEntry: { entry in
                                 timeEntryStore.delete(entry)
+                            },
+                            onMoveTimeEntry: { entry, minutes in
+                                timeEntryStore.move(entry, by: minutes)
+                            },
+                            onResizeTimeEntryStart: { entry, minutes in
+                                timeEntryStore.resizeStart(entry, by: minutes)
+                            },
+                            onResizeTimeEntryEnd: { entry, minutes in
+                                timeEntryStore.resizeEnd(entry, by: minutes)
                             }
                         )
                         CalendarEventsPanel(
@@ -5896,6 +5905,9 @@ private struct ActivityTimelinePanel: View {
     let onDeleteActivities: ([ActivitySegment]) -> Void
     let onEditTimeEntry: (TimeEntry) -> Void
     let onDeleteTimeEntry: (TimeEntry) -> Void
+    let onMoveTimeEntry: (TimeEntry, Int) -> Void
+    let onResizeTimeEntryStart: (TimeEntry, Int) -> Void
+    let onResizeTimeEntryEnd: (TimeEntry, Int) -> Void
 
     @State private var dragAnchorMinute: Int?
     @State private var hoveredSegmentID: UUID?
@@ -6217,6 +6229,7 @@ private struct ActivityTimelinePanel: View {
                                 .contentShape(Rectangle())
                                 .accessibilityLabel("Recorded time · \(entry.title)")
                                 .accessibilityIdentifier("activities.timeline.time-entry.\(entry.id.uuidString)")
+                                .accessibilityHint("Click to edit; drag the body to move it or drag either edge to resize")
                                 .onHover { isHovered in
                                     if isHovered {
                                         hoveredTimeEntryID = entry.id
@@ -6234,6 +6247,24 @@ private struct ActivityTimelinePanel: View {
                                     }
                                 }
                                 .help("Recorded time · \(entry.title)")
+                                .overlay {
+                                    TimelineEntryInteraction(
+                                        pixelsPerMinute: proxy.size.width / CGFloat(timelineWindow.spanMinutes),
+                                        onSelect: {
+                                            onEditTimeEntry(entry)
+                                        },
+                                        onMove: { minutes in
+                                            onMoveTimeEntry(entry, minutes)
+                                        },
+                                        onResizeStart: { minutes in
+                                            onResizeTimeEntryStart(entry, minutes)
+                                        },
+                                        onResizeEnd: { minutes in
+                                            onResizeTimeEntryEnd(entry, minutes)
+                                        }
+                                    )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                }
                         }
                     }
 
@@ -6282,7 +6313,8 @@ private struct ActivityTimelinePanel: View {
                         }
                         .onEnded { _ in
                             dragAnchorMinute = nil
-                        }
+                        },
+                    including: .gesture
                 )
                 .onHover { isInside in
                     if !isInside {
@@ -6493,6 +6525,7 @@ private struct ActivityTimelinePanel: View {
                                 .contentShape(Rectangle())
                                 .accessibilityLabel("Recorded time · \(entry.title)")
                                 .accessibilityIdentifier("activities.vertical-timeline.time-entry.\(entry.id.uuidString)")
+                                .accessibilityHint("Click to edit; drag the body to move it or drag either edge to resize")
                                 .contextMenu {
                                     Button("Edit Time Entry") {
                                         onEditTimeEntry(entry)
@@ -6502,6 +6535,24 @@ private struct ActivityTimelinePanel: View {
                                     }
                                 }
                                 .help("Recorded time · \(entry.title)")
+                                .overlay {
+                                    TimelineEntryInteraction(
+                                        pixelsPerMinute: chartWidth / CGFloat(timelineWindow.spanMinutes),
+                                        onSelect: {
+                                            onEditTimeEntry(entry)
+                                        },
+                                        onMove: { minutes in
+                                            onMoveTimeEntry(entry, minutes)
+                                        },
+                                        onResizeStart: { minutes in
+                                            onResizeTimeEntryStart(entry, minutes)
+                                        },
+                                        onResizeEnd: { minutes in
+                                            onResizeTimeEntryEnd(entry, minutes)
+                                        }
+                                    )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                }
                         }
                     }
                     ForEach(calendarEvents) { event in
@@ -6584,7 +6635,8 @@ private struct ActivityTimelinePanel: View {
                     }
                     .onEnded { _ in
                         dragAnchorMinute = nil
-                    }
+                    },
+                including: .gesture
             )
             .onHover { isInside in
                 if !isInside {
