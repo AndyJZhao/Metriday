@@ -111,6 +111,21 @@ expect(PlanTask(title: "Scheduled", startMinute: 540, endMinute: 600).isSchedule
 expect(TimeFormat.parseRange("09:30-10:15")?.start == 570, "ASCII time range should parse")
 expect(TimeFormat.parseRange("14:00–16:00")?.end == 960, "En dash time range should parse")
 expect(TimeFormat.parseRange("16:00–14:00") == nil, "Reverse range should be rejected")
+let scheduledTaskList = [
+    PlanTask(title: "Morning block", startMinute: 540, endMinute: 600),
+    PlanTask(title: "Afternoon block", startMinute: 840, endMinute: 900)
+]
+let scheduledTaskDay = Calendar.current.startOfDay(for: .now)
+let morningNow = scheduledTaskDay.addingTimeInterval(9 * 60 * 60 + 15 * 60)
+expect(
+    scheduledPlanTask(from: scheduledTaskList, for: scheduledTaskDay, now: morningNow)?.title == "Morning block",
+    "Today's current task should be the block containing the current minute"
+)
+let futureTaskDay = Calendar.current.date(byAdding: .day, value: 1, to: scheduledTaskDay)!
+expect(
+    scheduledPlanTask(from: scheduledTaskList, for: futureTaskDay, now: morningNow)?.title == "Morning block",
+    "A non-today status date should expose its first scheduled block"
+)
 
 let samplePath = "/Users/andyzhao/Projects/Metriday/Calendar/2026-08-21.md"
 expect(

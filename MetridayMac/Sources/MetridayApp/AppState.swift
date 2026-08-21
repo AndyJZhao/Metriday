@@ -155,26 +155,23 @@ final class AppState: ObservableObject {
     }
 
     var currentTask: PlanTask? {
-        if let selectedTaskID, let selected = markdownStore.task(selectedTaskID), selected.isScheduled {
-            return selected
-        }
+        currentTask(for: selectedDate)
+    }
 
-        let scheduled = markdownStore.tasks
-            .filter(\.isScheduled)
-            .sorted { ($0.startMinute ?? 0) < ($1.startMinute ?? 0) }
-
-        if Calendar.current.isDateInToday(selectedDate) {
-            let components = Calendar.current.dateComponents([.hour, .minute], from: .now)
-            let minute = (components.hour ?? 0) * 60 + (components.minute ?? 0)
-            if let active = scheduled.first(where: {
-                guard let start = $0.startMinute, let end = $0.endMinute else { return false }
-                return start <= minute && minute < end
-            }) {
-                return active
+    func currentTask(for date: Date) -> PlanTask? {
+        let normalized = Calendar.current.startOfDay(for: date)
+        let tasks: [PlanTask]
+        if Calendar.current.isDate(normalized, inSameDayAs: selectedDate) {
+            if let selectedTaskID,
+               let selected = markdownStore.task(selectedTaskID),
+               selected.isScheduled {
+                return selected
             }
-            return nil
+            tasks = markdownStore.tasks
+        } else {
+            tasks = markdownStore.planDocument(for: normalized).tasks
         }
-        return scheduled.first
+        return scheduledPlanTask(from: tasks, for: normalized)
     }
 
     /// A Focus Session is the user-facing bridge between the planned current
@@ -380,10 +377,12 @@ final class AppState: ObservableObject {
         }
 
         if request.method == "GET", path == "/v1/status" {
+            let statusDate = apiDate(from: request.query["date"]) ?? selectedDate
             var response: [String: Any] = [
                 "tracking": activityMonitor.isTracking,
                 "section": section.rawValue,
                 "selectedDate": apiDate(selectedDate),
+                "statusDate": apiDate(statusDate),
                 "currentApplication": activityMonitor.currentApplication,
                 "currentWindowTitle": activityMonitor.currentWindowTitle,
                 "deviceName": syncStore.deviceName,
@@ -391,7 +390,7 @@ final class AppState: ObservableObject {
                 "focusActive": focusIsActive,
                 "focusSessionActive": focusSessionActive
             ]
-            if let task = currentTask {
+            if let task = currentTask(for: statusDate) {
                 response["currentTask"] = [
                     "id": task.id.uuidString,
                     "title": task.title,

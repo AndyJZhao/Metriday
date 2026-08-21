@@ -320,7 +320,7 @@ function useMetridayAPI(dateKey, apiBase) {
       };
     }));
     try {
-      const status = await request("/v1/status");
+      const status = await request(`/v1/status?date=${date}`);
       const results = await Promise.allSettled([
         request(`/v1/activities?date=${date}`),
         request(`/api/v1/time-entries?start_date_min=${date}&start_date_max=${date}`),
@@ -1526,7 +1526,7 @@ function WebGlobalHeader({ api, setPage, dateKey, setDateKey }) {
     if (!api.connected || (!currentTask && !focusActive)) return;
     try {
       if (focusActive) await api.stopFocusSession();
-      else await api.startFocusSession();
+      else await api.startFocusSession(currentTask?.id || null, dateKey);
     } catch {
       // The page-level controls continue to reflect the native API on the next refresh.
     }

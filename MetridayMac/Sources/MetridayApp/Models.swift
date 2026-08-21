@@ -97,6 +97,28 @@ struct PlanTask: Identifiable, Hashable {
     }
 }
 
+func scheduledPlanTask(
+    from tasks: [PlanTask],
+    for date: Date,
+    now: Date = .now,
+    calendar: Calendar = .current
+) -> PlanTask? {
+    let scheduled = tasks
+        .filter(\.isScheduled)
+        .sorted { ($0.startMinute ?? 0) < ($1.startMinute ?? 0) }
+
+    guard calendar.isDateInToday(date) else {
+        return scheduled.first
+    }
+
+    let components = calendar.dateComponents([.hour, .minute], from: now)
+    let minute = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+    return scheduled.first {
+        guard let start = $0.startMinute, let end = $0.endMinute else { return false }
+        return start <= minute && minute < end
+    }
+}
+
 enum TimelineDropIntent: Hashable {
     case choose
     case timeBlock
