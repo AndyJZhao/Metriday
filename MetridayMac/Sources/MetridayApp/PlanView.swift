@@ -1014,6 +1014,8 @@ private struct MiniMonthCalendar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, minHeight: 24)
+        .contentShape(Rectangle())
         .accessibilityIdentifier("calendar.day.\(idFormatter.string(from: date))")
         .help(hasFile ? "Open daily Markdown" : "Create daily Markdown")
     }

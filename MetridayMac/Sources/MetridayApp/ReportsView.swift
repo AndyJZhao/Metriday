@@ -93,6 +93,8 @@ struct ReportsView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
                             .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                             .accessibilityIdentifier("reports.preset.\(preset.rawValue)")
                         }
                     }
