@@ -194,6 +194,31 @@ final class AppState: ObservableObject {
         return true
     }
 
+    /// Returns the active app and Screen Time seconds for the current logical
+    /// day. The menu bar uses the same category and project productivity
+    /// semantics as Review, while intentionally excluding Idle evidence.
+    func menuBarTrackedSeconds(at date: Date = .now, productiveOnly: Bool = false) -> Int {
+        let logicalDate = TrackingDay.logicalDayLabel(
+            for: date,
+            wrapAtMinute: preferences.wrapDaysAtMinute
+        )
+        let activities = categoryStore.applyingCategories(
+            to: activityMonitor.segments(for: logicalDate) + screenTimeStore.segments(for: logicalDate),
+            filterStore: filterStore,
+            date: logicalDate
+        )
+        return activities
+            .filter { segment in
+                guard segment.relevance != .idle else { return false }
+                guard productiveOnly else { return true }
+                if let project = projectStore.project(segment.projectID) {
+                    return project.productivity > 0
+                }
+                return segment.relevance == .related
+            }
+            .reduce(0) { $0 + $1.durationSeconds }
+    }
+
     func currentTask(for date: Date) -> PlanTask? {
         let normalized = Calendar.current.startOfDay(for: date)
         let tasks: [PlanTask]
@@ -554,6 +579,10 @@ final class AppState: ObservableObject {
             if let raw = body["new_child_project_color_scheme"] as? String,
                let scheme = NewChildProjectColorScheme(rawValue: raw) {
                 projectStore.newChildColorScheme = scheme
+            }
+            if let raw = body["menu_bar_status_display"] as? String,
+               let display = MenuBarStatusDisplay(rawValue: raw) {
+                preferences.menuBarStatusDisplay = display
             }
             if let value = body["allow_local_network_api"] as? Bool {
                 preferences.allowLocalNetworkAPI = value
@@ -2838,6 +2867,7 @@ final class AppState: ObservableObject {
             "always_show_project_drop_zone": preferences.alwaysShowProjectDropZone,
             "new_top_level_project_color_scheme": projectStore.newTopLevelColorScheme.rawValue,
             "new_child_project_color_scheme": projectStore.newChildColorScheme.rawValue,
+            "menu_bar_status_display": preferences.menuBarStatusDisplay.rawValue,
             "allow_local_network_api": preferences.allowLocalNetworkAPI,
             "launch_at_login": loginItemManager.isEnabled,
             "launch_at_login_status": loginItemManager.statusMessage,

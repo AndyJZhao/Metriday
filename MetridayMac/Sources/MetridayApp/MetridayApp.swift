@@ -116,11 +116,31 @@ private struct MenuBarStatusLabel: View {
     }
 
     private func statusLabel(timer: RunningTimer?, isFocus: Bool, isPaused: Bool, now: Date) -> String {
-        guard let timer else { return isPaused ? "Paused" : "Metriday" }
+        guard let timer else {
+            if isPaused { return "Paused" }
+            switch appState.preferences.menuBarStatusDisplay {
+            case .iconOnly:
+                return "Metriday"
+            case .todayTotal:
+                return "Today \(compactDuration(appState.menuBarTrackedSeconds(at: now)))"
+            case .productiveToday:
+                return "Productive \(compactDuration(appState.menuBarTrackedSeconds(at: now, productiveOnly: true)))"
+            }
+        }
         let prefix = isFocus ? "Focus" : "Timer"
         guard let estimate = timer.estimatedDurationSeconds else { return prefix }
         let remaining = max(0, estimate - Int(now.timeIntervalSince(timer.startedAt)))
         return "\(prefix) \(clockLabel(remaining))"
+    }
+
+    private func compactDuration(_ seconds: Int) -> String {
+        let minutes = max(0, Int((Double(seconds) / 60.0).rounded()))
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        if hours > 0 {
+            return remainder == 0 ? "\(hours)h" : "\(hours)h \(remainder)m"
+        }
+        return "\(minutes)m"
     }
 
     private func clockLabel(_ seconds: Int) -> String {
@@ -139,6 +159,16 @@ private struct MenuBarStatusView: View {
             Text("Local timer and tracking controls")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            if appState.preferences.menuBarStatusDisplay != .iconOnly {
+                let productiveOnly = appState.preferences.menuBarStatusDisplay == .productiveToday
+                Text(
+                    productiveOnly
+                        ? "Productive today · \(compactDuration(appState.menuBarTrackedSeconds(productiveOnly: true)))"
+                        : "Today · \(compactDuration(appState.menuBarTrackedSeconds()))"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
             if let timer = appState.timeEntryStore.runningTimer {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(timer.title)
@@ -246,6 +276,16 @@ private struct MenuBarStatusView: View {
         let hours = minutes / 60
         let remainder = minutes % 60
         if hours > 0 { return "\(hours)h \(remainder)m" }
+        return "\(minutes)m"
+    }
+
+    private func compactDuration(_ seconds: Int) -> String {
+        let minutes = max(0, Int((Double(seconds) / 60.0).rounded()))
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        if hours > 0 {
+            return remainder == 0 ? "\(hours)h" : "\(hours)h \(remainder)m"
+        }
         return "\(minutes)m"
     }
 

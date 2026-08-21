@@ -1,6 +1,25 @@
 import Combine
 import Foundation
 
+enum MenuBarStatusDisplay: String, CaseIterable, Codable, Identifiable {
+    case iconOnly
+    case todayTotal
+    case productiveToday
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .iconOnly:
+            return "Icon only"
+        case .todayTotal:
+            return "Today's total"
+        case .productiveToday:
+            return "Productive time today"
+        }
+    }
+}
+
 @MainActor
 final class PreferencesStore: ObservableObject {
     @Published var idleThresholdSeconds: Int {
@@ -45,6 +64,9 @@ final class PreferencesStore: ObservableObject {
     @Published var allowLocalNetworkAPI: Bool {
         didSet { persist() }
     }
+    @Published var menuBarStatusDisplay: MenuBarStatusDisplay {
+        didSet { persist() }
+    }
 
     let fileURL: URL
 
@@ -68,6 +90,7 @@ final class PreferencesStore: ObservableObject {
             self.includeSubprojectsWhenSelectingProject = payload.includeSubprojectsWhenSelectingProject
             self.alwaysShowProjectDropZone = payload.alwaysShowProjectDropZone
             self.allowLocalNetworkAPI = payload.allowLocalNetworkAPI
+            self.menuBarStatusDisplay = payload.menuBarStatusDisplay
         } else {
             self.idleThresholdSeconds = 120
             self.trackWeekends = true
@@ -83,6 +106,7 @@ final class PreferencesStore: ObservableObject {
             self.includeSubprojectsWhenSelectingProject = true
             self.alwaysShowProjectDropZone = true
             self.allowLocalNetworkAPI = false
+            self.menuBarStatusDisplay = .todayTotal
             persist()
         }
     }
@@ -128,7 +152,8 @@ final class PreferencesStore: ObservableObject {
                 callNotificationsEnabled: callNotificationsEnabled,
                 includeSubprojectsWhenSelectingProject: includeSubprojectsWhenSelectingProject,
                 alwaysShowProjectDropZone: alwaysShowProjectDropZone,
-                allowLocalNetworkAPI: allowLocalNetworkAPI
+                allowLocalNetworkAPI: allowLocalNetworkAPI,
+                menuBarStatusDisplay: menuBarStatusDisplay
             )
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -161,6 +186,7 @@ final class PreferencesStore: ObservableObject {
         let includeSubprojectsWhenSelectingProject: Bool
         let alwaysShowProjectDropZone: Bool
         let allowLocalNetworkAPI: Bool
+        let menuBarStatusDisplay: MenuBarStatusDisplay
 
         init(
             idleThresholdSeconds: Int,
@@ -176,7 +202,8 @@ final class PreferencesStore: ObservableObject {
             callNotificationsEnabled: Bool,
             includeSubprojectsWhenSelectingProject: Bool,
             alwaysShowProjectDropZone: Bool,
-            allowLocalNetworkAPI: Bool
+            allowLocalNetworkAPI: Bool,
+            menuBarStatusDisplay: MenuBarStatusDisplay
         ) {
             self.idleThresholdSeconds = idleThresholdSeconds
             self.trackWeekends = trackWeekends
@@ -192,6 +219,7 @@ final class PreferencesStore: ObservableObject {
             self.includeSubprojectsWhenSelectingProject = includeSubprojectsWhenSelectingProject
             self.alwaysShowProjectDropZone = alwaysShowProjectDropZone
             self.allowLocalNetworkAPI = allowLocalNetworkAPI
+            self.menuBarStatusDisplay = menuBarStatusDisplay
         }
 
         init(from decoder: Decoder) throws {
@@ -210,6 +238,7 @@ final class PreferencesStore: ObservableObject {
             includeSubprojectsWhenSelectingProject = try container.decodeIfPresent(Bool.self, forKey: .includeSubprojectsWhenSelectingProject) ?? true
             alwaysShowProjectDropZone = try container.decodeIfPresent(Bool.self, forKey: .alwaysShowProjectDropZone) ?? true
             allowLocalNetworkAPI = try container.decodeIfPresent(Bool.self, forKey: .allowLocalNetworkAPI) ?? false
+            menuBarStatusDisplay = try container.decodeIfPresent(MenuBarStatusDisplay.self, forKey: .menuBarStatusDisplay) ?? .todayTotal
         }
     }
 }

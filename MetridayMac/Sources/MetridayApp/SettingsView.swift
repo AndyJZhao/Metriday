@@ -39,6 +39,7 @@ struct SettingsSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     trackingPanel
+                    menuBarPanel
                     reviewReminderPanel
                     workingHoursPanel
                     projectSelectionPanel
@@ -132,6 +133,32 @@ struct SettingsSheet: View {
             Text("Idle time is stored as evidence in Today but excluded from active productivity totals.")
                 .font(.system(size: 10))
                 .foregroundStyle(MetridayTheme.secondary)
+        }
+        .settingsPanel()
+    }
+
+    private var menuBarPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Menu bar", systemImage: "menubar.rectangle")
+                .font(.system(size: 15, weight: .bold))
+
+            HStack {
+                Text("Status display")
+                    .font(.system(size: 12))
+                Spacer()
+                Picker("Menu bar status display", selection: $preferences.menuBarStatusDisplay) {
+                    ForEach(MenuBarStatusDisplay.allCases) { display in
+                        Text(display.label).tag(display)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 180)
+            }
+
+            Text("Focus and Timer countdowns always take priority. Daily totals use active App / Website / Item activity and exclude Idle time.")
+                .font(.system(size: 10))
+                .foregroundStyle(MetridayTheme.secondary)
+                .lineSpacing(2)
         }
         .settingsPanel()
     }

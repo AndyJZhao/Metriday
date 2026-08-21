@@ -1341,6 +1341,7 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
     always_show_project_drop_zone: true,
     new_top_level_project_color_scheme: "standard",
     new_child_project_color_scheme: "rainbow",
+    menu_bar_status_display: "todayTotal",
     allow_local_network_api: false,
     launch_at_login: false,
     launch_at_login_status: "Login item not configured",
@@ -1489,6 +1490,10 @@ function ConnectionSettings({ open, apiBase, connected, api, onSave, onClose }) 
         <label className="settings-field-row"><span>Child project colors<select value={preferences.new_child_project_color_scheme || "rainbow"} onChange={(event) => updatePreference("new_child_project_color_scheme", event.target.value)} disabled={!connected || saving}><option value="inherit">Inherit parent color</option><option value="similar">Use a similar color</option><option value="rainbow">Use rainbow colors</option></select></span></label>
         <small className="settings-help-text">These defaults affect only new projects without an explicit color.</small>
         <small className="settings-help-text">Selecting a parent in Activities or Stats includes descendant activity when enabled. Collapsed project totals always include their children.</small>
+      </div>
+      <div className="settings-section"><div className="settings-section-heading"><strong>Menu bar</strong></div>
+        <label className="settings-field-row"><span>Status display<select value={preferences.menu_bar_status_display || "todayTotal"} onChange={(event) => updatePreference("menu_bar_status_display", event.target.value)} disabled={!connected || saving}><option value="iconOnly">Icon only</option><option value="todayTotal">Today's total</option><option value="productiveToday">Productive time today</option></select></span></label>
+        <small className="settings-help-text">Focus and Timer countdowns take priority. Daily totals use active App / Website / Item activity and exclude Idle time.</small>
       </div>
       <div className="settings-section"><div className="settings-section-heading"><strong>Privacy & connection</strong></div>
         <label className="settings-toggle-row"><span><input type="checkbox" checked={Boolean(preferences.allow_local_network_api)} onChange={(event) => updatePreference("allow_local_network_api", event.target.checked)} disabled={!connected || saving} />Allow local network access</span><small>Required for another device to use this Web companion</small></label>
