@@ -1246,32 +1246,35 @@ struct ActivitiesView: View {
     }
 
     private var projectDropZone: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Image(systemName: isProjectDropTargeted ? "arrow.down.circle.fill" : "square.and.arrow.down")
-                    .foregroundStyle(isProjectDropTargeted ? MetridayTheme.accent : MetridayTheme.secondary)
-                Text(dropZoneTitle)
-                    .font(.system(size: 11, weight: .semibold))
-                Spacer()
-                Image(systemName: "plus")
-                    .font(.system(size: 10, weight: .bold))
+        Button(action: chooseProjectDropItems) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: isProjectDropTargeted ? "arrow.down.circle.fill" : "square.and.arrow.down")
+                        .foregroundStyle(isProjectDropTargeted ? MetridayTheme.accent : MetridayTheme.secondary)
+                    Text(dropZoneTitle)
+                        .font(.system(size: 11, weight: .semibold))
+                    Spacer()
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(MetridayTheme.secondary)
+                }
+                Text(dropZoneSubtitle)
+                    .font(.system(size: 10))
                     .foregroundStyle(MetridayTheme.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Text(dropZoneSubtitle)
-                .font(.system(size: 10))
-                .foregroundStyle(MetridayTheme.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isProjectDropTargeted ? MetridayTheme.accentSoft : MetridayTheme.canvas)
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(isProjectDropTargeted ? MetridayTheme.accent : MetridayTheme.line, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
-        .padding(12)
+        .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isProjectDropTargeted ? MetridayTheme.accentSoft : MetridayTheme.canvas)
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .stroke(isProjectDropTargeted ? MetridayTheme.accent : MetridayTheme.line, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .onTapGesture { chooseProjectDropItems() }
         .onDrop(
             of: [UTType.fileURL.identifier, UTType.plainText.identifier],
             isTargeted: $isProjectDropTargeted,
@@ -1283,10 +1286,8 @@ struct ActivitiesView: View {
             }
         }
         .help("Drop files, folders, or activities here to create a project")
-        .accessibilityAddTraits(.isButton)
         .accessibilityLabel("Create project from files, folders, or activities")
         .accessibilityHint("Click to choose files or drop items here")
-        .accessibilityAction { chooseProjectDropItems() }
         .accessibilityIdentifier("activities.project-drop-zone")
     }
 

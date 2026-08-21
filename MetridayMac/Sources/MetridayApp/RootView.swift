@@ -633,6 +633,8 @@ struct SidebarView: View {
                     }
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityAddTraits(appState.section == section ? .isSelected : [])
+                    .accessibilityRemoveTraits(appState.section == section ? [] : .isSelected)
                     .accessibilityIdentifier("sidebar.\(section.rawValue.lowercased())")
                 }
             }
