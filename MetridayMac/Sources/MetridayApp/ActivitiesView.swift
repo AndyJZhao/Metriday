@@ -5960,23 +5960,27 @@ private struct ActivityTimelinePanel: View {
                         let left = timelineWindow.x(for: range.start, width: proxy.size.width)
                         let width = max(4, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
                         let hitWidth = max(12, width)
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .fill(MetridayTheme.accent.opacity(0.13))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                        .strokeBorder(
-                                            MetridayTheme.accent,
-                                            style: StrokeStyle(lineWidth: 1, dash: [3, 2])
-                                        )
-                                )
-                                .frame(width: width, height: 12)
-                                .offset(x: -(hitWidth - width) / 2)
+                        Button {
+                            onRecordCalendarEvent(event, NSEvent.modifierFlags.contains(.option))
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                    .fill(MetridayTheme.accent.opacity(0.13))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                            .strokeBorder(
+                                                MetridayTheme.accent,
+                                                style: StrokeStyle(lineWidth: 1, dash: [3, 2])
+                                            )
+                                    )
+                                    .frame(width: width, height: 12)
+                                    .offset(x: -(hitWidth - width) / 2)
+                            }
                         }
+                            .buttonStyle(.plain)
                             .frame(width: hitWidth, height: 12)
                             .position(x: left + width / 2, y: 96)
                             .contentShape(Rectangle())
-                            .accessibilityAddTraits(.isButton)
                             .accessibilityLabel("Calendar event · \(event.title)")
                             .accessibilityIdentifier("activities.timeline.calendar.\(event.id)")
                             .onHover { isHovered in
@@ -5986,9 +5990,6 @@ private struct ActivityTimelinePanel: View {
                                     hoveredTimeEntryID = nil
                                     hoveredSuggestionID = nil
                                 }
-                            }
-                            .onTapGesture {
-                                onRecordCalendarEvent(event, NSEvent.modifierFlags.contains(.option))
                             }
                             .contextMenu {
                                 Button("Record Time Entry") {
@@ -6005,20 +6006,24 @@ private struct ActivityTimelinePanel: View {
                             let left = timelineWindow.x(for: range.start, width: proxy.size.width)
                             let width = max(4, timelineWindow.x(for: range.end, width: proxy.size.width) - left)
                             let hitWidth = max(12, width)
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                    .fill(MetridayTheme.warning.opacity(0.22))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                            .stroke(MetridayTheme.warning, lineWidth: 1)
-                                    )
-                                    .frame(width: width, height: 12)
-                                    .offset(x: -(hitWidth - width) / 2)
+                            Button {
+                                onEditTimeEntry(entry)
+                            } label: {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                        .fill(MetridayTheme.warning.opacity(0.22))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                                .stroke(MetridayTheme.warning, lineWidth: 1)
+                                        )
+                                        .frame(width: width, height: 12)
+                                        .offset(x: -(hitWidth - width) / 2)
+                                }
                             }
+                                .buttonStyle(.plain)
                                 .frame(width: hitWidth, height: 12)
                                 .position(x: left + width / 2, y: 114)
                                 .contentShape(Rectangle())
-                                .accessibilityAddTraits(.isButton)
                                 .accessibilityLabel("Recorded time · \(entry.title)")
                                 .accessibilityIdentifier("activities.timeline.time-entry.\(entry.id.uuidString)")
                                 .onHover { isHovered in
@@ -6028,9 +6033,6 @@ private struct ActivityTimelinePanel: View {
                                         hoveredCalendarEventID = nil
                                         hoveredSuggestionID = nil
                                     }
-                                }
-                                .onTapGesture {
-                                    onEditTimeEntry(entry)
                                 }
                                 .contextMenu {
                                     Button("Edit Time Entry") {
@@ -6225,27 +6227,34 @@ private struct ActivityTimelinePanel: View {
                             let left = timelineWindow.x(for: range.start, width: chartWidth)
                             let width = max(2, timelineWindow.x(for: range.end, width: chartWidth) - left)
                             let hitWidth = max(12, width)
-                            ZStack(alignment: .topTrailing) {
-                                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                    .fill(MetridayTheme.accent.opacity(0.08))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                            .strokeBorder(
-                                                MetridayTheme.accent,
-                                                style: StrokeStyle(lineWidth: 1, dash: [3, 2])
-                                            )
-                                    )
-                                    .frame(width: width, height: 16)
-                                    .offset(x: -(hitWidth - width) / 2)
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(MetridayTheme.accent)
-                                    .padding(.trailing, 2)
+                            Button {
+                                onSelectTimelineSuggestion(
+                                    suggestion,
+                                    NSEvent.modifierFlags.contains(.option)
+                                )
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                        .fill(MetridayTheme.accent.opacity(0.08))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                                .strokeBorder(
+                                                    MetridayTheme.accent,
+                                                    style: StrokeStyle(lineWidth: 1, dash: [3, 2])
+                                                )
+                                        )
+                                        .frame(width: width, height: 16)
+                                        .offset(x: -(hitWidth - width) / 2)
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(MetridayTheme.accent)
+                                        .padding(.trailing, 2)
+                                }
                             }
+                                .buttonStyle(.plain)
                             .frame(width: hitWidth, height: 16, alignment: .leading)
                             .offset(x: left)
                             .contentShape(Rectangle())
-                            .accessibilityAddTraits(.isButton)
                             .accessibilityLabel(
                                 "Summary suggestion · \(suggestion.title) · \(TimeFormat.range(start: suggestion.startMinute, end: suggestion.endMinute))"
                             )
@@ -6257,12 +6266,6 @@ private struct ActivityTimelinePanel: View {
                                     hoveredTimeEntryID = nil
                                     hoveredCalendarEventID = nil
                                 }
-                            }
-                            .onTapGesture {
-                                onSelectTimelineSuggestion(
-                                    suggestion,
-                                    NSEvent.modifierFlags.contains(.option)
-                                )
                             }
                             .help(
                                 "\(suggestion.title) · \(TimeFormat.range(start: suggestion.startMinute, end: suggestion.endMinute)) · ⌥-click to create immediately"
@@ -6279,23 +6282,26 @@ private struct ActivityTimelinePanel: View {
                             let left = timelineWindow.x(for: range.start, width: chartWidth)
                         let width = max(2, timelineWindow.x(for: range.end, width: chartWidth) - left)
                         let hitWidth = max(12, width)
-                        ZStack {
-                                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                    .fill(MetridayTheme.warning.opacity(0.18))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                            .stroke(MetridayTheme.warning, lineWidth: 1)
-                                    )
-                                    .frame(width: width, height: 16)
-                                    .offset(x: -(hitWidth - width) / 2)
-                            }
+                        Button {
+                            onEditTimeEntry(entry)
+                        } label: {
+                            ZStack {
+                                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                        .fill(MetridayTheme.warning.opacity(0.18))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                                .stroke(MetridayTheme.warning, lineWidth: 1)
+                                        )
+                                        .frame(width: width, height: 16)
+                                        .offset(x: -(hitWidth - width) / 2)
+                                }
+                        }
+                            .buttonStyle(.plain)
                                 .frame(width: hitWidth, height: 16, alignment: .leading)
                                 .offset(x: left)
                                 .contentShape(Rectangle())
-                                .accessibilityAddTraits(.isButton)
                                 .accessibilityLabel("Recorded time · \(entry.title)")
                                 .accessibilityIdentifier("activities.vertical-timeline.time-entry.\(entry.id.uuidString)")
-                                .onTapGesture { onEditTimeEntry(entry) }
                                 .contextMenu {
                                     Button("Edit Time Entry") {
                                         onEditTimeEntry(entry)
@@ -6328,28 +6334,29 @@ private struct ActivityTimelinePanel: View {
                         let left = timelineWindow.x(for: clipped.start, width: chartWidth)
                         let width = max(2, timelineWindow.x(for: clipped.end, width: chartWidth) - left)
                         let hitWidth = max(12, width)
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                .fill(MetridayTheme.accent.opacity(0.10))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                        .strokeBorder(
-                                            MetridayTheme.accent,
-                                            style: StrokeStyle(lineWidth: 1, dash: [3, 2])
-                                        )
-                                )
-                                .frame(width: width, height: 16)
-                                .offset(x: -(hitWidth - width) / 2)
+                        Button {
+                            onRecordCalendarEvent(event, NSEvent.modifierFlags.contains(.option))
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                    .fill(MetridayTheme.accent.opacity(0.10))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                            .strokeBorder(
+                                                MetridayTheme.accent,
+                                                style: StrokeStyle(lineWidth: 1, dash: [3, 2])
+                                            )
+                                    )
+                                    .frame(width: width, height: 16)
+                                    .offset(x: -(hitWidth - width) / 2)
+                            }
                         }
+                            .buttonStyle(.plain)
                             .frame(width: hitWidth, height: 16, alignment: .leading)
                             .offset(x: left)
                             .contentShape(Rectangle())
-                            .accessibilityAddTraits(.isButton)
                             .accessibilityLabel("Calendar event · \(event.title)")
                             .accessibilityIdentifier("activities.vertical-timeline.calendar.\(event.id)")
-                            .onTapGesture {
-                                onRecordCalendarEvent(event, NSEvent.modifierFlags.contains(.option))
-                            }
                             .help("Calendar event · \(event.title)")
                         }
                         }
