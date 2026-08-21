@@ -4628,23 +4628,28 @@ private struct CalendarEventsPanel: View {
                 VStack(spacing: 0) {
                     ForEach(store.events) { event in
                         HStack(spacing: 10) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "calendar")
-                                    .foregroundStyle(MetridayTheme.accent)
-                                    .frame(width: 23)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(event.title)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .lineLimit(1)
-                                    Text("\(formatTime(event.start))–\(formatTime(event.end)) · \(event.calendarTitle)")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(MetridayTheme.secondary)
+                            Button {
+                                onRecord(event)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "calendar")
+                                        .foregroundStyle(MetridayTheme.accent)
+                                        .frame(width: 23)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(event.title)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .lineLimit(1)
+                                        Text("\(formatTime(event.start))–\(formatTime(event.end)) · \(event.calendarTitle)")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(MetridayTheme.secondary)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
                             }
+                            .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
-                            .onTapGesture { onRecord(event) }
+                            .accessibilityLabel("Record calendar event \(event.title)")
                             Button("Record") {
                                 onRecord(event)
                             }
@@ -4784,23 +4789,28 @@ private struct RemindersPanel: View {
                 VStack(spacing: 0) {
                     ForEach(store.reminders) { reminder in
                         HStack(spacing: 10) {
-                            HStack(spacing: 10) {
-                                Image(systemName: reminder.isRecurring ? "repeat.circle" : "checkmark.circle")
-                                    .foregroundStyle(MetridayTheme.success)
-                                    .frame(width: 23)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(reminder.title)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .lineLimit(1)
-                                    Text("\(formatTime(reminder.completedAt)) · \(reminder.listTitle)")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(MetridayTheme.secondary)
+                            Button {
+                                onRecord(reminder)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: reminder.isRecurring ? "repeat.circle" : "checkmark.circle")
+                                        .foregroundStyle(MetridayTheme.success)
+                                        .frame(width: 23)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(reminder.title)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .lineLimit(1)
+                                        Text("\(formatTime(reminder.completedAt)) · \(reminder.listTitle)")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(MetridayTheme.secondary)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
                             }
+                            .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
-                            .onTapGesture { onRecord(reminder) }
+                            .accessibilityLabel("Record completed reminder \(reminder.title)")
                             Button("Record") {
                                 onRecord(reminder)
                             }
@@ -4892,23 +4902,28 @@ private struct PhoneCallsPanel: View {
                 VStack(spacing: 0) {
                     ForEach(store.calls) { call in
                         HStack(spacing: 10) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "phone.fill")
-                                    .foregroundStyle(MetridayTheme.accent)
-                                    .frame(width: 23)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(call.title)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .lineLimit(1)
-                                    Text(rangeLabel(for: call))
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(MetridayTheme.secondary)
+                            Button {
+                                onRecord(call)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "phone.fill")
+                                        .foregroundStyle(MetridayTheme.accent)
+                                        .frame(width: 23)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(call.title)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .lineLimit(1)
+                                        Text(rangeLabel(for: call))
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(MetridayTheme.secondary)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
                             }
+                            .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
-                            .onTapGesture { onRecord(call) }
+                            .accessibilityLabel("Record phone call \(call.title)")
                             Button("Record") {
                                 onRecord(call)
                             }
